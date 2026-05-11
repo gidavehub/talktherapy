@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+:root {
+  --background: #E7E4DE;
+  --foreground: #0A0A0A;
+  --surface: #FFFFFF;
+  --muted: #6B6B6B;
+  --border: rgba(10, 10, 10, 0.08);
+  --accent: #FF5A1F;
+  --accent-soft: #FF7A45;
+  --dark: #0A0A0A;
+  --dark-soft: #141414;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-dark: var(--dark);
+  --color-dark-soft: var(--dark-soft);
+  --font-sans: var(--font-geist-sans);
+  --font-display: var(--font-instrument-serif);
+  --font-mono: var(--font-geist-mono);
+}
+
+html, body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.marquee-track {
+  animation: marquee 28s linear infinite;
+}
+
+@keyframes orb-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.95; }
+  50% { transform: scale(1.05); opacity: 1; }
+}
+
+@keyframes orb-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes orb-breath {
+  0%, 100% { filter: blur(34px) brightness(1); }
+  50% { filter: blur(40px) brightness(1.15); }
+}
+
+.orb-pulse { animation: orb-pulse 3.6s ease-in-out infinite; }
+.orb-rotate { animation: orb-rotate 22s linear infinite; }
+.orb-breath { animation: orb-breath 4s ease-in-out infinite; }
+
+@keyframes star-pop {
+  from { transform: scale(0.6); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.star-pop { animation: star-pop 240ms ease-out both; }
+
+/* Big italic stamp text at bottom of sections */
+.stamp {
+  font-family: var(--font-instrument-serif), serif;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.04em;
+  line-height: 0.85;
+}
+
+/* Hide scrollbar for marquee container */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
