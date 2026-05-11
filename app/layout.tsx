@@ -24,6 +24,11 @@ export const metadata: Metadata = {
   title: "Talk Therapy — AI-guided therapy matching",
   description:
     "Calm your mind. Elevate your clarity. Talk Therapy uses conversational AI to match you with the right therapist in minutes.",
+  icons: {
+    icon: "/tablogo.png",
+    shortcut: "/tablogo.png",
+    apple: "/tablogo.png",
+  },
 };
 
 export default function RootLayout({
@@ -36,7 +41,13 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} antialiased`}
     >
-      <body className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+      <body
+        className="min-h-screen bg-[var(--background)] text-[var(--foreground)]"
+        // Browser extensions (e.g. NewVT, Grammarly, password managers) inject
+        // attributes onto <body> before React hydrates, causing a benign
+        // hydration mismatch. This is the React-recommended way to silence it.
+        suppressHydrationWarning
+      >
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
