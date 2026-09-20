@@ -30,6 +30,23 @@ export type AudioLevel = {
   pitch: number;
   /** Raw f0 in Hz, for anything that needs the real number. */
   pitchHz: number;
+  /** Raw RMS before gating and scaling. Diagnostic. */
+  rms: number;
+  /**
+   * Live state of the capture chain. Exists because "the meter is flat" has
+   * several completely different causes — a suspended context, a muted track,
+   * a device that reports live but sends silence — and they are
+   * indistinguishable from the outside.
+   */
+  debug: {
+    contextState: string;
+    sampleRate: number;
+    trackLabel: string;
+    trackMuted: boolean;
+    trackEnabled: boolean;
+    trackState: string;
+    frames: number;
+  };
   status: MicStatus;
   /** The live stream, for the AI engine. Null until start() succeeds. */
   stream: MediaStream | null;
@@ -43,7 +60,7 @@ export type AudioLevel = {
 /** How often the React-visible value is refreshed. */
 const PUBLISH_MS = 66;
 /** Below this, treat it as silence — room tone should not wobble the blob. */
-const NOISE_FLOOR = 0.012;
+const NOISE_FLOOR = 0.005;
 /**
  * Speech f0 range. Roughly a low male voice to a high female one; anything
  * outside is almost certainly noise or a harmonic misfire rather than pitch.
@@ -92,16 +109,30 @@ export function useAudioLevel(): AudioLevel {
   const [level, setLevel] = useState(0);
   const [pitch, setPitch] = useState(0);
   const [pitchHz, setPitchHz] = useState(0);
+  const [rms, setRms] = useState(0);
+  const [debug, setDebug] = useState({
+    contextState: "-",
+    sampleRate: 0,
+    trackLabel: "-",
+    trackMuted: false,
+    trackEnabled: false,
+    trackState: "-",
+    frames: 0,
+  });
   const [status, setStatus] = useState<MicStatus>("idle");
   const [stream, setStream] = useState<MediaStream | null>(null);
 
   const levelRef = useRef(0);
+  // Raw pre-gate RMS, exposed purely so a flat meter can be diagnosed.
+  const rmsRef = useRef(0);
   const pitchRef = useRef(0);
   const ctxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const sinkRef = useRef<GainNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef(0);
   const lastPublish = useRef(0);
+  const framesRef = useRef(0);
   // Float rather than byte: 8-bit quantisation is too coarse for reliable
   // autocorrelation, and the pitch estimate jitters badly on quiet speech.
   const bufRef = useRef<Float32Array<ArrayBuffer> | null>(null);
@@ -116,6 +147,8 @@ export function useAudioLevel(): AudioLevel {
 
     analyserRef.current?.disconnect();
     analyserRef.current = null;
+    sinkRef.current?.disconnect();
+    sinkRef.current = null;
 
     // Closing can reject if the context is already closed — the page may be
     // unloading. Nothing useful to do about it either way.
@@ -124,6 +157,8 @@ export function useAudioLevel(): AudioLevel {
 
     levelRef.current = 0;
     pitchRef.current = 0;
+    rmsRef.current = 0;
+    setRms(0);
     setLevel(0);
     setPitch(0);
     setPitchHz(0);
@@ -165,8 +200,29 @@ export function useAudioLevel(): AudioLevel {
       const source = ctx.createMediaStreamSource(media);
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 1024;
-      analyser.smoothingTimeConstant = 0.6;
+      // No smoothing: smoothingTimeConstant only affects the FREQUENCY data,
+      // and leaving it high on a node we read time-domain samples from buys
+      // nothing while making the analyser lag. The smoothing that matters is
+      // done on the computed level instead.
+      analyser.smoothingTimeConstant = 0;
       source.connect(analyser);
+
+      // THE ANALYSER MUST REACH THE DESTINATION.
+      //
+      // The Web Audio graph is pulled from ctx.destination. A branch that
+      // dead-ends at an AnalyserNode is not guaranteed to be processed at all,
+      // and getFloatTimeDomainData then returns silence — microphone granted,
+      // status "live", meter permanently flat. That was this bug exactly.
+      //
+      // Routing through a zero-gain node keeps the graph alive without
+      // playing the user's own microphone back at them, which would also
+      // cause feedback.
+      const sink = ctx.createGain();
+      sink.gain.value = 0;
+      analyser.connect(sink);
+      sink.connect(ctx.destination);
+      sinkRef.current = sink;
+
       analyserRef.current = analyser;
       bufRef.current = new Float32Array(new ArrayBuffer(analyser.fftSize * 4));
 
@@ -177,6 +233,13 @@ export function useAudioLevel(): AudioLevel {
         const a = analyserRef.current;
         const buf = bufRef.current;
         if (!a || !buf) return;
+
+        // Autoplay policy can suspend the context again after the gesture
+        // that created it (tab hidden, device change). A suspended context
+        // yields silence rather than an error, so it has to be re-resumed
+        // rather than assumed live.
+        const c = ctxRef.current;
+        if (c && c.state === "suspended") void c.resume().catch(() => {});
 
         a.getFloatTimeDomainData(buf);
 
@@ -191,8 +254,9 @@ export function useAudioLevel(): AudioLevel {
         const gated = rms < NOISE_FLOOR ? 0 : (rms - NOISE_FLOOR) / (1 - NOISE_FLOOR);
         // Speech RMS rarely exceeds ~0.3, so scale into a usable 0..1 before
         // the curve — otherwise the blob barely moves at normal volume.
-        const scaled = Math.min(1, gated * 3.2);
+        const scaled = Math.min(1, gated * 4.5);
         levelRef.current = scaled;
+        rmsRef.current = rms;
 
         // Pitch only while there is enough signal to be periodic. Running it
         // on silence returns confident nonsense.
@@ -209,12 +273,25 @@ export function useAudioLevel(): AudioLevel {
           pitchRef.current *= 0.92;
         }
 
+        framesRef.current += 1;
+
         const now = performance.now();
         if (now - lastPublish.current >= PUBLISH_MS) {
           lastPublish.current = now;
           setLevel(scaled);
           setPitch(pitchRef.current);
           setPitchHz(hz);
+          setRms(rms);
+          const track = streamRef.current?.getAudioTracks()[0];
+          setDebug({
+            contextState: ctxRef.current?.state ?? "-",
+            sampleRate: ctxRef.current?.sampleRate ?? 0,
+            trackLabel: track?.label ?? "-",
+            trackMuted: track?.muted ?? false,
+            trackEnabled: track?.enabled ?? false,
+            trackState: track?.readyState ?? "-",
+            frames: framesRef.current,
+          });
         }
       };
       rafRef.current = requestAnimationFrame(tick);
@@ -231,5 +308,5 @@ export function useAudioLevel(): AudioLevel {
   // released when the component goes — not left to GC.
   useEffect(() => stop, [stop]);
 
-  return { level, pitch, pitchHz, status, stream, levelRef, pitchRef, start, stop };
+  return { level, pitch, pitchHz, rms, debug, status, stream, levelRef, pitchRef, start, stop };
 }

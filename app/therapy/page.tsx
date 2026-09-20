@@ -27,7 +27,7 @@ const STATUS: Record<BlobState, string> = {
 };
 
 export default function TherapyPage() {
-  const { level, pitch, pitchHz, status, start, stop } = useAudioLevel();
+  const { level, pitch, pitchHz, rms, debug, status, start, stop } = useAudioLevel();
   const [active, setActive] = useState(false);
 
   // Derived, not stored. The original version kept a separate `status` string
@@ -136,7 +136,11 @@ export default function TherapyPage() {
             <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-white/50">
               <span>Level</span>
               <span className="tabular-nums">
-                {pitchHz > 0 ? `${Math.round(pitchHz)} Hz` : "—"}
+                {/* Raw RMS alongside the bar: a flat bar with a non-zero RMS
+                    means the scaling is wrong, a flat bar with zero RMS means
+                    no audio is reaching the analyser at all. Those need
+                    completely different fixes. */}
+                rms {rms.toFixed(3)} · {pitchHz > 0 ? `${Math.round(pitchHz)} Hz` : "—"}
               </span>
             </div>
             <div className="mt-2 h-1 rounded-full bg-white/15 overflow-hidden">
@@ -151,6 +155,28 @@ export default function TherapyPage() {
                 style={{ width: `${Math.round(pitch * 100)}%` }}
               />
             </div>
+
+            {/* Capture diagnostics. A flat meter has several unrelated causes
+                and they are indistinguishable from the outside, so the state
+                of the chain is shown rather than guessed at. */}
+            <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] text-white/40 tabular-nums">
+              <dt>context</dt>
+              <dd className={debug.contextState === "running" ? "text-white/70" : "text-[var(--accent)]"}>
+                {debug.contextState} @ {debug.sampleRate}Hz
+              </dd>
+              <dt>frames</dt>
+              <dd className={debug.frames > 0 ? "text-white/70" : "text-[var(--accent)]"}>
+                {debug.frames}
+              </dd>
+              <dt>track</dt>
+              <dd className={debug.trackState === "live" && !debug.trackMuted ? "text-white/70" : "text-[var(--accent)]"}>
+                {debug.trackState}
+                {debug.trackMuted ? " · MUTED" : ""}
+                {debug.trackEnabled ? "" : " · DISABLED"}
+              </dd>
+              <dt className="truncate">device</dt>
+              <dd className="truncate text-white/70">{debug.trackLabel}</dd>
+            </dl>
           </div>
         ) : null}
 
