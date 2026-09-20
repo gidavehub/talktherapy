@@ -9,10 +9,10 @@
  */
 export default function GlobalError({
   error,
-  unstable_retry,
+  retry,
 }: {
   error: Error & { digest?: string };
-  unstable_retry: () => void;
+  retry: () => void;
 }) {
   return (
     <html lang="en">
@@ -58,7 +58,7 @@ export default function GlobalError({
 
           <button
             type="button"
-            onClick={unstable_retry}
+            onClick={retry}
             style={{
               marginTop: 32,
               height: 48,

@@ -6,16 +6,19 @@ import { useEffect } from "react";
 /**
  * Public site error boundary.
  *
- * Next 16 renamed the recovery prop from `reset` to `unstable_retry`. The old
- * `reset` still exists but only re-renders — it does not re-run the failed
- * fetch — so `unstable_retry` is what actually gives someone a second chance.
+ * The recovery prop is `retry`, which re-fetches and re-renders this
+ * boundary's children. It shipped as `unstable_retry` in 16.2 and became
+ * stable in 16.3, so on this version `unstable_retry` is no longer passed —
+ * a boundary still destructuring the old name would call `undefined` the
+ * moment someone pressed "Try again". `reset` also exists but only
+ * re-renders without re-fetching, which usually re-shows the same error.
  */
 export default function MarketingError({
   error,
-  unstable_retry,
+  retry,
 }: {
   error: Error & { digest?: string };
-  unstable_retry: () => void;
+  retry: () => void;
 }) {
   useEffect(() => {
     // Surfaced in the dev overlay anyway; this is the hook point for real
@@ -41,7 +44,7 @@ export default function MarketingError({
         <div className="mt-10 flex flex-col sm:flex-row gap-3 justify-center">
           <button
             type="button"
-            onClick={unstable_retry}
+            onClick={retry}
             className="inline-flex h-12 items-center justify-center rounded-full bg-[var(--accent)] hover:bg-[var(--accent-soft)] transition-colors text-white px-7 text-[12px] uppercase tracking-[0.14em] font-medium"
           >
             Try again
