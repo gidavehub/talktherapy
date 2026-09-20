@@ -1,86 +1,149 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import Orb from "../components/Orb";
+import { useCallback, useEffect, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { SPRING_SOFT, SPRING_SNAP } from "@/components/motion/primitives";
+import TalkBlob, { type BlobState } from "@/components/voice/TalkBlob";
+import { useAudioLevel } from "@/lib/audio/useAudioLevel";
+
+/**
+ * The voice surface.
+ *
+ * The blob is a controlled component — this page owns the microphone through
+ * `useAudioLevel` and hands the amplitude down, so when the companion engine
+ * lands it consumes the same stream rather than opening a second one.
+ *
+ * The conversation itself is not wired yet: `state` moves on the user's
+ * actions and on audio, not on a model. That is deliberate — the UI is real
+ * and the engine slots in behind it.
+ */
+
+const STATUS: Record<BlobState, string> = {
+  idle: "Tap to begin. You can stop at any time.",
+  listening: "Listening — speak naturally.",
+  thinking: "Thinking…",
+  speaking: "Talk is speaking.",
+};
 
 export default function TherapyPage() {
-  const [listening, setListening] = useState(false);
-  const [status, setStatus] = useState("Tap the orb to begin your session.");
+  const { level, status, start, stop } = useAudioLevel();
+  const [active, setActive] = useState(false);
+
+  // Derived, not stored. The original version kept a separate `status` string
+  // and set it from the pre-toggle value of `listening`, so the label was
+  // always one tap behind what the button did. Deriving it removes the bug
+  // rather than fixing it.
+  const blobState: BlobState = !active
+    ? "idle"
+    : status === "requesting"
+      ? "thinking"
+      : "listening";
+
+  const begin = useCallback(async () => {
+    setActive(true);
+    await start();
+  }, [start]);
+
+  const end = useCallback(() => {
+    setActive(false);
+    stop();
+  }, [stop]);
+
+  useEffect(() => stop, [stop]);
+
+  const denied = status === "denied" || status === "unsupported" || status === "error";
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[var(--dark)] text-white">
-      {/* top bar */}
-      <div className="absolute top-0 left-0 right-0 z-10 px-4 sm:px-6 md:px-10 pt-5 md:pt-6 flex items-center justify-between">
+    <div className="relative min-h-screen overflow-hidden bg-[var(--dark)] text-white">
+      {/* Ambient warmth behind the field. */}
+      <div
+        aria-hidden
+        className="absolute inset-0 opacity-60"
+        style={{
+          background:
+            "radial-gradient(circle at 50% 52%, rgba(255,90,31,0.30) 0%, rgba(255,90,31,0) 58%)," +
+            "radial-gradient(circle at 80% 18%, rgba(255,90,31,0.14), transparent 52%)",
+        }}
+      />
+
+      <header className="relative z-10 px-4 sm:px-6 md:px-10 pt-5 md:pt-8 flex items-center justify-between">
         <Link href="/" className="leading-[0.85] text-[15px] font-medium tracking-tight">
           <span className="block">TALK</span>
           <span className="block">THERAPY</span>
         </Link>
         <Link
-          href="/"
-          className="h-10 px-4 rounded-full border border-white/20 text-[12px] uppercase tracking-[0.14em] flex items-center hover:bg-white/10 transition-colors"
+          href="/dashboard"
+          className="h-10 px-4 rounded-full border border-white/20 text-[12px] uppercase tracking-[0.14em] font-medium flex items-center hover:bg-white/10 transition-colors"
         >
-          End Session
+          Exit
         </Link>
-      </div>
+      </header>
 
-      {/* ambient bg */}
-      <div
-        className="absolute inset-0 opacity-60"
-        style={{
-          background:
-            "radial-gradient(circle at 50% 55%, rgba(255,90,31,0.35) 0%, rgba(255,90,31,0) 55%), radial-gradient(circle at 80% 20%, rgba(255,90,31,0.18), transparent 50%)",
-        }}
-      />
-
-      <section className="relative z-[1] flex flex-col items-center justify-center min-h-screen px-4 sm:px-6">
-        <p className="text-[12px] uppercase tracking-[0.22em] text-white/65 mb-10">
-          Session in progress
-        </p>
-
-        <button
-          type="button"
-          onClick={() => {
-            setListening((v) => !v);
-            setStatus(
-              listening ? "Paused. Tap to resume." : "Listening… speak naturally.",
-            );
-          }}
-          className="group"
-          aria-label={listening ? "Pause session" : "Start session"}
+      <main className="relative z-[1] min-h-[calc(100vh-120px)] flex flex-col items-center justify-center px-4 sm:px-6 py-10">
+        <motion.p
+          initial={{ y: 12, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={SPRING_SOFT}
+          className="text-[12px] uppercase tracking-[0.22em] text-white/65"
         >
-          <Orb size={320} reactive={listening} />
-        </button>
+          AI companion
+        </motion.p>
 
-        <p className="mt-12 text-center text-[18px] md:text-[20px] max-w-[520px] text-white/90">
-          {status}
-        </p>
+        <motion.button
+          type="button"
+          onClick={active ? end : begin}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          transition={SPRING_SNAP}
+          aria-label={active ? "End session" : "Begin session"}
+          className="mt-8 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-4 focus-visible:ring-offset-[var(--dark)]"
+        >
+          <TalkBlob state={blobState} level={level} size={340} />
+        </motion.button>
 
-        <div className="mt-10 flex items-center gap-3">
+        <AnimatePresence mode="wait">
+          <motion.p
+            key={blobState + String(denied)}
+            initial={{ y: 10, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -10, opacity: 0 }}
+            transition={SPRING_SOFT}
+            className="mt-8 text-[14px] md:text-[15px] text-white/75 text-center max-w-[420px]"
+            aria-live="polite"
+          >
+            {denied
+              ? "Talk cannot hear you — microphone access was blocked. You can still type, or allow the microphone in your browser settings."
+              : STATUS[blobState]}
+          </motion.p>
+        </AnimatePresence>
+
+        <div className="mt-10 flex flex-col sm:flex-row items-center gap-3">
           <button
             type="button"
-            onClick={() => setListening((v) => !v)}
-            className={`h-12 px-6 rounded-full text-[12px] uppercase tracking-[0.14em] font-medium transition-colors ${
-              listening
-                ? "bg-white text-[var(--dark)] hover:bg-white/90"
-                : "bg-[var(--accent)] text-white hover:bg-[var(--accent-soft)]"
-            }`}
+            onClick={active ? end : begin}
+            className="h-12 px-7 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-soft)] text-white text-[12px] uppercase tracking-[0.14em] font-medium transition-colors"
           >
-            {listening ? "Pause" : "Begin"}
+            {active ? "End session" : "Begin"}
           </button>
           <Link
-            href="/"
+            href="/therapists"
             className="h-12 px-6 rounded-full border border-white/20 text-[12px] uppercase tracking-[0.14em] font-medium flex items-center hover:bg-white/10 transition-colors"
           >
-            Exit
+            Talk to a human
           </Link>
         </div>
 
-        <p className="mt-16 text-[11px] uppercase tracking-[0.18em] text-white/45 text-center max-w-[380px]">
-          If you are in crisis, please call your local emergency line or a
-          suicide-prevention hotline immediately.
+        {/* Never further than one line away, on the surface most likely to
+            be open when someone is struggling. */}
+        <p className="mt-12 text-[11px] uppercase tracking-[0.18em] text-white/45 text-center max-w-[460px] leading-relaxed">
+          Talk is an AI companion, not a therapist, and cannot respond to an
+          emergency.{" "}
+          <Link href="/crisis" className="underline underline-offset-4 text-white/70">
+            Urgent help
+          </Link>
         </p>
-      </section>
-    </main>
+      </main>
+    </div>
   );
 }
