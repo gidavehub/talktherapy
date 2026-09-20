@@ -1,0 +1,375 @@
+rules_version = '2';
+
+// Talk — Firestore security rules.
+//
+// Threat model worth stating plainly: this database holds journal entries,
+// mood history and mental-health disclosures. A read leak here is not a bug,
+// it is a harm. So the default is deny, private data lives in subcollections
+// under its owner (making the rule a trivial uid match), and nothing is
+// readable "because you are signed in".
+//
+// Role lives on users/{uid}.role and is read back with get(). Custom claims
+// would be cheaper, but they require the Admin SDK (Blaze plan), which this
+// project is not on yet. Every get() below costs a document read and Firestore
+// caps them at 10 per request, so helpers are kept shallow deliberately.
+//
+// Bootstrapping the first admin: create the user normally, then edit
+// users/{uid}.role to "admin" by hand in the Firebase console. No code path
+// can mint an admin — see the role-escalation guard in /users/{uid}.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------------------------------------------------------------- helpers
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function hasRole(role) {
+      return isSignedIn() && userDoc().role == role;
+    }
+
+    function isAdmin() {
+      return hasRole('admin');
+    }
+
+    // A counsellor who has actually cleared credential review. Anything that
+    // exposes a counsellor to patients must check this, not just the role.
+    function isVerifiedCounsellor() {
+      return isSignedIn()
+        && userDoc().role == 'counsellor'
+        && userDoc().verified == true;
+    }
+
+    // Fields a user may never set on themselves. Privilege escalation guard.
+    function keepsPrivilegeFields(existing) {
+      return request.resource.data.role == existing.role
+        && request.resource.data.verified == existing.verified;
+    }
+
+    // ------------------------------------------------------------------ users
+
+    match /users/{uid} {
+      // A user reads their own doc. Admins read anyone. Counsellors do NOT get
+      // blanket read over patients — they see only the patients who booked
+      // them, and that link is resolved through /bookings, not here.
+      allow get: if isSelf(uid) || isAdmin();
+      allow list: if isAdmin();
+
+      // On create you may only make yourself, only as patient or counsellor,
+      // and `verified` is forced: patients are trivially verified (the flag is
+      // meaningless for them), counsellors must start unverified and be
+      // approved by an admin.
+      allow create: if isSelf(uid)
+        && request.resource.data.role in ['patient', 'counsellor']
+        && request.resource.data.verified == (request.resource.data.role == 'patient');
+
+      // Self-updates may not touch role or verified. Admins may change both.
+      allow update: if (isSelf(uid) && keepsPrivilegeFields(resource.data))
+        || isAdmin();
+
+      // Account deletion is a data right, so owners may delete themselves.
+      allow delete: if isSelf(uid) || isAdmin();
+
+      // ------------------------------------------------ private wellbeing data
+      //
+      // Mood, journal and consent history. Owner only — no admin read, no
+      // counsellor read, ever. If a counsellor needs context, the patient
+      // shares it deliberately through a session note, not by us opening a
+      // back door here.
+
+      match /moodEntries/{entryId} {
+        allow read, write: if isSelf(uid);
+      }
+
+      match /journalEntries/{entryId} {
+        allow read, write: if isSelf(uid);
+      }
+
+      // Append-only consent ledger. Users can see what they agreed to and
+      // when; nobody can rewrite history, including them.
+      match /consentEvents/{eventId} {
+        allow read: if isSelf(uid) || isAdmin();
+        allow create: if isSelf(uid);
+        allow update, delete: if false;
+      }
+    }
+
+    // ----------------------------------------------------- counsellor profiles
+
+    match /counsellorProfiles/{uid} {
+      // The public directory only ever shows verified counsellors. Unverified
+      // and suspended profiles are visible to their owner and to admins.
+      allow get, list: if resource.data.status == 'verified'
+        || isSelf(uid)
+        || isAdmin();
+
+      // A counsellor writes their own profile but can never self-approve.
+      allow create: if isSelf(uid)
+        && hasRole('counsellor')
+        && request.resource.data.status in ['draft', 'pending'];
+
+      allow update: if (isSelf(uid) && request.resource.data.status == resource.data.status)
+        || isAdmin();
+
+      allow delete: if isAdmin();
+
+      // Credential documents (certificates, ID). Owner and admin only.
+      //
+      // NOTE: these docs hold Storage download URLs, which are capability
+      // URLs — anyone holding one can fetch the file regardless of Storage
+      // rules. Gating the URL here is what actually restricts access.
+      // TODO(security): before public launch, move to Admin-SDK-issued signed
+      // URLs with an expiry so a leaked link stops working.
+      match /privateDocs/{docId} {
+        allow read: if isSelf(uid) || isAdmin();
+        allow create, update: if isSelf(uid);
+        allow delete: if isSelf(uid) || isAdmin();
+      }
+    }
+
+    // Credential review queue.
+    match /verificationRequests/{requestId} {
+      allow get, list: if isAdmin()
+        || (isSignedIn() && resource.data.counsellorId == request.auth.uid);
+      allow create: if isSignedIn()
+        && request.resource.data.counsellorId == request.auth.uid
+        && request.resource.data.status == 'pending';
+      // Only an admin decides. The applicant cannot move their own request.
+      allow update, delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------- availability
+
+    match /availability/{counsellorId} {
+      allow read: if isSignedIn();
+      allow write: if isSelf(counsellorId) || isAdmin();
+
+      match /slots/{slotId} {
+        // Patients must see open slots to book them.
+        allow read: if isSignedIn();
+        allow write: if isSelf(counsellorId) || isAdmin();
+      }
+    }
+
+    // ------------------------------------------------------------- bookings
+
+    match /bookings/{bookingId} {
+      // `participants` is a denormalised [patientId, counsellorId]. It lets one
+      // composite index serve "my bookings" for both roles, and makes this rule
+      // a membership test with zero extra document reads.
+      function isParticipant() {
+        return isSignedIn() && request.auth.uid in resource.data.participants;
+      }
+
+      allow get, list: if isParticipant() || isAdmin();
+
+      // The patient creates the booking, and cannot mark it paid themselves —
+      // only the payment webhook (server-side, Admin SDK) may do that.
+      allow create: if isSignedIn()
+        && request.resource.data.patientId == request.auth.uid
+        && request.resource.data.participants.hasAll([
+             request.resource.data.patientId,
+             request.resource.data.counsellorId
+           ])
+        && request.resource.data.status == 'pending'
+        && request.resource.data.paymentStatus == 'unpaid';
+
+      // Either side may cancel or reschedule; neither may touch payment state,
+      // and neither may add a third party to the booking.
+      allow update: if (isParticipant()
+          && request.resource.data.paymentStatus == resource.data.paymentStatus
+          && request.resource.data.participants == resource.data.participants)
+        || isAdmin();
+
+      allow delete: if isAdmin();
+    }
+
+    // ------------------------------------------------------------- sessions
+
+    match /sessions/{sessionId} {
+      function isSessionParticipant() {
+        return isSignedIn() && request.auth.uid in resource.data.participants;
+      }
+
+      allow get, list: if isSessionParticipant() || isAdmin();
+      allow create: if isSignedIn()
+        && request.resource.data.patientId == request.auth.uid
+        && request.auth.uid in request.resource.data.participants;
+      allow update: if isSessionParticipant() || isAdmin();
+      allow delete: if isAdmin();
+
+      // Transcript / in-session chat.
+      //
+      // `participants` is denormalised onto every message ON PURPOSE. The
+      // obvious rule — get() the parent session — costs a billed read on every
+      // single message write, and a companion conversation produces hundreds.
+      // At free-tier quota (50k reads/day) that alone would sink the app.
+      // Denormalising trades a few bytes per document for zero reads.
+      match /messages/{messageId} {
+        allow read: if (isSignedIn() && request.auth.uid in resource.data.participants)
+          || isAdmin();
+        allow create: if isSignedIn()
+          && request.auth.uid in request.resource.data.participants;
+        // Immutable once written — a therapy transcript nobody can quietly
+        // edit is worth more than a convenient one.
+        allow update, delete: if false;
+      }
+
+      // Clinical notes. Written by the counsellor, never visible to the
+      // patient through this path, never visible to other counsellors.
+      match /notes/{noteId} {
+        allow read, write: if isSignedIn()
+          && get(/databases/$(database)/documents/sessions/$(sessionId)).data.counsellorId == request.auth.uid;
+      }
+    }
+
+    // ------------------------------------------------- WebRTC call signaling
+
+    // Short-lived SDP offer/answer and ICE candidates. Contents are useless
+    // without also being the live peer, but they still identify who is talking
+    // to whom, so they stay locked to the two participants.
+    match /calls/{sessionId} {
+      // Same denormalisation as messages: ICE candidates arrive in bursts of
+      // dozens, and a parent lookup per candidate is pure waste.
+      function isCallParticipant() {
+        return isSignedIn() && request.auth.uid in resource.data.participants;
+      }
+
+      allow read: if isCallParticipant();
+      // The room is created by whoever arrives first, who must be a listed
+      // participant, and the participant list can never be rewritten.
+      allow create: if isSignedIn()
+        && request.auth.uid in request.resource.data.participants;
+      allow update: if isCallParticipant()
+        && request.resource.data.participants == resource.data.participants;
+      allow delete: if isCallParticipant();
+
+      // Candidates inherit the room's participant list through one get() on
+      // the room document — not the session — which is a single cached read
+      // per request rather than one per candidate.
+      function inRoom() {
+        return isSignedIn() && request.auth.uid in
+          get(/databases/$(database)/documents/calls/$(sessionId)).data.participants;
+      }
+
+      match /callerCandidates/{candidateId} {
+        allow read, write: if inRoom();
+      }
+
+      match /calleeCandidates/{candidateId} {
+        allow read, write: if inRoom();
+      }
+    }
+
+    // --------------------------------------------------------- transactions
+
+    // Money is server-authoritative. Clients read their own history and write
+    // nothing — every mutation comes from the Modem Pay webhook route handler.
+    match /transactions/{transactionId} {
+      allow get, list: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.counsellorId == request.auth.uid
+      ) || isAdmin();
+      allow write: if false;
+    }
+
+    // ------------------------------------------------------------ resources
+
+    // Wellbeing Resource Centre. Published entries are free to read, signed in
+    // or not — the concept note makes this the free tier.
+    match /resources/{resourceId} {
+      allow get, list: if resource.data.status == 'published' || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // ------------------------------------------------------ support requests
+
+    // Contact form. Anyone may submit, signed in or not — an organisation
+    // enquiring about packages has no account yet, and neither does someone
+    // reporting a problem that stopped them signing up.
+    //
+    // Write-only from the client: nobody can read the queue back, so one
+    // submitter cannot enumerate other people's messages.
+    match /supportRequests/{requestId} {
+      allow get, list: if isAdmin();
+      allow create: if request.resource.data.keys().hasAll(['name', 'email', 'message'])
+        && request.resource.data.message is string
+        && request.resource.data.message.size() > 0
+        && request.resource.data.message.size() < 5000
+        && request.resource.data.email is string
+        && request.resource.data.email.size() < 320;
+      allow update, delete: if isAdmin();
+    }
+
+    // ---------------------------------------------------------- escalations
+
+    // Crisis escalations. A user can raise one; only admins can read the queue
+    // or work it.
+    match /escalations/{escalationId} {
+      allow get, list: if isAdmin()
+        || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------- organizations
+
+    match /organizations/{orgId} {
+      function isOrgAdmin() {
+        return isSignedIn()
+          && exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid))
+          && get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.orgRole == 'admin';
+      }
+
+      allow get: if isOrgAdmin()
+        || isAdmin()
+        || (isSignedIn() && exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)));
+      allow list: if isAdmin();
+      allow create, update: if isOrgAdmin() || isAdmin();
+      allow delete: if isAdmin();
+
+      match /members/{memberId} {
+        allow get: if isSelf(memberId) || isOrgAdmin() || isAdmin();
+        allow list: if isOrgAdmin() || isAdmin();
+        allow write: if isOrgAdmin() || isAdmin();
+      }
+    }
+
+    // ------------------------------------------------------------ audit logs
+
+    // Written server-side only. Admins read; nobody edits.
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // ------------------------------------------------------ legacy: media/
+
+    // Pre-existing base64 avatar store from app/lib/media.ts. Superseded by
+    // Storage but still readable so nothing breaks; writes stay owner-only.
+    match /media/{mediaId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn()
+        && request.resource.data.ownerId == request.auth.uid;
+    }
+
+    // ------------------------------------------------------------- catch-all
+
+    // Anything not matched above is denied. Adding a collection means adding a
+    // rule for it, on purpose.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

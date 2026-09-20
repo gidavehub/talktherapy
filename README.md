@@ -2,7 +2,31 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
-First, run the development server:
+### 1. Configure Firebase
+
+The app uses Firebase Auth + Firestore + Realtime Database. Without config, the
+app still renders but sign-in is disabled.
+
+Copy the template and fill it in:
+
+```bash
+cp .env.example .env.local
+```
+
+Get the values from the [Firebase console](https://console.firebase.google.com/):
+**Project settings -> General -> Your apps -> Web app -> SDK setup and
+configuration -> Config**. Create a web app first if you don't have one.
+
+Then enable, in the console:
+
+- **Authentication -> Sign-in method**: Email/Password and Google
+- **Firestore Database**: create a database
+- **Realtime Database**: create a database (this gives you `databaseURL`)
+
+`.env.local` is gitignored. Restart the dev server after editing it — Next.js
+inlines `NEXT_PUBLIC_*` at build time and won't pick up changes otherwise.
+
+### 2. Run the dev server
 
 ```bash
 npm run dev

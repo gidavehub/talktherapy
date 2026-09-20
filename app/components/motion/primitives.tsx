@@ -1,7 +1,12 @@
 "use client";
 
 import { motion, useScroll, useTransform, type MotionProps, type Transition } from "motion/react";
-import { type ComponentPropsWithoutRef, type ReactNode, type ElementType, useRef } from "react";
+import {
+  type ComponentPropsWithoutRef,
+  type ReactNode,
+  type ElementType,
+  useRef,
+} from "react";
 
 /**
  * Motion design rules for this app:
@@ -40,7 +45,7 @@ const offsets: Record<Direction, { x: number; y: number }> = {
   right: { x: -56, y: 0 },
 };
 
-type SlideInProps<T extends ElementType> = {
+type SlideInProps<T extends MotionTagName> = {
   as?: T;
   from?: Direction;
   delay?: number;
@@ -53,7 +58,24 @@ type SlideInProps<T extends ElementType> = {
   transition?: Transition;
 } & Omit<ComponentPropsWithoutRef<T>, "as" | "children">;
 
-export function SlideIn<T extends ElementType = "div">({
+/**
+ * `as` is restricted to intrinsic elements on purpose.
+ *
+ * The obvious implementation, `motion.create(Tag)` in the component body,
+ * mints a brand-new component *type* on every render. React sees a different
+ * type each pass and remounts the subtree — which shows up as elements
+ * replaying their entrance animation on unrelated state changes, and child
+ * state being silently wiped.
+ *
+ * Reading `motion[tag]` instead is a property access on motion's own proxy,
+ * which builds and caches each wrapper once for the lifetime of the module.
+ * No creation happens during render at all.
+ */
+type MotionTagName = keyof React.JSX.IntrinsicElements;
+
+const motionProxy = motion as unknown as Record<MotionTagName, ElementType>;
+
+export function SlideIn<T extends MotionTagName = "div">({
   as,
   from = "up",
   delay = 0,
@@ -66,8 +88,8 @@ export function SlideIn<T extends ElementType = "div">({
   transition,
   ...rest
 }: SlideInProps<T>) {
-  const Tag = (as ?? "div") as ElementType;
-  const MotionTag = motion(Tag);
+  const Tag = (as ?? "div") as MotionTagName;
+  const MotionTag = motionProxy[Tag];
   const base = offsets[from];
   const x = distance != null ? Math.sign(base.x) * distance : base.x;
   const y = distance != null ? Math.sign(base.y) * distance : base.y;

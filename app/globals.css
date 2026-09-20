@@ -10,6 +10,29 @@
   --accent-soft: #FF7A45;
   --dark: #0A0A0A;
   --dark-soft: #141414;
+
+  /* Status colours. The accent orange cannot carry "confirmed / pending /
+     cancelled / escalated" on its own, and a crisis banner must never read as
+     a marketing CTA. */
+  --success: #0E7C5A;
+  --success-soft: rgba(14, 124, 90, 0.12);
+  --warning: #B4690E;
+  --warning-soft: rgba(180, 105, 14, 0.14);
+  --danger: #C03221;
+  --danger-soft: rgba(192, 50, 33, 0.12);
+  --info: #2563EB;
+  --info-soft: rgba(37, 99, 235, 0.10);
+
+  /* A nested card sitting on a white card needs its own step. */
+  --surface-2: #F5F3EF;
+  /* Used inline ~8 times across the dark sections. */
+  --on-dark-muted: rgba(255, 255, 255, 0.65);
+
+  /* Elevation, lifted from StatCard / AuthCard / the Hero CTA so new screens
+     cannot invent a fourth shadow. */
+  --shadow-raised: 0 18px 40px -18px rgba(0, 0, 0, 0.18);
+  --shadow-floating: 0 30px 80px -30px rgba(0, 0, 0, 0.25);
+  --shadow-accent: 0 10px 30px -10px rgba(255, 90, 31, 0.6);
 }
 
 @theme inline {
@@ -22,6 +45,11 @@
   --color-accent-soft: var(--accent-soft);
   --color-dark: var(--dark);
   --color-dark-soft: var(--dark-soft);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --color-surface-2: var(--surface-2);
   --font-sans: var(--font-geist-sans);
   --font-display: var(--font-instrument-serif);
   --font-mono: var(--font-geist-mono);
