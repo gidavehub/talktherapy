@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // firebase-admin and google-auth-library use Node built-ins and dynamic
+  // requires that the bundler cannot statically analyse. Bundling them breaks
+  // credential loading at runtime, so they stay external and are required from
+  // node_modules by the server at request time.
+  serverExternalPackages: ["firebase-admin", "google-auth-library"],
   turbopack: {
     root: __dirname,
   },

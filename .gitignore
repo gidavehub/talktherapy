@@ -40,3 +40,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# probe output (audio, scratch files)
+/scratch/
+
+# service account keys — NEVER commit
+/secrets/
+*-sa.json
+*.serviceaccount.json
