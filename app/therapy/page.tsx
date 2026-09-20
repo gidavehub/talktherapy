@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 import { SPRING_SOFT, SPRING_SNAP } from "@/components/motion/primitives";
 import TalkBlob, { type BlobState } from "@/components/voice/TalkBlob";
 import { useAudioLevel } from "@/lib/audio/useAudioLevel";
@@ -27,14 +27,19 @@ const STATUS: Record<BlobState, string> = {
 };
 
 export default function TherapyPage() {
-  const { level, status, start, stop } = useAudioLevel();
+  const { level, pitch, pitchHz, status, start, stop } = useAudioLevel();
   const [active, setActive] = useState(false);
 
   // Derived, not stored. The original version kept a separate `status` string
   // and set it from the pre-toggle value of `listening`, so the label was
   // always one tap behind what the button did. Deriving it removes the bug
   // rather than fixing it.
-  const blobState: BlobState = !active
+  const denied = status === "denied" || status === "unsupported" || status === "error";
+
+  // A blob that swells and ripples while the microphone is blocked is lying
+  // about what the app can hear, so a failed mic falls back to idle rather
+  // than sitting in a "listening" pose that never responds.
+  const blobState: BlobState = !active || denied
     ? "idle"
     : status === "requesting"
       ? "thinking"
@@ -51,8 +56,6 @@ export default function TherapyPage() {
   }, [stop]);
 
   useEffect(() => stop, [stop]);
-
-  const denied = status === "denied" || status === "unsupported" || status === "error";
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[var(--dark)] text-white">
@@ -99,24 +102,57 @@ export default function TherapyPage() {
           aria-label={active ? "End session" : "Begin session"}
           className="mt-8 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-4 focus-visible:ring-offset-[var(--dark)]"
         >
-          <TalkBlob state={blobState} level={level} size={340} />
+          <TalkBlob state={blobState} level={level} pitch={pitch} size={340} />
         </motion.button>
 
-        <AnimatePresence mode="wait">
-          <motion.p
-            key={blobState + String(denied)}
-            initial={{ y: 10, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -10, opacity: 0 }}
-            transition={SPRING_SOFT}
-            className="mt-8 text-[14px] md:text-[15px] text-white/75 text-center max-w-[420px]"
-            aria-live="polite"
-          >
-            {denied
-              ? "Talk cannot hear you — microphone access was blocked. You can still type, or allow the microphone in your browser settings."
-              : STATUS[blobState]}
-          </motion.p>
-        </AnimatePresence>
+        {/* Deliberately NOT wrapped in AnimatePresence mode="wait".
+            It was, and the exit animation could deadlock — leaving the status
+            reading "Tap to begin" while the session was actually running and
+            the microphone had been refused. A status line on this surface has
+            to be correct before it is pretty, so the text updates directly and
+            only the opacity transitions. */}
+        <motion.p
+          animate={{ opacity: 1 }}
+          initial={{ opacity: 0 }}
+          transition={SPRING_SOFT}
+          className={`mt-8 text-[14px] md:text-[15px] text-center max-w-[440px] ${
+            denied ? "text-[var(--accent)]" : "text-white/75"
+          }`}
+          aria-live="polite"
+        >
+          {denied
+            ? "Talk cannot hear you — your browser blocked microphone access. Allow the microphone for this site and press Begin again."
+            : STATUS[blobState]}
+        </motion.p>
+
+        {/* Live input meter.
+            Not decoration: when someone says the orb is not reacting, this is
+            what distinguishes "the microphone is not being heard" from "the
+            microphone works and the visual response is too weak". It also
+            tells the user Talk can actually hear them, which a silent orb
+            does not. */}
+        {active && status === "live" ? (
+          <div className="mt-8 w-full max-w-[320px]">
+            <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-white/50">
+              <span>Level</span>
+              <span className="tabular-nums">
+                {pitchHz > 0 ? `${Math.round(pitchHz)} Hz` : "—"}
+              </span>
+            </div>
+            <div className="mt-2 h-1 rounded-full bg-white/15 overflow-hidden">
+              <div
+                className="h-full bg-[var(--accent)] transition-[width] duration-75"
+                style={{ width: `${Math.round(level * 100)}%` }}
+              />
+            </div>
+            <div className="mt-2 h-1 rounded-full bg-white/10 overflow-hidden">
+              <div
+                className="h-full bg-white/60 transition-[width] duration-75"
+                style={{ width: `${Math.round(pitch * 100)}%` }}
+              />
+            </div>
+          </div>
+        ) : null}
 
         <div className="mt-10 flex flex-col sm:flex-row items-center gap-3">
           <button

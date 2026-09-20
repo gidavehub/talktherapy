@@ -30,6 +30,8 @@ type Props = {
   state?: BlobState;
   /** Audio amplitude, 0..1. Ignored when state is "idle" or "thinking". */
   level?: number;
+  /** Fundamental frequency across the speech range, 0..1. 0 means unvoiced. */
+  pitch?: number;
   /** CSS size in px. The canvas is rendered at devicePixelRatio above this. */
   size?: number;
   className?: string;
@@ -101,7 +103,7 @@ const FS_SIM = `#version 300 es
 precision highp float; precision highp sampler2D;
 uniform sampler2D uPos, uVel;
 uniform float uDt, uTime, uSpring, uDamp, uFlow, uNoiseScale;
-uniform float uJitter, uBurst, uRadius, uDeform, uSwirl;
+uniform float uJitter, uBurst, uRadius, uDeform, uSwirl, uPitch;
 layout(location=0) out vec4 outPos;
 layout(location=1) out vec4 outVel;
 ${NOISE_GLSL}
@@ -116,7 +118,12 @@ void main(){
   /* The shell breathes and dents. A slow noise over the sphere makes whole
      regions swell while their neighbours hold, which is what stops it
      reading as a perfect ball. uDeform is driven by the voice. */
-  float wob = snoise(dir * uNoiseScale + vec3(0.0, 0.0, uTime * 0.45));
+  /* Pitch sets the SPATIAL FREQUENCY of the denting: a low voice makes a few
+     broad lobes, a high one makes many fine ripples. Amplitude changes how
+     far the shell moves; pitch changes what shape it moves into, so the two
+     are legible independently rather than both reading as "louder". */
+  float scale = uNoiseScale * mix(1.0, 3.4, uPitch);
+  float wob = snoise(dir * scale + vec3(0.0, 0.0, uTime * (0.45 + uPitch * 1.1)));
   float shell = uRadius * (1.0 + wob * uDeform);
 
   /* Depth in the shell, so the cloud has thickness instead of being a
@@ -164,7 +171,7 @@ const VS_PARTICLE = `#version 300 es
 precision highp float; precision highp sampler2D;
 uniform sampler2D uPos, uVel;
 uniform vec2 uTexSize, uRes;
-uniform float uFocal, uPointScale, uStretch, uAlpha, uSpin;
+uniform float uFocal, uPointScale, uStretch, uAlpha, uSpin, uPitch;
 uniform vec3 uColA, uColB, uColHot;
 out vec2 vUv;
 out vec4 vCol;
@@ -202,6 +209,9 @@ void main(){
   float heat = clamp(length(V.xyz) / 420.0, 0.0, 1.0);
   vec3 col = mix(uColA, uColB, clamp(p.z * 0.004 + 0.5, 0.0, 1.0));
   col = mix(col, uColHot, heat * 0.85);
+  /* A higher voice reads brighter, so pitch is visible even when the shape
+     change is subtle. */
+  col = mix(col, uColHot, uPitch * 0.45);
 
   /* Energy is conserved as the sprite smears, so a stretched one dims. */
   float a = uAlpha / max(stretch, 1.0);
@@ -240,10 +250,10 @@ const PRESETS: Record<
   BlobState,
   { spring: number; damp: number; flow: number; jitter: number; deform: number; swirl: number; burst: number; alpha: number }
 > = {
-  idle:      { spring: 2.2, damp: 2.6, flow: 2.5, jitter: 4, deform: 0.10, swirl: 0.10, burst: 0,  alpha: 0.26 },
-  listening: { spring: 3.4, damp: 2.9, flow: 5.0, jitter: 6, deform: 0.16, swirl: 0.16, burst: 14, alpha: 0.34 },
-  thinking:  { spring: 5.0, damp: 3.6, flow: 7.5, jitter: 4, deform: 0.13, swirl: 0.62, burst: 0,  alpha: 0.32 },
-  speaking:  { spring: 4.4, damp: 3.2, flow: 4.0, jitter: 5, deform: 0.20, swirl: 0.22, burst: 20, alpha: 0.40 },
+  idle:      { spring: 7.0, damp: 5.0, flow: 1.8, jitter: 4, deform: 0.10, swirl: 0.10, burst: 0,  alpha: 0.26 },
+  listening: { spring: 9.0, damp: 5.2, flow: 2.0, jitter: 6, deform: 0.12, swirl: 0.16, burst: 26, alpha: 0.34 },
+  thinking:  { spring: 11.0, damp: 6.0, flow: 3.2, jitter: 4, deform: 0.13, swirl: 0.62, burst: 0, alpha: 0.32 },
+  speaking:  { spring: 10.0, damp: 5.0, flow: 2.0, jitter: 5, deform: 0.14, swirl: 0.22, burst: 30, alpha: 0.40 },
 };
 
 const ACCENT = [1.0, 0.353, 0.122]; // #FF5A1F
@@ -284,6 +294,7 @@ function program(gl: WebGL2RenderingContext, vs: string, fs: string) {
 export default function TalkBlob({
   state = "idle",
   level = 0,
+  pitch = 0,
   size = 320,
   className = "",
 }: Props) {
@@ -299,6 +310,7 @@ export default function TalkBlob({
   // that smooths its input anyway.
   const stateRef = useRef(state);
   const levelRef = useRef(level);
+  const pitchRef = useRef(pitch);
 
   useEffect(() => {
     stateRef.current = state;
@@ -307,6 +319,10 @@ export default function TalkBlob({
   useEffect(() => {
     levelRef.current = level;
   }, [level]);
+
+  useEffect(() => {
+    pitchRef.current = pitch;
+  }, [pitch]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -356,12 +372,12 @@ export default function TalkBlob({
       const a = Math.random() * Math.PI * 2;
       const z = Math.random() * 2 - 1;
       const r = Math.sqrt(1 - z * z);
-      // Scattered relative to the shell, not in absolute units — far enough
-      // out that the opening seconds read as the field gathering itself,
-      // close enough that it settles in about a second rather than staring
-      // at a cloud. Absolute values here meant the intro length depended on
-      // the component's pixel size.
-      const d = size * (0.42 + Math.random() * 0.5);
+      // Scattered just outside the shell. Far enough that the opening reads as
+      // the field gathering itself, close enough that it is formed in a few
+      // hundred milliseconds — a blob that takes seconds to appear looks
+      // broken, not dramatic. Relative to `size` so the intro does not get
+      // longer on a bigger canvas.
+      const d = size * (0.22 + Math.random() * 0.2);
       pos[i * 4 + 0] = Math.cos(a) * r * d;
       pos[i * 4 + 1] = Math.sin(a) * r * d;
       pos[i * 4 + 2] = z * d;
@@ -406,6 +422,8 @@ export default function TalkBlob({
     // twitch; the asymmetric rise/fall makes it snap open on a syllable and
     // settle gently afterwards, which is what reads as "voice".
     let smooth = 0;
+    let smoothPitch = 0;
+    let voiced = 0;
     let disposed = false;
 
     function frame(now: number) {
@@ -423,12 +441,17 @@ export default function TalkBlob({
       time += dt;
 
       const p = PRESETS[stateRef.current];
-      const target = stateRef.current === "idle" || stateRef.current === "thinking"
-        ? 0
-        : Math.min(1, Math.max(0, levelRef.current));
-      smooth += (target - smooth) * (target > smooth ? 0.35 : 0.08);
+      const silent = stateRef.current === "idle" || stateRef.current === "thinking";
+      const target = silent ? 0 : Math.min(1, Math.max(0, levelRef.current));
+      // Asymmetric on purpose: snap open on a syllable, settle slowly after.
+      // Symmetric smoothing makes speech read as a vague pulsing.
+      smooth += (target - smooth) * (target > smooth ? 0.55 : 0.09);
 
-      spin += dt * (0.12 + smooth * 0.25);
+      const pitchTarget = silent ? 0 : Math.min(1, Math.max(0, pitchRef.current));
+      smoothPitch += (pitchTarget - smoothPitch) * 0.25;
+      voiced = smoothPitch;
+
+      spin += dt * (0.12 + smooth * 0.9);
 
       const g = gl!;
 
@@ -454,17 +477,25 @@ export default function TalkBlob({
       g.uniform1f(uSim("uTime"), time);
       g.uniform1f(uSim("uSpring"), p.spring);
       g.uniform1f(uSim("uDamp"), p.damp);
-      g.uniform1f(uSim("uFlow"), p.flow * (1 + smooth * 1.4));
+      // Every audio-driven term below is sized against the SHELL RADIUS rather
+      // than in absolute units, so the reaction is the same proportion of the
+      // blob at any component size. The budget matters: radius + curl + burst
+      // is magnified up to ~1.5x by the perspective divide, and once that
+      // exceeds half the canvas the sphere crops into a square.
+      g.uniform1f(uSim("uFlow"), p.flow * (1 + smooth * 1.6));
       g.uniform1f(uSim("uNoiseScale"), 0.009);
       g.uniform1f(uSim("uJitter"), reduced ? p.jitter * 0.3 : p.jitter);
-      g.uniform1f(uSim("uBurst"), p.burst * smooth);
+      // Cubed: quiet room tone barely registers, a spoken syllable kicks hard.
+      // Linear here made normal speech look like a gentle wobble.
+      g.uniform1f(uSim("uBurst"), (size / 340) * p.burst * smooth * smooth * smooth);
       // Sized so the outermost particles land inside the canvas: near ones
       // are magnified ~1.5x by the perspective divide and the curl noise
       // pushes another ~40% beyond the shell, so the base radius has to be
       // well under half the canvas or the sphere crops to a square.
-      g.uniform1f(uSim("uRadius"), size * 0.22 + smooth * size * 0.045);
-      g.uniform1f(uSim("uDeform"), p.deform + smooth * 0.22);
-      g.uniform1f(uSim("uSwirl"), reduced ? 0 : p.swirl);
+      g.uniform1f(uSim("uRadius"), size * 0.135 + smooth * size * 0.075);
+      g.uniform1f(uSim("uDeform"), p.deform + smooth * 0.55);
+      g.uniform1f(uSim("uSwirl"), reduced ? 0 : p.swirl * (1 + smooth * 1.8));
+      g.uniform1f(uSim("uPitch"), voiced);
       g.bindVertexArray(null);
       g.drawArrays(g.TRIANGLES, 0, 3);
 
@@ -497,6 +528,7 @@ export default function TalkBlob({
       g.uniform1f(uDraw("uStretch"), 0.05);
       g.uniform1f(uDraw("uAlpha"), p.alpha);
       g.uniform1f(uDraw("uSpin"), spin);
+      g.uniform1f(uDraw("uPitch"), voiced);
       g.uniform3fv(uDraw("uColA"), ACCENT);
       g.uniform3fv(uDraw("uColB"), ACCENT_SOFT);
       g.uniform3fv(uDraw("uColHot"), HOT);
