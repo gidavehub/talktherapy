@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "probe:models": "node scripts/probe-models.mjs",
-    "probe:accounts": "node scripts/verify-service-accounts.mjs"
+    "probe:accounts": "node scripts/verify-service-accounts.mjs",
+    "probe:pipeline": "node scripts/probe-pipeline.mjs",
+    "smoke:companion": "node scripts/smoke-companion.mjs"
   },
   "dependencies": {
     "firebase": "^12.13.0",
@@ -17,7 +19,8 @@
     "motion": "^12.38.0",
     "next": "16.3.5",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BAND_COUNT, VoiceAnalyser, type AudioFeed } from "./analysis";
 
 /**
  * Single owner of the microphone.
  *
  * Everything that needs the user's audio goes through here: the blob's
- * amplitude, and later the companion engine's PCM feed for Gemini. Two
+ * amplitude, and the utterance recorder that feeds the companion. Two
  * getUserMedia calls on the same page compete for the device, and on mobile
  * Safari the second one can fail outright — which is exactly the bug that
  * would have shipped if the blob kept acquiring its own stream the way the
@@ -20,47 +21,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export type MicStatus = "idle" | "requesting" | "live" | "denied" | "unsupported" | "error";
 
-/**
- * Number of spectral bands. Shared with the blob's shader, which allocates a
- * uniform array of exactly this length — change it in one place only.
- */
-export const BAND_COUNT = 16;
-
-/** Speech-relevant span for the bands: fundamental up through sibilance. */
-const BAND_LO_HZ = 90;
-const BAND_HI_HZ = 7500;
-
-/**
- * Per-frame audio for a visual to read directly.
- *
- * Refs rather than state, deliberately: the blob samples these inside its own
- * render loop at 60fps. Routing them through React state would cap the
- * response at the publish rate and re-render the page on every frame.
- */
-export type AudioFeed = {
-  levelRef: React.RefObject<number>;
-  pitchRef: React.RefObject<number>;
-  /** BAND_COUNT smoothed energies, 0..1, lowest frequency first. */
-  bandsRef: React.RefObject<Float32Array>;
-};
-
-/**
- * Log-spaced FFT bin ranges for each band. Log, not linear, because pitch is
- * perceived logarithmically and speech energy is concentrated low: linear
- * bands would spend most of their resolution above 4kHz where little happens.
- */
-function bandEdges(sampleRate: number, fftSize: number): Array<[number, number]> {
-  const binHz = sampleRate / fftSize;
-  const edges: Array<[number, number]> = [];
-  for (let i = 0; i < BAND_COUNT; i++) {
-    const f0 = BAND_LO_HZ * Math.pow(BAND_HI_HZ / BAND_LO_HZ, i / BAND_COUNT);
-    const f1 = BAND_LO_HZ * Math.pow(BAND_HI_HZ / BAND_LO_HZ, (i + 1) / BAND_COUNT);
-    const b0 = Math.max(1, Math.floor(f0 / binHz));
-    const b1 = Math.max(b0 + 1, Math.ceil(f1 / binHz));
-    edges.push([b0, b1]);
-  }
-  return edges;
-}
+// Moved to ./analysis so Talk's own voice drives the blob through the same
+// processing as the microphone. Re-exported for existing importers.
+export { BAND_COUNT, type AudioFeed } from "./analysis";
 
 export type AudioLevel = {
   /** 0..1, smoothed RMS. */
@@ -97,97 +60,54 @@ export type AudioLevel = {
   pitchRef: React.RefObject<number>;
   /** Everything a visual needs, as refs, for per-frame reading. */
   feed: AudioFeed;
+  /**
+   * The live audio graph, for anything else that needs the microphone — the
+   * utterance recorder attaches here rather than opening a second stream.
+   * Null until start() succeeds.
+   */
+  graph: () => MicGraph | null;
   start: () => Promise<void>;
   stop: () => void;
 };
 
+export type MicGraph = { ctx: AudioContext; source: MediaStreamAudioSourceNode };
+
 /** How often the React-visible value is refreshed. */
 const PUBLISH_MS = 66;
-/** Below this, treat it as silence — room tone should not wobble the blob. */
-const NOISE_FLOOR = 0.005;
-/**
- * Speech f0 range. Roughly a low male voice to a high female one; anything
- * outside is almost certainly noise or a harmonic misfire rather than pitch.
- */
-const MIN_HZ = 70;
-const MAX_HZ = 400;
-/** Autocorrelation below this is not a confident periodicity — report no pitch. */
-const PITCH_CONFIDENCE = 0.55;
 
-/**
- * Fundamental frequency by autocorrelation.
- *
- * Chosen over an FFT peak because the loudest bin in speech is frequently a
- * harmonic rather than f0, which makes a naive spectral peak jump an octave
- * mid-vowel — the blob would twitch on timbre instead of tracking the voice.
- * Autocorrelation finds the repeat period directly and is stable across it.
- */
-function detectPitch(buf: Float32Array, sampleRate: number): number {
-  const minLag = Math.floor(sampleRate / MAX_HZ);
-  const maxLag = Math.min(Math.floor(sampleRate / MIN_HZ), buf.length - 1);
-
-  let bestLag = -1;
-  let bestCorr = 0;
-  let energy = 0;
-  for (let i = 0; i < buf.length; i++) energy += buf[i] * buf[i];
-  if (energy <= 0) return 0;
-
-  for (let lag = minLag; lag <= maxLag; lag++) {
-    let corr = 0;
-    for (let i = 0; i < buf.length - lag; i++) corr += buf[i] * buf[i + lag];
-    // Normalised so long lags are not penalised for overlapping less.
-    corr /= buf.length - lag;
-    if (corr > bestCorr) {
-      bestCorr = corr;
-      bestLag = lag;
-    }
-  }
-
-  if (bestLag < 0) return 0;
-  const normalised = bestCorr / (energy / buf.length);
-  if (normalised < PITCH_CONFIDENCE) return 0;
-  return sampleRate / bestLag;
-}
+const IDLE_DEBUG = {
+  contextState: "-",
+  sampleRate: 0,
+  trackLabel: "-",
+  trackMuted: false,
+  trackEnabled: false,
+  trackState: "-",
+  frames: 0,
+};
 
 export function useAudioLevel(): AudioLevel {
   const [level, setLevel] = useState(0);
   const [pitch, setPitch] = useState(0);
   const [pitchHz, setPitchHz] = useState(0);
   const [rms, setRms] = useState(0);
-  const [debug, setDebug] = useState({
-    contextState: "-",
-    sampleRate: 0,
-    trackLabel: "-",
-    trackMuted: false,
-    trackEnabled: false,
-    trackState: "-",
-    frames: 0,
-  });
+  const [debug, setDebug] = useState(IDLE_DEBUG);
   const [status, setStatus] = useState<MicStatus>("idle");
   const [stream, setStream] = useState<MediaStream | null>(null);
 
   const levelRef = useRef(0);
-  // Raw pre-gate RMS, exposed purely so a flat meter can be diagnosed.
-  const rmsRef = useRef(0);
   const pitchRef = useRef(0);
-  const ctxRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const sinkRef = useRef<GainNode | null>(null);
-  // A second analyser for the spectrum. Separate from the time-domain one
-  // because the bands want a larger FFT for low-frequency resolution, and
-  // running pitch autocorrelation over that larger window would double its
-  // cost on the main thread for no gain.
-  const freqRef = useRef<AnalyserNode | null>(null);
-  const freqBufRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
-  const edgesRef = useRef<Array<[number, number]> | null>(null);
   const bandsRef = useRef<Float32Array>(new Float32Array(BAND_COUNT));
+  const ctxRef = useRef<AudioContext | null>(null);
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const analyserRef = useRef<VoiceAnalyser | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef(0);
   const lastPublish = useRef(0);
   const framesRef = useRef(0);
-  // Float rather than byte: 8-bit quantisation is too coarse for reliable
-  // autocorrelation, and the pitch estimate jitters badly on quiet speech.
-  const bufRef = useRef<Float32Array<ArrayBuffer> | null>(null);
+
+  // Refs are stable for the component's lifetime, so this object is too — a
+  // consumer can hold it in an effect without resubscribing.
+  const feed = useMemo<AudioFeed>(() => ({ levelRef, pitchRef, bandsRef }), []);
 
   const stop = useCallback(() => {
     cancelAnimationFrame(rafRef.current);
@@ -197,13 +117,10 @@ export function useAudioLevel(): AudioLevel {
     streamRef.current = null;
     setStream(null);
 
-    analyserRef.current?.disconnect();
+    analyserRef.current?.dispose();
     analyserRef.current = null;
-    sinkRef.current?.disconnect();
-    sinkRef.current = null;
-    freqRef.current?.disconnect();
-    freqRef.current = null;
-    bandsRef.current.fill(0);
+    sourceRef.current?.disconnect();
+    sourceRef.current = null;
 
     // Closing can reject if the context is already closed — the page may be
     // unloading. Nothing useful to do about it either way.
@@ -212,7 +129,7 @@ export function useAudioLevel(): AudioLevel {
 
     levelRef.current = 0;
     pitchRef.current = 0;
-    rmsRef.current = 0;
+    bandsRef.current.fill(0);
     setRms(0);
     setLevel(0);
     setPitch(0);
@@ -231,77 +148,46 @@ export function useAudioLevel(): AudioLevel {
     setStatus("requesting");
 
     try {
-      const media = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
-
-      streamRef.current = media;
-      setStream(media);
-
+      // The context is created BEFORE awaiting the microphone prompt, so it is
+      // born inside the user's click. Created after the await, Safari starts it
+      // suspended and Talk's voice would never play.
       const Ctx: typeof AudioContext =
         window.AudioContext ||
         (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const ctx = new Ctx();
       ctxRef.current = ctx;
+      const resumed = ctx.state === "suspended" ? ctx.resume() : Promise.resolve();
 
-      // Browsers start the context suspended until a user gesture. start() is
-      // expected to be called from a click, so this usually resolves at once.
-      if (ctx.state === "suspended") await ctx.resume();
+      const media = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          // Echo cancellation is what lets the microphone stay open while
+          // Talk is speaking without Talk hearing herself.
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+      await resumed.catch(() => {});
+
+      // stop() may have run while the permission prompt was open.
+      if (ctxRef.current !== ctx) {
+        media.getTracks().forEach((t) => t.stop());
+        return;
+      }
+
+      streamRef.current = media;
+      setStream(media);
 
       const source = ctx.createMediaStreamSource(media);
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 1024;
-      // No smoothing: smoothingTimeConstant only affects the FREQUENCY data,
-      // and leaving it high on a node we read time-domain samples from buys
-      // nothing while making the analyser lag. The smoothing that matters is
-      // done on the computed level instead.
-      analyser.smoothingTimeConstant = 0;
-      source.connect(analyser);
-
-      // THE ANALYSER MUST REACH THE DESTINATION.
-      //
-      // The Web Audio graph is pulled from ctx.destination. A branch that
-      // dead-ends at an AnalyserNode is not guaranteed to be processed at all,
-      // and getFloatTimeDomainData then returns silence — microphone granted,
-      // status "live", meter permanently flat. That was this bug exactly.
-      //
-      // Routing through a zero-gain node keeps the graph alive without
-      // playing the user's own microphone back at them, which would also
-      // cause feedback.
-      const sink = ctx.createGain();
-      sink.gain.value = 0;
-      analyser.connect(sink);
-      sink.connect(ctx.destination);
-      sinkRef.current = sink;
-
-      const freq = ctx.createAnalyser();
-      freq.fftSize = 2048;
-      freq.smoothingTimeConstant = 0.35;
-      // The dB window the byte data is scaled into. Narrower than the default
-      // so ordinary speech spans most of 0..255 instead of sitting in the
-      // bottom third.
-      freq.minDecibels = -92;
-      freq.maxDecibels = -28;
-      source.connect(freq);
-      freq.connect(sink);
-      freqRef.current = freq;
-      freqBufRef.current = new Uint8Array(new ArrayBuffer(freq.frequencyBinCount));
-      edgesRef.current = bandEdges(ctx.sampleRate, freq.fftSize);
-
-      analyserRef.current = analyser;
-      bufRef.current = new Float32Array(new ArrayBuffer(analyser.fftSize * 4));
+      sourceRef.current = source;
+      analyserRef.current = new VoiceAnalyser(ctx, source, feed);
 
       setStatus("live");
 
       const tick = () => {
         rafRef.current = requestAnimationFrame(tick);
-        const a = analyserRef.current;
-        const buf = bufRef.current;
-        if (!a || !buf) return;
+        const analyser = analyserRef.current;
+        if (!analyser) return;
 
         // Autoplay policy can suspend the context again after the gesture
         // that created it (tab hidden, device change). A suspended context
@@ -310,75 +196,16 @@ export function useAudioLevel(): AudioLevel {
         const c = ctxRef.current;
         if (c && c.state === "suspended") void c.resume().catch(() => {});
 
-        a.getFloatTimeDomainData(buf);
-
-        // RMS over the waveform, not an average of the FFT bins. Time-domain
-        // RMS tracks loudness; a frequency average also rises when the timbre
-        // changes at constant volume, which makes the blob react to vowels
-        // rather than to speech.
-        let sum = 0;
-        for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
-        const rms = Math.sqrt(sum / buf.length);
-
-        const gated = rms < NOISE_FLOOR ? 0 : (rms - NOISE_FLOOR) / (1 - NOISE_FLOOR);
-        // Speech RMS rarely exceeds ~0.3, so scale into a usable 0..1 before
-        // the curve — otherwise the blob barely moves at normal volume.
-        const scaled = Math.min(1, gated * 4.5);
-        levelRef.current = scaled;
-        rmsRef.current = rms;
-
-        // Pitch only while there is enough signal to be periodic. Running it
-        // on silence returns confident nonsense.
-        let hz = 0;
-        if (scaled > 0.06) {
-          hz = detectPitch(buf, ctx.sampleRate);
-        }
-        // Hold the last pitch briefly through consonants rather than snapping
-        // to zero between every syllable, which reads as flicker.
-        if (hz > 0) {
-          const norm = (hz - MIN_HZ) / (MAX_HZ - MIN_HZ);
-          pitchRef.current = Math.min(1, Math.max(0, norm));
-        } else {
-          pitchRef.current *= 0.92;
-        }
-
-        // Spectral bands — what makes different sounds move different parts
-        // of the blob. Loudness alone cannot tell "sss" from "ooh"; the
-        // spectrum can.
-        const fa = freqRef.current;
-        const fb = freqBufRef.current;
-        const edges = edgesRef.current;
-        if (fa && fb && edges) {
-          fa.getByteFrequencyData(fb);
-          const bands = bandsRef.current;
-          for (let i = 0; i < BAND_COUNT; i++) {
-            const [b0, b1] = edges[i];
-            let peak = 0;
-            for (let b = b0; b < b1 && b < fb.length; b++) if (fb[b] > peak) peak = fb[b];
-            let v = peak / 255;
-            // Spectral tilt. Speech carries far more energy low than high, so
-            // without lifting the upper bands the top of the blob would almost
-            // never move — sibilants and fricatives would be invisible.
-            v *= 0.85 + (i / (BAND_COUNT - 1)) * 0.9;
-            // Gate then curve: room tone stays still, real syllables pop.
-            v = Math.max(0, v - 0.14) / 0.86;
-            v = Math.min(1, v * v * 1.7);
-            // Fast attack, slow release, per band — so a region blooms on the
-            // sound that excites it and relaxes on its own time afterwards.
-            const cur = bands[i];
-            bands[i] = cur + (v - cur) * (v > cur ? 0.5 : 0.1);
-          }
-        }
-
+        const reading = analyser.update();
         framesRef.current += 1;
 
         const now = performance.now();
         if (now - lastPublish.current >= PUBLISH_MS) {
           lastPublish.current = now;
-          setLevel(scaled);
+          setLevel(reading.level);
           setPitch(pitchRef.current);
-          setPitchHz(hz);
-          setRms(rms);
+          setPitchHz(reading.hz);
+          setRms(reading.rms);
           const track = streamRef.current?.getAudioTracks()[0];
           setDebug({
             contextState: ctxRef.current?.state ?? "-",
@@ -395,19 +222,23 @@ export function useAudioLevel(): AudioLevel {
     } catch (e) {
       const name = (e as DOMException)?.name;
       setStatus(name === "NotAllowedError" || name === "SecurityError" ? "denied" : "error");
+      ctxRef.current?.close().catch(() => {});
+      ctxRef.current = null;
       if (process.env.NODE_ENV !== "production") {
         console.warn("[useAudioLevel] microphone unavailable:", e);
       }
     }
-  }, []);
+  }, [feed]);
 
   // Tracks keep the browser's recording indicator lit, so they must be
   // released when the component goes — not left to GC.
   useEffect(() => stop, [stop]);
 
-  // Refs are stable for the component's lifetime, so this object is too — a
-  // consumer can hold it in an effect without resubscribing.
-  const feed = useMemo<AudioFeed>(() => ({ levelRef, pitchRef, bandsRef }), []);
+  const graph = useCallback((): MicGraph | null => {
+    const ctx = ctxRef.current;
+    const source = sourceRef.current;
+    return ctx && source ? { ctx, source } : null;
+  }, []);
 
-  return { level, pitch, pitchHz, rms, debug, status, stream, levelRef, pitchRef, feed, start, stop };
+  return { level, pitch, pitchHz, rms, debug, status, stream, levelRef, pitchRef, feed, graph, start, stop };
 }
