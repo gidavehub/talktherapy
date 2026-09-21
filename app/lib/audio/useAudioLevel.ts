@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 /**
  * Single owner of the microphone.
@@ -19,6 +19,48 @@ import { useCallback, useEffect, useRef, useState } from "react";
  */
 
 export type MicStatus = "idle" | "requesting" | "live" | "denied" | "unsupported" | "error";
+
+/**
+ * Number of spectral bands. Shared with the blob's shader, which allocates a
+ * uniform array of exactly this length — change it in one place only.
+ */
+export const BAND_COUNT = 16;
+
+/** Speech-relevant span for the bands: fundamental up through sibilance. */
+const BAND_LO_HZ = 90;
+const BAND_HI_HZ = 7500;
+
+/**
+ * Per-frame audio for a visual to read directly.
+ *
+ * Refs rather than state, deliberately: the blob samples these inside its own
+ * render loop at 60fps. Routing them through React state would cap the
+ * response at the publish rate and re-render the page on every frame.
+ */
+export type AudioFeed = {
+  levelRef: React.RefObject<number>;
+  pitchRef: React.RefObject<number>;
+  /** BAND_COUNT smoothed energies, 0..1, lowest frequency first. */
+  bandsRef: React.RefObject<Float32Array>;
+};
+
+/**
+ * Log-spaced FFT bin ranges for each band. Log, not linear, because pitch is
+ * perceived logarithmically and speech energy is concentrated low: linear
+ * bands would spend most of their resolution above 4kHz where little happens.
+ */
+function bandEdges(sampleRate: number, fftSize: number): Array<[number, number]> {
+  const binHz = sampleRate / fftSize;
+  const edges: Array<[number, number]> = [];
+  for (let i = 0; i < BAND_COUNT; i++) {
+    const f0 = BAND_LO_HZ * Math.pow(BAND_HI_HZ / BAND_LO_HZ, i / BAND_COUNT);
+    const f1 = BAND_LO_HZ * Math.pow(BAND_HI_HZ / BAND_LO_HZ, (i + 1) / BAND_COUNT);
+    const b0 = Math.max(1, Math.floor(f0 / binHz));
+    const b1 = Math.max(b0 + 1, Math.ceil(f1 / binHz));
+    edges.push([b0, b1]);
+  }
+  return edges;
+}
 
 export type AudioLevel = {
   /** 0..1, smoothed RMS. */
@@ -53,6 +95,8 @@ export type AudioLevel = {
   /** Per-frame amplitude for anything that cannot wait for a re-render. */
   levelRef: React.RefObject<number>;
   pitchRef: React.RefObject<number>;
+  /** Everything a visual needs, as refs, for per-frame reading. */
+  feed: AudioFeed;
   start: () => Promise<void>;
   stop: () => void;
 };
@@ -129,6 +173,14 @@ export function useAudioLevel(): AudioLevel {
   const ctxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sinkRef = useRef<GainNode | null>(null);
+  // A second analyser for the spectrum. Separate from the time-domain one
+  // because the bands want a larger FFT for low-frequency resolution, and
+  // running pitch autocorrelation over that larger window would double its
+  // cost on the main thread for no gain.
+  const freqRef = useRef<AnalyserNode | null>(null);
+  const freqBufRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
+  const edgesRef = useRef<Array<[number, number]> | null>(null);
+  const bandsRef = useRef<Float32Array>(new Float32Array(BAND_COUNT));
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef(0);
   const lastPublish = useRef(0);
@@ -149,6 +201,9 @@ export function useAudioLevel(): AudioLevel {
     analyserRef.current = null;
     sinkRef.current?.disconnect();
     sinkRef.current = null;
+    freqRef.current?.disconnect();
+    freqRef.current = null;
+    bandsRef.current.fill(0);
 
     // Closing can reject if the context is already closed — the page may be
     // unloading. Nothing useful to do about it either way.
@@ -223,6 +278,20 @@ export function useAudioLevel(): AudioLevel {
       sink.connect(ctx.destination);
       sinkRef.current = sink;
 
+      const freq = ctx.createAnalyser();
+      freq.fftSize = 2048;
+      freq.smoothingTimeConstant = 0.35;
+      // The dB window the byte data is scaled into. Narrower than the default
+      // so ordinary speech spans most of 0..255 instead of sitting in the
+      // bottom third.
+      freq.minDecibels = -92;
+      freq.maxDecibels = -28;
+      source.connect(freq);
+      freq.connect(sink);
+      freqRef.current = freq;
+      freqBufRef.current = new Uint8Array(new ArrayBuffer(freq.frequencyBinCount));
+      edgesRef.current = bandEdges(ctx.sampleRate, freq.fftSize);
+
       analyserRef.current = analyser;
       bufRef.current = new Float32Array(new ArrayBuffer(analyser.fftSize * 4));
 
@@ -273,6 +342,34 @@ export function useAudioLevel(): AudioLevel {
           pitchRef.current *= 0.92;
         }
 
+        // Spectral bands — what makes different sounds move different parts
+        // of the blob. Loudness alone cannot tell "sss" from "ooh"; the
+        // spectrum can.
+        const fa = freqRef.current;
+        const fb = freqBufRef.current;
+        const edges = edgesRef.current;
+        if (fa && fb && edges) {
+          fa.getByteFrequencyData(fb);
+          const bands = bandsRef.current;
+          for (let i = 0; i < BAND_COUNT; i++) {
+            const [b0, b1] = edges[i];
+            let peak = 0;
+            for (let b = b0; b < b1 && b < fb.length; b++) if (fb[b] > peak) peak = fb[b];
+            let v = peak / 255;
+            // Spectral tilt. Speech carries far more energy low than high, so
+            // without lifting the upper bands the top of the blob would almost
+            // never move — sibilants and fricatives would be invisible.
+            v *= 0.85 + (i / (BAND_COUNT - 1)) * 0.9;
+            // Gate then curve: room tone stays still, real syllables pop.
+            v = Math.max(0, v - 0.14) / 0.86;
+            v = Math.min(1, v * v * 1.7);
+            // Fast attack, slow release, per band — so a region blooms on the
+            // sound that excites it and relaxes on its own time afterwards.
+            const cur = bands[i];
+            bands[i] = cur + (v - cur) * (v > cur ? 0.5 : 0.1);
+          }
+        }
+
         framesRef.current += 1;
 
         const now = performance.now();
@@ -308,5 +405,9 @@ export function useAudioLevel(): AudioLevel {
   // released when the component goes — not left to GC.
   useEffect(() => stop, [stop]);
 
-  return { level, pitch, pitchHz, rms, debug, status, stream, levelRef, pitchRef, start, stop };
+  // Refs are stable for the component's lifetime, so this object is too — a
+  // consumer can hold it in an effect without resubscribing.
+  const feed = useMemo<AudioFeed>(() => ({ levelRef, pitchRef, bandsRef }), []);
+
+  return { level, pitch, pitchHz, rms, debug, status, stream, levelRef, pitchRef, feed, start, stop };
 }

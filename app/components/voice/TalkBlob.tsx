@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { BAND_COUNT, type AudioFeed } from "../../lib/audio/useAudioLevel";
 
 /**
  * Talk's voice blob — a GPU particle field that reacts to sound.
@@ -11,28 +12,39 @@ import { useEffect, useRef } from "react";
  * between two framebuffers. Each particle springs toward a target, is carried
  * sideways by divergence-free curl noise, and is damped exponentially.
  *
- * What is deliberately NOT ported: the bone rig, the authored scene morphs and
- * the baked target textures. Those exist to turn the field into a person or a
- * globe. A blob only needs one shape, so the target is derived from each
- * particle's seed — a stable point on a sphere — which removes two textures
- * and the whole bake step.
+ * WHAT MAKES IT FEEL ALIVE
  *
- * CONTROLLED COMPONENT, ON PURPOSE. It does not touch the microphone. The
- * companion needs that same stream for Gemini, and two getUserMedia calls
- * compete — on mobile Safari the second one can fail outright. One owner
- * acquires the audio and feeds both this and the engine. See
- * `app/lib/audio/useAudioLevel.ts`.
+ * The voice is split into BAND_COUNT frequency bands, and the sphere carries
+ * the same number of soft "sensitive patches" laid out on a golden-angle
+ * spiral — lowest frequencies at the bottom, highest at the top. Each patch
+ * swells and reaches outward on its own band. Different words have different
+ * spectra ("sss" is high, "ooh" is low), so different parts of the blob move
+ * for different sounds rather than the whole thing pulsing on loudness.
+ *
+ * Outer particles spring softer than inner ones, so they trail behind the
+ * motion — tendrils rather than a hard edge. And every patch breathes on its
+ * own phase in silence, so it never sits dead.
+ *
+ * CONTROLLED COMPONENT. It never touches the microphone: the companion needs
+ * that same stream for Gemini, and two getUserMedia calls compete. Audio
+ * arrives through `feed` (refs, read every frame) or the `level`/`pitch`
+ * props as a fallback.
  */
 
 export type BlobState = "idle" | "listening" | "thinking" | "speaking";
 
 type Props = {
   state?: BlobState;
-  /** Audio amplitude, 0..1. Ignored when state is "idle" or "thinking". */
+  /** Fallback amplitude, 0..1, used when no `feed` is supplied. */
   level?: number;
-  /** Fundamental frequency across the speech range, 0..1. 0 means unvoiced. */
+  /** Fallback pitch, 0..1, used when no `feed` is supplied. */
   pitch?: number;
-  /** CSS size in px. The canvas is rendered at devicePixelRatio above this. */
+  /**
+   * Per-frame audio as refs. Preferred over the props: read inside the render
+   * loop at full frame rate, with no React re-render involved.
+   */
+  feed?: AudioFeed | null;
+  /** Maximum CSS size in px. The canvas fills its container up to this. */
   size?: number;
   className?: string;
 };
@@ -45,11 +57,7 @@ void main(){
   gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
 }`;
 
-/**
- * Simplex noise and curl, lifted verbatim from the source engine.
- * curl(n*a) == grad(n) x a, so the field cannot compress — it only swirls,
- * which is what makes it read as wind rather than as scatter.
- */
+/** Simplex noise and curl, verbatim from the source engine. */
 const NOISE_GLSL = `
 vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}
 vec4 mod289(vec4 x){return x-floor(x*(1.0/289.0))*289.0;}
@@ -101,58 +109,86 @@ vec3 sphereDir(float seed){
 
 const FS_SIM = `#version 300 es
 precision highp float; precision highp sampler2D;
+#define BANDS ${BAND_COUNT}
 uniform sampler2D uPos, uVel;
 uniform float uDt, uTime, uSpring, uDamp, uFlow, uNoiseScale;
 uniform float uJitter, uBurst, uRadius, uDeform, uSwirl, uPitch;
+uniform float uBands[BANDS];
+uniform float uBandGain, uSharp, uIdle;
 layout(location=0) out vec4 outPos;
 layout(location=1) out vec4 outVel;
 ${NOISE_GLSL}
+
+/* Where band i listens on the sphere. A golden-angle spiral from the bottom
+   pole to the top: evenly spread with no visible stripes, and ordered so the
+   lowest frequencies sit at the bottom and sibilance lives at the top. The
+   spiral drifts slowly so the patches migrate rather than sitting fixed. */
+vec3 bandCenter(int i){
+  float k = float(i) + 0.5;
+  float y = -0.92 + 1.84 * k / float(BANDS);
+  float r = sqrt(max(0.0, 1.0 - y * y));
+  float phi = k * 2.39996323 + uTime * 0.07;
+  return vec3(cos(phi) * r, y, sin(phi) * r);
+}
+
 void main(){
   ivec2 uv = ivec2(gl_FragCoord.xy);
   vec4 P = texelFetch(uPos, uv, 0);
   vec4 V = texelFetch(uVel, uv, 0);
   float seed = P.w;
-
   vec3 dir = sphereDir(seed);
 
-  /* The shell breathes and dents. A slow noise over the sphere makes whole
-     regions swell while their neighbours hold, which is what stops it
-     reading as a perfect ball. uDeform is driven by the voice. */
-  /* Pitch sets the SPATIAL FREQUENCY of the denting: a low voice makes a few
-     broad lobes, a high one makes many fine ripples. Amplitude changes how
-     far the shell moves; pitch changes what shape it moves into, so the two
-     are legible independently rather than both reading as "louder". */
+  /* Depth biased toward the surface with a wide spread: a thick, airy shell
+     with room between particles, not a packed ball. The sqrt pushes most of
+     the population outward while leaving a sparse interior. */
+  float depth = mix(0.36, 1.0, sqrt(fract(seed * 53.13)));
+  float outer = smoothstep(0.6, 1.0, depth);
+
+  /* How strongly this particle's region is being spoken to. Each band excites
+     a soft patch around its centre; overlapping patches blend, so the
+     response flows across the surface instead of switching tile by tile. */
+  float resp = 0.0;
+  for (int i = 0; i < BANDS; i++) {
+    vec3 c = bandCenter(i);
+    float w = exp(-(1.0 - dot(dir, c)) * uSharp);
+    /* Each patch breathes on its own phase in silence, so the whole thing
+       reads as an organism at rest rather than an object switched off. */
+    float breath = uIdle * 0.10 * (0.5 + 0.5 * sin(uTime * 0.8 + float(i) * 1.7));
+    resp += w * (uBands[i] + breath);
+  }
+  resp = min(resp, 1.1);
+
+  /* Pitch sets the spatial frequency of the denting: a low voice makes broad
+     lobes, a high one fine ripples. */
   float scale = uNoiseScale * mix(1.0, 3.4, uPitch);
   float wob = snoise(dir * scale + vec3(0.0, 0.0, uTime * (0.45 + uPitch * 1.1)));
   float shell = uRadius * (1.0 + wob * uDeform);
 
-  /* Depth in the shell, so the cloud has thickness instead of being a
-     soap bubble one particle deep. */
-  float depth = mix(0.72, 1.0, fract(seed * 53.13));
-  vec3 tgt = dir * shell * depth;
+  /* The active region reaches out. Outer particles reach furthest, so a
+     spoken-to patch grows tendrils rather than just bulging. */
+  float reach = resp * uRadius * uBandGain * (0.5 + outer);
+  vec3 tgt = dir * (shell * depth + reach);
 
-  /* Wind. Same divergence-free flow as the source engine, stretched a
-     little on Y so the field drifts upward rather than churning evenly. */
+  /* Wind, stirred harder wherever the voice is landing. A perturbation of the
+     shell, never a replacement — past about uRadius it smears into a cube. */
   vec3 np = tgt * 0.006 + vec3(uTime * 0.09, uTime * -0.06, uTime * 0.11);
-  /* A perturbation of the shell, NOT a replacement for it: once this
-     term approaches uRadius the sphere smears into a filled cube and
-     stops reading as a blob at all. */
-  tgt += curlNoise(np) * uFlow * vec3(1.0, 1.15, 1.0);
+  tgt += curlNoise(np) * uFlow * (1.0 + resp * 1.5) * vec3(1.0, 1.15, 1.0);
 
-  /* Radial kick on a loud syllable — the thing that makes it feel alive. */
+  /* A small global kick on a loud syllable, on top of the regional response. */
   tgt += dir * uBurst * (0.45 + fract(seed * 13.71));
 
   vec3 pos = P.xyz, vel = V.xyz;
 
-  vec3 f = (tgt - pos) * uSpring;
+  /* Outer particles spring softer and so trail behind — the lag is what makes
+     the edge read as living tissue rather than a rigid surface. */
+  float k = uSpring * mix(1.0, 0.5, outer);
+  vec3 f = (tgt - pos) * k;
 
-  /* Never fully still: a slow breathing drift keeps the field alive even
-     in silence. Straight from the original. */
+  /* Never fully still. Straight from the original. */
   f += vec3(sin(uTime * 1.17 + pos.y * 0.011 + seed * 6.28),
             cos(uTime * 0.93 + pos.x * 0.013 + seed * 4.71),
             sin(uTime * 0.71 + pos.z * 0.021)) * uJitter;
 
-  /* A gentle rotation about Y so the mass turns while it listens. */
   f += vec3(-pos.z, 0.0, pos.x) * uSwirl;
 
   vel += f * uDt;
@@ -164,7 +200,9 @@ void main(){
   if (any(isnan(pos)) || any(isnan(vel))) { pos = tgt; vel = vec3(0.0); }
 
   outPos = vec4(pos, seed);
-  outVel = vec4(vel, 0.0);
+  /* The spare channel carries this particle's regional activity to the
+     renderer, so a spoken-to patch can glow as well as move. */
+  outVel = vec4(vel, resp);
 }`;
 
 const VS_PARTICLE = `#version 300 es
@@ -180,9 +218,9 @@ void main(){
   ivec2 tx = ivec2(id % int(uTexSize.x), id / int(uTexSize.x));
   vec4 P = texelFetch(uPos, tx, 0);
   vec4 V = texelFetch(uVel, tx, 0);
+  float act = clamp(V.w, 0.0, 1.1);
 
-  /* Slow turntable, so the silhouette keeps changing without the physics
-     having to do anything. */
+  /* Slow turntable. */
   float c = cos(uSpin), s = sin(uSpin);
   vec3 p = vec3(P.x * c - P.z * s, P.y, P.x * s + P.z * c);
   vec3 v = vec3(V.x * c - V.z * s, V.y, V.x * s + V.z * c);
@@ -190,7 +228,8 @@ void main(){
   float w = uFocal / max(40.0, uFocal + p.z);
   vec2 sp = p.xy * w + uRes * 0.5;
 
-  float px = uPointScale * w;
+  /* Active particles grow a little — the spoken-to region sparkles. */
+  float px = uPointScale * w * (1.0 + act * 0.55);
 
   /* Stretch along screen-space velocity — cheap, convincing motion blur. */
   vec2 sv = v.xy * w;
@@ -205,19 +244,20 @@ void main(){
   vec2 clip = (sp + off) / uRes * 2.0 - 1.0;
   gl_Position = vec4(clip, 0.0, 1.0);
 
-  /* Fast particles run hot — the same speed-to-white cue the source uses. */
   float heat = clamp(length(V.xyz) / 420.0, 0.0, 1.0);
   vec3 col = mix(uColA, uColB, clamp(p.z * 0.004 + 0.5, 0.0, 1.0));
-  col = mix(col, uColHot, heat * 0.85);
-  /* A higher voice reads brighter, so pitch is visible even when the shape
-     change is subtle. */
-  col = mix(col, uColHot, uPitch * 0.45);
+  /* Whitening is capped on every term. Additive blending already drives
+     dense areas toward white; letting heat, pitch and activity all push the
+     same way is what produced the blown-out white disc. */
+  col = mix(col, uColHot, heat * 0.4);
+  col = mix(col, uColHot, uPitch * 0.18);
+  col = mix(col, uColHot, act * 0.34);
 
-  /* Energy is conserved as the sprite smears, so a stretched one dims. */
   float a = uAlpha / max(stretch, 1.0);
-  a *= mix(1.0, 1.6, heat);
+  a *= mix(1.0, 1.3, heat);
+  a *= mix(1.0, 3.2, act);
   /* The far half is dimmer than the near half: cheapest depth cue there is. */
-  a *= mix(1.0, 0.45, smoothstep(-120.0, 160.0, p.z));
+  a *= mix(1.0, 0.4, smoothstep(-120.0, 160.0, p.z));
 
   vCol = vec4(col, a);
 }`;
@@ -239,26 +279,35 @@ void main(){
 // ------------------------------------------------------------- parameters
 
 /**
- * Per-state physics. These are the whole personality of the thing.
+ * Per-state physics — the whole personality of the thing.
  *
- *  idle      — barely moving, a slow breath
- *  listening — loose and reactive, opens up on the voice
- *  thinking  — tight, fast swirl, no audio input
- *  speaking  — firm shell that pulses with the output
+ * Alpha is low on purpose. The field is additive, so density does the
+ * brightening; a high base alpha is what turned the blob into a white disc.
  */
 const PRESETS: Record<
   BlobState,
-  { spring: number; damp: number; flow: number; jitter: number; deform: number; swirl: number; burst: number; alpha: number }
+  {
+    spring: number; damp: number; flow: number; jitter: number; deform: number;
+    swirl: number; burst: number; alpha: number; bandGain: number; idle: number;
+  }
 > = {
-  idle:      { spring: 7.0, damp: 5.0, flow: 1.8, jitter: 4, deform: 0.10, swirl: 0.10, burst: 0,  alpha: 0.26 },
-  listening: { spring: 9.0, damp: 5.2, flow: 2.0, jitter: 6, deform: 0.12, swirl: 0.16, burst: 26, alpha: 0.34 },
-  thinking:  { spring: 11.0, damp: 6.0, flow: 3.2, jitter: 4, deform: 0.13, swirl: 0.62, burst: 0, alpha: 0.32 },
-  speaking:  { spring: 10.0, damp: 5.0, flow: 2.0, jitter: 5, deform: 0.14, swirl: 0.22, burst: 30, alpha: 0.40 },
+  idle:      { spring: 7.0,  damp: 5.0, flow: 1.8, jitter: 4, deform: 0.10, swirl: 0.10, burst: 0,  alpha: 0.17, bandGain: 0.30, idle: 1.0 },
+  listening: { spring: 9.0,  damp: 5.2, flow: 2.0, jitter: 6, deform: 0.12, swirl: 0.16, burst: 10, alpha: 0.20, bandGain: 0.62, idle: 0.45 },
+  thinking:  { spring: 11.0, damp: 6.0, flow: 3.2, jitter: 4, deform: 0.13, swirl: 0.62, burst: 0,  alpha: 0.19, bandGain: 0.30, idle: 0.0 },
+  speaking:  { spring: 10.0, damp: 5.0, flow: 2.0, jitter: 5, deform: 0.14, swirl: 0.22, burst: 12, alpha: 0.22, bandGain: 0.62, idle: 0.35 },
 };
 
 const ACCENT = [1.0, 0.353, 0.122]; // #FF5A1F
 const ACCENT_SOFT = [1.0, 0.478, 0.271]; // #FF7A45
-const HOT = [1.0, 0.94, 0.86];
+const HOT = [1.0, 0.9, 0.78];
+
+/**
+ * Shell radius as a fraction of the canvas. Kept well under half because the
+ * reach of an active region, the curl noise and the perspective divide all
+ * stack on top of it — and once the total passes half the canvas the sphere
+ * crops into a square.
+ */
+const RADIUS_FRACTION = 0.16;
 
 function compile(gl: WebGL2RenderingContext, type: number, src: string) {
   const sh = gl.createShader(type);
@@ -295,41 +344,38 @@ export default function TalkBlob({
   state = "idle",
   level = 0,
   pitch = 0,
-  size = 320,
+  feed = null,
+  size = 440,
   className = "",
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  // Props are mirrored into refs so the render loop reads the latest value
-  // without the effect re-running — re-running it would rebuild every GL
-  // resource on each prop change, which for a 60fps `level` means rebuilding
-  // the particle buffers 60 times a second.
-  //
-  // Mirrored in an effect rather than during render: writing a ref while
-  // rendering is not safe under concurrent rendering, where a render can be
-  // thrown away or replayed. One commit of lag is irrelevant to an animation
-  // that smooths its input anyway.
+
+  // Props mirrored into refs so the render loop reads the latest value
+  // without the effect re-running — which would rebuild every GL resource.
+  // Mirrored in effects rather than during render: writing a ref while
+  // rendering is not safe under concurrent rendering.
   const stateRef = useRef(state);
-  const levelRef = useRef(level);
-  const pitchRef = useRef(pitch);
+  const levelPropRef = useRef(level);
+  const pitchPropRef = useRef(pitch);
+  const feedRef = useRef(feed);
 
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
-
   useEffect(() => {
-    levelRef.current = level;
+    levelPropRef.current = level;
   }, [level]);
-
   useEffect(() => {
-    pitchRef.current = pitch;
+    pitchPropRef.current = pitch;
   }, [pitch]);
+  useEffect(() => {
+    feedRef.current = feed;
+  }, [feed]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Respect the OS setting. A dense animated field is a genuine vestibular
-    // problem for some people, and this one is large and central.
     const reduced =
       typeof window !== "undefined" &&
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -343,41 +389,56 @@ export default function TalkBlob({
     // No WebGL2, or no float render targets: the caller shows its fallback.
     if (!gl || !gl.getExtension("EXT_color_buffer_float")) return;
 
-    // Fewer particles on a phone. This runs on mid-range Android over a
-    // mobile network as the default case, not the exception.
+    // Fewer particles on a phone — mid-range Android on a mobile network is
+    // the default case here, not the exception.
     const small = window.innerWidth < 768;
-    const TEX = small ? 96 : 160; // 9,216 or 25,600 particles
+    const TEX = small ? 96 : 144; // 9,216 or 20,736 particles
     const COUNT = TEX * TEX;
-
     const dpr = Math.min(window.devicePixelRatio || 1, small ? 1.5 : 2);
-    canvas.width = Math.round(size * dpr);
-    canvas.height = Math.round(size * dpr);
 
-    let simProg: WebGLProgram | null = null;
-    let drawProg: WebGLProgram | null = null;
+    // The canvas is sized by CSS and measured here, so the blob fills its
+    // container on a phone and caps at `size` on a desktop. Resizing only
+    // re-measures; the particle buffers are not rebuilt.
+    let cssSize = canvas.clientWidth || size;
+    const measure = () => {
+      cssSize = canvas.clientWidth || size;
+      canvas.width = Math.max(1, Math.round(cssSize * dpr));
+      canvas.height = Math.max(1, Math.round(cssSize * dpr));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(canvas);
+
+    let simProg: WebGLProgram;
+    let drawProg: WebGLProgram;
     try {
       simProg = program(gl, VS_FULLSCREEN, FS_SIM);
       drawProg = program(gl, VS_PARTICLE, FS_PARTICLE);
     } catch (e) {
       if (process.env.NODE_ENV !== "production") console.error("[TalkBlob]", e);
+      ro.disconnect();
       return;
     }
 
-    // --- particle state textures -----------------------------------------
+    // Uniform locations looked up once. Doing it per frame is ~40 string
+    // lookups every 16ms for values that never change.
+    const locCache = new Map<string, WebGLUniformLocation | null>();
+    const loc = (prog: WebGLProgram, name: string) => {
+      const key = (prog === simProg ? "s:" : "d:") + name;
+      if (!locCache.has(key)) locCache.set(key, gl.getUniformLocation(prog, name));
+      return locCache.get(key) ?? null;
+    };
+
+    // --- particle state ----------------------------------------------------
     const pos = new Float32Array(COUNT * 4);
     const vel = new Float32Array(COUNT * 4);
     for (let i = 0; i < COUNT; i++) {
-      // Start scattered well outside the shell so the first seconds are the
-      // field gathering itself, rather than a ball simply appearing.
       const a = Math.random() * Math.PI * 2;
       const z = Math.random() * 2 - 1;
       const r = Math.sqrt(1 - z * z);
-      // Scattered just outside the shell. Far enough that the opening reads as
-      // the field gathering itself, close enough that it is formed in a few
-      // hundred milliseconds — a blob that takes seconds to appear looks
-      // broken, not dramatic. Relative to `size` so the intro does not get
-      // longer on a bigger canvas.
-      const d = size * (0.22 + Math.random() * 0.2);
+      // Scattered just outside the shell: the opening reads as the field
+      // gathering itself, and it is formed within a few hundred milliseconds.
+      const d = cssSize * (0.2 + Math.random() * 0.18);
       pos[i * 4 + 0] = Math.cos(a) * r * d;
       pos[i * 4 + 1] = Math.sin(a) * r * d;
       pos[i * 4 + 2] = z * d;
@@ -410,96 +471,99 @@ export default function TalkBlob({
     }
     let fboA = fbo(posA, velA);
     let fboB = fbo(posB, velB);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
-    const uSim = (n: string) => gl.getUniformLocation(simProg!, n);
-    const uDraw = (n: string) => gl.getUniformLocation(drawProg!, n);
+    const bands = new Float32Array(BAND_COUNT);
 
     let raf = 0;
     let last = performance.now();
     let time = 0;
     let spin = 0;
-    // Smoothed level. Raw amplitude is jittery enough to make the blob
-    // twitch; the asymmetric rise/fall makes it snap open on a syllable and
-    // settle gently afterwards, which is what reads as "voice".
+    // Asymmetric smoothing of overall level: snap open, settle slowly.
     let smooth = 0;
     let smoothPitch = 0;
-    let voiced = 0;
     let disposed = false;
 
     function frame(now: number) {
       if (disposed) return;
       raf = requestAnimationFrame(frame);
-      const dtRaw = (now - last) / 1000;
+
+      // Clamp BOTH ends: a backgrounded tab returns a huge dt and explodes
+      // the spring, and a non-monotonic timestamp gives a negative dt that
+      // integrates backwards. Math.min alone allows the latter.
+      const dt = Math.max(0, Math.min((now - last) / 1000, 1 / 30));
       last = now;
-      // Clamp BOTH ends. The upper bound stops a backgrounded tab returning a
-      // huge dt and exploding the spring. The lower bound matters too: any
-      // path that hands the loop a timestamp older than the last one — a
-      // non-monotonic clock, or a test harness driving frames by hand —
-      // produces a negative dt, which integrates the simulation backwards and
-      // diverges. Math.min alone silently allows that.
-      const dt = Math.max(0, Math.min(dtRaw, 1 / 30));
       time += dt;
 
-      const p = PRESETS[stateRef.current];
-      const silent = stateRef.current === "idle" || stateRef.current === "thinking";
-      const target = silent ? 0 : Math.min(1, Math.max(0, levelRef.current));
-      // Asymmetric on purpose: snap open on a syllable, settle slowly after.
-      // Symmetric smoothing makes speech read as a vague pulsing.
+      const st = stateRef.current;
+      const p = PRESETS[st];
+      const silent = st === "idle" || st === "thinking";
+      const src = feedRef.current;
+
+      const rawLevel = src ? src.levelRef.current : levelPropRef.current;
+      const rawPitch = src ? src.pitchRef.current : pitchPropRef.current;
+      const target = silent ? 0 : Math.min(1, Math.max(0, rawLevel));
       smooth += (target - smooth) * (target > smooth ? 0.55 : 0.09);
-
-      const pitchTarget = silent ? 0 : Math.min(1, Math.max(0, pitchRef.current));
+      const pitchTarget = silent ? 0 : Math.min(1, Math.max(0, rawPitch));
       smoothPitch += (pitchTarget - smoothPitch) * 0.25;
-      voiced = smoothPitch;
 
-      spin += dt * (0.12 + smooth * 0.9);
+      // Band energies. With a feed they come straight from the spectrum.
+      // Without one (a caller passing only `level`), a scalar is spread
+      // across the bands with a travelling phase so regions still move
+      // independently rather than the whole blob pulsing as one.
+      const srcBands = src?.bandsRef.current;
+      for (let i = 0; i < BAND_COUNT; i++) {
+        const next = silent
+          ? 0
+          : srcBands
+            ? srcBands[i]
+            : smooth * (0.55 + 0.45 * Math.sin(time * 3.1 + i * 1.3));
+        bands[i] += (next - bands[i]) * 0.5;
+      }
+
+      spin += dt * (0.1 + smooth * 0.6);
 
       const g = gl!;
+      const radius = cssSize * RADIUS_FRACTION;
 
       // ---- simulate ----
-      // Blending MUST be off here. The draw pass below enables additive
-      // blending, and GL state is global — leaving it on means the sim's
-      // output is ADDED to whatever the target texture already held rather
-      // than replacing it. With ping-pong that produces x[n] = f(x[n-1]) +
-      // x[n-2]: a Fibonacci recurrence whose ratio converges on the golden
-      // ratio, which is exactly how this presented — every value, including
-      // the supposedly-copied particle seed, growing by 1.618x per frame.
+      // Blending MUST be off here. The draw pass enables additive blending
+      // and GL state is global; left on, the sim's output is ADDED to the
+      // target texture instead of replacing it, which with ping-pong is a
+      // Fibonacci recurrence — every value, including the copied seed,
+      // growing by 1.618x per frame.
       g.disable(g.BLEND);
       g.bindFramebuffer(g.FRAMEBUFFER, fboB);
       g.viewport(0, 0, TEX, TEX);
       g.useProgram(simProg);
       g.activeTexture(g.TEXTURE0);
       g.bindTexture(g.TEXTURE_2D, posA);
-      g.uniform1i(uSim("uPos"), 0);
+      g.uniform1i(loc(simProg, "uPos"), 0);
       g.activeTexture(g.TEXTURE1);
       g.bindTexture(g.TEXTURE_2D, velA);
-      g.uniform1i(uSim("uVel"), 1);
-      g.uniform1f(uSim("uDt"), reduced ? dt * 0.35 : dt);
-      g.uniform1f(uSim("uTime"), time);
-      g.uniform1f(uSim("uSpring"), p.spring);
-      g.uniform1f(uSim("uDamp"), p.damp);
-      // Every audio-driven term below is sized against the SHELL RADIUS rather
-      // than in absolute units, so the reaction is the same proportion of the
-      // blob at any component size. The budget matters: radius + curl + burst
-      // is magnified up to ~1.5x by the perspective divide, and once that
-      // exceeds half the canvas the sphere crops into a square.
-      g.uniform1f(uSim("uFlow"), p.flow * (1 + smooth * 1.6));
-      g.uniform1f(uSim("uNoiseScale"), 0.009);
-      g.uniform1f(uSim("uJitter"), reduced ? p.jitter * 0.3 : p.jitter);
-      // Cubed: quiet room tone barely registers, a spoken syllable kicks hard.
-      // Linear here made normal speech look like a gentle wobble.
-      g.uniform1f(uSim("uBurst"), (size / 340) * p.burst * smooth * smooth * smooth);
-      // Sized so the outermost particles land inside the canvas: near ones
-      // are magnified ~1.5x by the perspective divide and the curl noise
-      // pushes another ~40% beyond the shell, so the base radius has to be
-      // well under half the canvas or the sphere crops to a square.
-      g.uniform1f(uSim("uRadius"), size * 0.135 + smooth * size * 0.075);
-      g.uniform1f(uSim("uDeform"), p.deform + smooth * 0.55);
-      g.uniform1f(uSim("uSwirl"), reduced ? 0 : p.swirl * (1 + smooth * 1.8));
-      g.uniform1f(uSim("uPitch"), voiced);
+      g.uniform1i(loc(simProg, "uVel"), 1);
+      g.uniform1f(loc(simProg, "uDt"), reduced ? dt * 0.35 : dt);
+      g.uniform1f(loc(simProg, "uTime"), time);
+      g.uniform1f(loc(simProg, "uSpring"), p.spring);
+      g.uniform1f(loc(simProg, "uDamp"), p.damp);
+      g.uniform1f(loc(simProg, "uFlow"), p.flow * (1 + smooth * 0.8));
+      g.uniform1f(loc(simProg, "uNoiseScale"), 0.009);
+      g.uniform1f(loc(simProg, "uJitter"), reduced ? p.jitter * 0.3 : p.jitter);
+      // Cubed so room tone is ignored and a syllable kicks.
+      g.uniform1f(loc(simProg, "uBurst"), (cssSize / 340) * p.burst * smooth * smooth * smooth);
+      g.uniform1f(loc(simProg, "uRadius"), radius * (1 + smooth * 0.12));
+      g.uniform1f(loc(simProg, "uDeform"), p.deform + smooth * 0.15);
+      g.uniform1f(loc(simProg, "uSwirl"), reduced ? 0 : p.swirl * (1 + smooth * 1.5));
+      g.uniform1f(loc(simProg, "uPitch"), smoothPitch);
+      g.uniform1fv(loc(simProg, "uBands"), bands);
+      g.uniform1f(loc(simProg, "uBandGain"), p.bandGain);
+      g.uniform1f(loc(simProg, "uSharp"), 9.5);
+      g.uniform1f(loc(simProg, "uIdle"), reduced ? p.idle * 0.3 : p.idle);
+      // The DEFAULT vertex array. Drawing through a created-but-unconfigured
+      // VAO emitted no fragments at all on this driver.
       g.bindVertexArray(null);
       g.drawArrays(g.TRIANGLES, 0, 3);
 
-      // ping-pong
       [posA, posB] = [posB, posA];
       [velA, velB] = [velB, velA];
       [fboA, fboB] = [fboB, fboA];
@@ -510,30 +574,31 @@ export default function TalkBlob({
       g.clearColor(0, 0, 0, 0);
       g.clear(g.COLOR_BUFFER_BIT);
       g.enable(g.BLEND);
-      // Additive, premultiplied: overlapping particles build to the hot core
-      // instead of averaging to mud.
+      // Additive, premultiplied: overlapping particles build to the hot core.
       g.blendFunc(g.ONE, g.ONE);
 
       g.useProgram(drawProg);
       g.activeTexture(g.TEXTURE0);
       g.bindTexture(g.TEXTURE_2D, posA);
-      g.uniform1i(uDraw("uPos"), 0);
+      g.uniform1i(loc(drawProg, "uPos"), 0);
       g.activeTexture(g.TEXTURE1);
       g.bindTexture(g.TEXTURE_2D, velA);
-      g.uniform1i(uDraw("uVel"), 1);
-      g.uniform2f(uDraw("uTexSize"), TEX, TEX);
-      g.uniform2f(uDraw("uRes"), canvas!.width, canvas!.height);
-      g.uniform1f(uDraw("uFocal"), 520);
-      g.uniform1f(uDraw("uPointScale"), 1.8 * dpr);
-      g.uniform1f(uDraw("uStretch"), 0.05);
-      g.uniform1f(uDraw("uAlpha"), p.alpha);
-      g.uniform1f(uDraw("uSpin"), spin);
-      g.uniform1f(uDraw("uPitch"), voiced);
-      g.uniform3fv(uDraw("uColA"), ACCENT);
-      g.uniform3fv(uDraw("uColB"), ACCENT_SOFT);
-      g.uniform3fv(uDraw("uColHot"), HOT);
-      // Default VAO rather than the empty one — attributeless instanced draws
-      // are legal either way, but this removes a variable while diagnosing.
+      g.uniform1i(loc(drawProg, "uVel"), 1);
+      g.uniform2f(loc(drawProg, "uTexSize"), TEX, TEX);
+      g.uniform2f(loc(drawProg, "uRes"), canvas!.width, canvas!.height);
+      // Long focal length: a flatter perspective, so the near side is not
+      // magnified past the canvas edge when a region reaches outward.
+      g.uniform1f(loc(drawProg, "uFocal"), 900);
+      // Projection is in CSS pixels scaled by dpr, so world units stay in
+      // proportion to the component at any density.
+      g.uniform1f(loc(drawProg, "uPointScale"), 1.35 * dpr);
+      g.uniform1f(loc(drawProg, "uStretch"), 0.05);
+      g.uniform1f(loc(drawProg, "uAlpha"), p.alpha);
+      g.uniform1f(loc(drawProg, "uSpin"), spin);
+      g.uniform1f(loc(drawProg, "uPitch"), smoothPitch);
+      g.uniform3fv(loc(drawProg, "uColA"), ACCENT);
+      g.uniform3fv(loc(drawProg, "uColB"), ACCENT_SOFT);
+      g.uniform3fv(loc(drawProg, "uColHot"), HOT);
       g.bindVertexArray(null);
       g.drawArraysInstanced(g.TRIANGLES, 0, 6, COUNT);
     }
@@ -543,8 +608,7 @@ export default function TalkBlob({
     return () => {
       disposed = true;
       cancelAnimationFrame(raf);
-      // Free GPU memory explicitly. These are multi-megabyte float textures;
-      // relying on GC to collect them leaks across route changes.
+      ro.disconnect();
       gl.deleteProgram(simProg);
       gl.deleteProgram(drawProg);
       gl.deleteTexture(posA);
@@ -553,11 +617,9 @@ export default function TalkBlob({
       gl.deleteTexture(velB);
       gl.deleteFramebuffer(fboA);
       gl.deleteFramebuffer(fboB);
-      // NOT loseContext(). It kills the context permanently for this canvas,
-      // and getContext() afterwards hands back the same dead one — so the
-      // component is blank after any remount, including StrictMode's
-      // mount/unmount/mount in development. Deleting the resources above
-      // already releases the GPU memory that mattered.
+      // NOT loseContext(): it kills the context permanently for this canvas,
+      // and getContext() afterwards returns the same dead one — so the blob
+      // was blank after any remount, including StrictMode's.
     };
   }, [size]);
 
@@ -566,7 +628,7 @@ export default function TalkBlob({
       ref={canvasRef}
       aria-hidden
       className={`block ${className}`}
-      style={{ width: size, height: size }}
+      style={{ width: "100%", maxWidth: size, aspectRatio: "1 / 1" }}
     />
   );
 }

@@ -27,8 +27,14 @@ const STATUS: Record<BlobState, string> = {
 };
 
 export default function TherapyPage() {
-  const { level, pitch, pitchHz, rms, debug, status, start, stop } = useAudioLevel();
+  const { level, pitch, pitchHz, rms, debug, feed, status, start, stop } = useAudioLevel();
   const [active, setActive] = useState(false);
+  // Capture diagnostics only with ?debug in the URL. Read once, lazily: the
+  // gated markup renders only after Begin (client state), so the server and
+  // first client render agree and there is nothing to mismatch on hydration.
+  const [showDebug] = useState(
+    () => typeof window !== "undefined" && new URLSearchParams(window.location.search).has("debug"),
+  );
 
   // Derived, not stored. The original version kept a separate `status` string
   // and set it from the pre-toggle value of `listening`, so the label was
@@ -100,9 +106,11 @@ export default function TherapyPage() {
           whileTap={{ scale: 0.98 }}
           transition={SPRING_SNAP}
           aria-label={active ? "End session" : "Begin session"}
-          className="mt-8 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-4 focus-visible:ring-offset-[var(--dark)]"
+          className="mt-6 w-full max-w-[440px] rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-4 focus-visible:ring-offset-[var(--dark)]"
         >
-          <TalkBlob state={blobState} level={level} pitch={pitch} size={340} />
+          {/* `feed` carries the spectrum as refs, read by the blob every frame.
+              level/pitch stay as the props fallback. */}
+          <TalkBlob state={blobState} level={level} pitch={pitch} feed={feed} size={440} />
         </motion.button>
 
         {/* Deliberately NOT wrapped in AnimatePresence mode="wait".
@@ -131,7 +139,7 @@ export default function TherapyPage() {
             microphone works and the visual response is too weak". It also
             tells the user Talk can actually hear them, which a silent orb
             does not. */}
-        {active && status === "live" ? (
+        {showDebug && active && status === "live" ? (
           <div className="mt-8 w-full max-w-[320px]">
             <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-white/50">
               <span>Level</span>
