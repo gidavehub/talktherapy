@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { motion } from "motion/react";
 import { SPRING_SOFT, SPRING_SNAP } from "@/components/motion/primitives";
 import TalkBlob, { type BlobState } from "@/components/voice/TalkBlob";
@@ -18,6 +18,20 @@ import { useAudioLevel } from "@/lib/audio/useAudioLevel";
  * actions and on audio, not on a model. That is deliberate — the UI is real
  * and the engine slots in behind it.
  */
+
+/**
+ * Blob sizing, shared between CSS and the canvas.
+ *
+ * The body's diameter is 30% of the smaller viewport side, clamped — the same
+ * formula TalkBlob uses for its radius (15%, 88..150px), so the clickable disc
+ * lines up with what is drawn. The canvas is far larger than the body: it is
+ * where thrown particles and the ember halo live, and a canvas the size of
+ * the body clips every reaction worth seeing.
+ */
+const BLOB_VARS = {
+  "--blob-d": "clamp(176px, 30vmin, 300px)",
+  "--blob-canvas": "calc(var(--blob-d) * 4.4)",
+} as CSSProperties;
 
 const STATUS: Record<BlobState, string> = {
   idle: "Tap to begin. You can stop at any time.",
@@ -64,7 +78,7 @@ export default function TherapyPage() {
   useEffect(() => stop, [stop]);
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[var(--dark)] text-white">
+    <div className="relative min-h-screen overflow-hidden bg-[var(--dark)] text-white" style={BLOB_VARS}>
       {/* Ambient warmth behind the field. */}
       <div
         aria-hidden
@@ -94,7 +108,7 @@ export default function TherapyPage() {
           initial={{ y: 12, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={SPRING_SOFT}
-          className="text-[12px] uppercase tracking-[0.22em] text-white/65"
+          className="relative z-10 text-[12px] uppercase tracking-[0.22em] text-white/65"
         >
           AI companion
         </motion.p>
@@ -106,11 +120,22 @@ export default function TherapyPage() {
           whileTap={{ scale: 0.98 }}
           transition={SPRING_SNAP}
           aria-label={active ? "End session" : "Begin session"}
-          className="mt-6 w-full max-w-[440px] rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-4 focus-visible:ring-offset-[var(--dark)]"
+          className="relative mt-8 shrink-0 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-4 focus-visible:ring-offset-[var(--dark)]"
+          style={{ width: "var(--blob-d)", height: "var(--blob-d)" }}
         >
           {/* `feed` carries the spectrum as refs, read by the blob every frame.
-              level/pitch stay as the props fallback. */}
-          <TalkBlob state={blobState} level={level} pitch={pitch} feed={feed} size={440} />
+              level/pitch stay as the props fallback. The canvas overflows the
+              button on purpose and ignores the pointer, so only the body is
+              the tap target; the page's overflow-hidden trims it at the
+              viewport. */}
+          <TalkBlob
+            state={blobState}
+            level={level}
+            pitch={pitch}
+            feed={feed}
+            className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+            style={{ width: "var(--blob-canvas)", height: "var(--blob-canvas)" }}
+          />
         </motion.button>
 
         {/* Deliberately NOT wrapped in AnimatePresence mode="wait".
@@ -123,7 +148,7 @@ export default function TherapyPage() {
           animate={{ opacity: 1 }}
           initial={{ opacity: 0 }}
           transition={SPRING_SOFT}
-          className={`mt-8 text-[14px] md:text-[15px] text-center max-w-[440px] ${
+          className={`relative z-10 mt-10 text-[14px] md:text-[15px] text-center max-w-[440px] ${
             denied ? "text-[var(--accent)]" : "text-white/75"
           }`}
           aria-live="polite"
@@ -140,7 +165,7 @@ export default function TherapyPage() {
             tells the user Talk can actually hear them, which a silent orb
             does not. */}
         {showDebug && active && status === "live" ? (
-          <div className="mt-8 w-full max-w-[320px]">
+          <div className="relative z-10 mt-8 w-full max-w-[320px]">
             <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-white/50">
               <span>Level</span>
               <span className="tabular-nums">
@@ -188,7 +213,7 @@ export default function TherapyPage() {
           </div>
         ) : null}
 
-        <div className="mt-10 flex flex-col sm:flex-row items-center gap-3">
+        <div className="relative z-10 mt-10 flex flex-col sm:flex-row items-center gap-3">
           <button
             type="button"
             onClick={active ? end : begin}
@@ -206,7 +231,7 @@ export default function TherapyPage() {
 
         {/* Never further than one line away, on the surface most likely to
             be open when someone is struggling. */}
-        <p className="mt-12 text-[11px] uppercase tracking-[0.18em] text-white/45 text-center max-w-[460px] leading-relaxed">
+        <p className="relative z-10 mt-12 text-[11px] uppercase tracking-[0.18em] text-white/45 text-center max-w-[460px] leading-relaxed">
           Talk is an AI companion, not a therapist, and cannot respond to an
           emergency.{" "}
           <Link href="/crisis" className="underline underline-offset-4 text-white/70">
