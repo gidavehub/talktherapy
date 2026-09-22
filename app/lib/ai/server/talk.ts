@@ -3,12 +3,24 @@ import { generate, models, streamGenerate, textOf, type Content } from "./vertex
 import {
   LANGUAGES,
   RISK_LEVELS,
+  type ConversationMode,
   type HeardLanguage,
   type HistoryTurn,
   type Language,
   type Risk,
   type TurnResult,
 } from "../protocol";
+import {
+  FORMAT_PREFS,
+  GENDER_PREFS,
+  SPECIALIZATIONS,
+  SUPPORT_TYPES,
+  cleanIntake,
+  mergeIntake,
+  missingFields,
+  type Intake,
+  type RequiredField,
+} from "../../matching";
 
 /**
  * Talk's conversation pipeline — one voice turn.
@@ -53,7 +65,7 @@ const SPELLINGS = [
 
 const SYSTEM = `You are Talk, the voice companion inside Talk Therapy, a mental-wellbeing service for people in The Gambia. You speak aloud with a warm, calm, female Gambian voice. You are an AI companion — not a therapist, doctor or human. If asked, say so plainly.
 
-EACH TURN the user's newest message arrives as audio. Fill every field:
+EACH TURN the user's newest message arrives as audio — or, now and then, as typed text, in which case the transcript is exactly what they typed. Fill every field:
 - transcript: exactly what they said, in the language and spelling they used. Keep code-switching as spoken (Wolof with English words stays that way). Do not translate, correct or tidy it. If there is no intelligible speech — silence, noise, a cough, background talk not addressed to you — return an empty transcript.
 - language: the main language they spoke: english, wolof, mandinka, pulaar, or other. Use "none" only when the transcript is empty.
 - english: a faithful English translation of the transcript. Identical to the transcript if they spoke English.
@@ -185,12 +197,113 @@ function historyContents(history: HistoryTurn[]): Content[] {
   return out;
 }
 
-function systemFor(summary: string) {
+function systemFor(summary: string, mode: ConversationMode, intake: Intake) {
   const memory = summary.trim()
     ? `\n\nEARLIER IN THIS CONVERSATION (your own summary — the recent turns follow as messages):\n${summary.trim()}`
     : "";
-  return SYSTEM + memory;
+  return SYSTEM + (mode === "intake" ? intakeSection(intake) : "") + memory;
 }
+
+// ------------------------------------------------------------------- intake
+
+/**
+ * The onboarding, as an agent loop.
+ *
+ * The page sends everything learned so far; this works out what is still
+ * missing and tells the model to ask for exactly the next thing — one
+ * question, in the person's language, in a conversation rather than a form.
+ * The model returns what THIS message told it as structured fields; the
+ * server merges and validates them, and decides completion itself from the
+ * merged result rather than trusting the model's say-so.
+ */
+const FIELD_GUIDE: Record<RequiredField, string> = {
+  concerns: "what has been weighing on them, and what brings them to Talk",
+  supportType:
+    "what kind of help they want — therapy (working through something deeper with a professional), counselling (talking things through with someone), coaching (goals, confidence, direction), or social support (practical help with family, work, money or housing)",
+  counsellorGender: "whether they would prefer to talk to a woman or a man, or it does not matter",
+  format: "how they would like to meet — video call, voice call, chat (typed messages), or in person",
+};
+
+function describeKnown(intake: Intake): string {
+  const known: string[] = [];
+  if (intake.preferredName) known.push(`name: ${intake.preferredName}`);
+  if (intake.concerns.length) {
+    known.push(`concerns: ${intake.concerns.join(", ")}${intake.concernSummary ? ` (${intake.concernSummary})` : ""}`);
+  }
+  if (intake.supportType) known.push(`support type: ${intake.supportType}`);
+  if (intake.counsellorGender) known.push(`counsellor gender: ${intake.counsellorGender}`);
+  if (intake.format) known.push(`format: ${intake.format}`);
+  return known.length ? known.join("; ") : "nothing yet";
+}
+
+function intakeSection(intake: Intake): string {
+  const missing = missingFields(intake);
+  const todo = missing.length
+    ? missing.map((f, i) => `${i + 1}. ${FIELD_GUIDE[f]}`).join("\n")
+    : "(nothing — close the conversation now)";
+  const language = intake.language
+    ? `${intake.language}. Ask everything in ${intake.language}, even if they mix in English words — this overrides "answer in the language they just used", unless they clearly ask to switch.`
+    : "not known yet. They may use English, Wolof, Mandinka or Pulaar.";
+
+  return `
+
+RIGHT NOW: GETTING TO KNOW THEM
+This person has just joined. Before they meet a counsellor you are getting to know them — gently, and quickly — so Talk can suggest the right people. This is a conversation, not a form: ask ONE thing at a time in plain, warm words, and acknowledge what they share before moving on. Never list the questions, number them, or mention a form.
+
+Their preferred language: ${language}
+If they say or show they would rather use another language — for example "dégguma anglais, Wolof laa dégg" — switch to it at once, set intake.language, and ask everything from then on in that language.
+
+Already known: ${describeKnown(intake)}
+Still to learn, in this order — ask only about the FIRST one:
+${todo}
+
+Fill "intake" with what THIS message tells you, null (or an empty list) for anything it does not:
+- preferredName: what they want to be called.
+- language: english, wolof, mandinka, pulaar or other — the language they want to be supported in.
+- concerns: any of ${SPECIALIZATIONS.join(", ")} ("depression" covers low mood; "youth" means they are young or a student). concernSummary: one short English sentence in their own terms.
+- supportType: therapy, counselling, coaching, social-support, or unsure. Offer these as simple choices in their language.
+- counsellorGender: woman, man, or any.
+- format: video, voice, chat, in-person, or any.
+
+- If they would rather not answer something, accept it kindly and record unsure / any.
+- If they want to skip the questions and simply be matched, record unsure / any for whatever is left and finish.
+- When this message answers the last thing still to learn: set intakeComplete true, ask nothing more, thank them (by name if you know it), and tell them you will now show them some counsellors who could be a good fit. Otherwise intakeComplete is false.
+- Safety comes first: if they share something heavy or unsafe, respond to that with care before any question, and follow the SAFETY rules.`;
+}
+
+const INTAKE_SCHEMA = {
+  ...TURN_SCHEMA,
+  properties: {
+    ...TURN_SCHEMA.properties,
+    intake: {
+      type: "OBJECT",
+      properties: {
+        preferredName: { type: "STRING", nullable: true },
+        language: { type: "STRING", enum: [...LANGUAGES], nullable: true },
+        concerns: { type: "ARRAY", items: { type: "STRING", enum: [...SPECIALIZATIONS] } },
+        concernSummary: { type: "STRING", nullable: true },
+        supportType: { type: "STRING", enum: [...SUPPORT_TYPES], nullable: true },
+        counsellorGender: { type: "STRING", enum: [...GENDER_PREFS], nullable: true },
+        format: { type: "STRING", enum: [...FORMAT_PREFS], nullable: true },
+      },
+      required: ["preferredName", "language", "concerns", "concernSummary", "supportType", "counsellorGender", "format"],
+    },
+    intakeComplete: { type: "BOOLEAN" },
+  },
+  required: [...TURN_SCHEMA.required, "intake", "intakeComplete"],
+  // What was learned, and whether that finishes it, before the reply is written.
+  propertyOrdering: [
+    "transcript",
+    "language",
+    "english",
+    "risk",
+    "intake",
+    "intakeComplete",
+    "helpLine",
+    "reply",
+    "replyEnglish",
+  ],
+};
 
 // --------------------------------------------------------------------- turn
 
@@ -200,28 +313,35 @@ function pick<T extends string>(v: unknown, allowed: readonly T[], otherwise: T)
   return allowed.includes(v as T) ? (v as T) : otherwise;
 }
 
-export async function runTurn(
-  input: { audio: string; history: HistoryTurn[]; summary: string },
-  signal?: AbortSignal,
-): Promise<TurnResult> {
+export type TurnInput = {
+  /** Base64 WAV. Either this or `text`. */
+  audio?: string;
+  text?: string;
+  history: HistoryTurn[];
+  summary: string;
+  mode: ConversationMode;
+  /** Intake mode: what is already known. */
+  intake: Intake;
+};
+
+export async function runTurn(input: TurnInput, signal?: AbortSignal): Promise<TurnResult> {
+  const intakeMode = input.mode === "intake";
+  const message = input.audio
+    ? { inlineData: { mimeType: "audio/wav", data: input.audio } }
+    : { text: input.text ?? "" };
+
   const res = await generate(
     models.text,
     {
-      systemInstruction: { parts: [{ text: systemFor(input.summary) }] },
-      contents: [
-        ...historyContents(input.history),
-        {
-          role: "user",
-          parts: [{ inlineData: { mimeType: "audio/wav", data: input.audio } }],
-        },
-      ],
+      systemInstruction: { parts: [{ text: systemFor(input.summary, input.mode, input.intake) }] },
+      contents: [...historyContents(input.history), { role: "user", parts: [message] }],
       generationConfig: {
         // Low enough that the transcript stays verbatim, high enough that
         // Talk does not answer every sadness with the same sentence.
         temperature: 0.5,
         maxOutputTokens: 4096,
         responseMimeType: "application/json",
-        responseSchema: TURN_SCHEMA,
+        responseSchema: intakeMode ? INTAKE_SCHEMA : TURN_SCHEMA,
         // "low" measured ~5.6s against ~15s for the default; "minimal" is
         // rejected by this model and a zero budget is ignored.
         thinkingConfig: { thinkingLevel: "low" },
@@ -257,7 +377,7 @@ export async function runTurn(
     : "none";
   const reply = transcript ? str(parsed.reply) : "";
 
-  return ensureHelp(
+  const result = ensureHelp(
     {
       transcript,
       language,
@@ -268,6 +388,103 @@ export async function runTurn(
     },
     str(parsed.helpLine),
   );
+  if (!intakeMode || !transcript) return result;
+
+  // Merge what this message told Talk into what was already known. The
+  // conversation language counts as a preference once it is not English,
+  // even if they never said so in words.
+  const learned = cleanIntake(parsed.intake, LANGUAGES);
+  if (!learned.language && language !== "none" && language !== "english" && !input.intake.language) {
+    learned.language = language;
+  }
+  const intake = mergeIntake(input.intake, learned);
+  // Completion is decided from the merged facts, not the model's flag: a
+  // model that says "done" with a gap would strand someone unmatched, and one
+  // that forgets to say "done" would keep asking after it has everything.
+  const intakeComplete = missingFields(intake).length === 0;
+  if (intakeComplete && !intake.completedAt) intake.completedAt = Date.now();
+  return { ...result, intake, intakeComplete };
+}
+
+// ----------------------------------------------------------------- greeting
+
+/**
+ * Talk speaks first.
+ *
+ * A brand-new person hears a fixed opening — no model call, so she starts
+ * speaking within a second of the page opening. Someone returning mid-way
+ * gets a model-written line in their own language that picks up with the
+ * next thing still to learn.
+ */
+function firstName(displayName: string | null | undefined): string | null {
+  const first = displayName?.trim().split(/\s+/)[0];
+  return first && first.length <= 30 ? first : null;
+}
+
+// Short on purpose: the first draft ran 23 seconds, which is a speech, not a
+// welcome. Who she is, what happens next, that any language works — then the
+// first question.
+const OPENING = (name: string | null) =>
+  "Salaam aleekum. I'm Talk, an AI companion — let's find you the right counsellor. " +
+  "Speak English, Wolof, Mandinka or Pulaar. " +
+  (name ? `Shall I call you ${name}?` : "What should I call you?");
+
+const GREETING_SCHEMA = {
+  type: "OBJECT",
+  properties: { reply: { type: "STRING" }, replyEnglish: { type: "STRING" } },
+  required: ["reply", "replyEnglish"],
+};
+
+export async function runGreeting(
+  input: { mode: ConversationMode; intake: Intake; displayName: string | null },
+  signal?: AbortSignal,
+): Promise<TurnResult> {
+  const { intake } = input;
+  const name = intake.preferredName ?? firstName(input.displayName);
+  const language: Language = intake.language ?? "english";
+  const started = intake.preferredName || intake.concerns.length || intake.supportType;
+
+  if (input.mode === "intake" && !started) {
+    const reply = OPENING(firstName(input.displayName));
+    return { transcript: "", language: "english", english: "", risk: "none", reply, replyEnglish: reply, greeting: true, intake };
+  }
+
+  const ask =
+    input.mode === "intake"
+      ? `They are coming back to finish getting started. In ${language}, welcome them back${name ? ` by name (${name})` : ""} in one short sentence, then ask about: ${FIELD_GUIDE[missingFields(intake)[0] ?? "concerns"]}.`
+      : `They have opened a conversation with you. In ${language}, greet them warmly${name ? ` by name (${name})` : ""} and ask, in one short sentence, what is on their mind today.`;
+
+  const res = await generate(
+    models.text,
+    {
+      systemInstruction: { parts: [{ text: SYSTEM + (input.mode === "intake" ? intakeSection(intake) : "") }] },
+      contents: [{ role: "user", parts: [{ text: `[${ask} Reply only with what you will say.]` }] }],
+      generationConfig: {
+        temperature: 0.6,
+        maxOutputTokens: 2048,
+        responseMimeType: "application/json",
+        responseSchema: GREETING_SCHEMA,
+        thinkingConfig: { thinkingLevel: "low" },
+      },
+      safetySettings: SAFETY_SETTINGS,
+    },
+    signal,
+  );
+  let parsed: Record<string, unknown> = {};
+  try {
+    parsed = JSON.parse(textOf(res));
+  } catch {}
+  const reply = str(parsed.reply) || (name ? `Welcome back, ${name}.` : "Welcome back.");
+  return {
+    transcript: "",
+    language,
+    english: "",
+    risk: "none",
+    reply,
+    replyEnglish: str(parsed.replyEnglish) || reply,
+    greeting: true,
+    intake,
+  };
 }
 
 // -------------------------------------------------------------------- voice

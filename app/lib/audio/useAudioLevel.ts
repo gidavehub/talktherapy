@@ -70,7 +70,12 @@ export type AudioLevel = {
   stop: () => void;
 };
 
-export type MicGraph = { ctx: AudioContext; source: MediaStreamAudioSourceNode };
+/**
+ * `source` is null when the microphone was refused: the context is kept alive
+ * anyway (it was created inside the user's click, so it may still play sound),
+ * which lets Talk speak and the person type instead of being locked out.
+ */
+export type MicGraph = { ctx: AudioContext; source: MediaStreamAudioSourceNode | null };
 
 /** How often the React-visible value is refreshed. */
 const PUBLISH_MS = 66;
@@ -222,8 +227,7 @@ export function useAudioLevel(): AudioLevel {
     } catch (e) {
       const name = (e as DOMException)?.name;
       setStatus(name === "NotAllowedError" || name === "SecurityError" ? "denied" : "error");
-      ctxRef.current?.close().catch(() => {});
-      ctxRef.current = null;
+      // The context stays open — see MicGraph. stop() closes it.
       if (process.env.NODE_ENV !== "production") {
         console.warn("[useAudioLevel] microphone unavailable:", e);
       }
@@ -237,7 +241,7 @@ export function useAudioLevel(): AudioLevel {
   const graph = useCallback((): MicGraph | null => {
     const ctx = ctxRef.current;
     const source = sourceRef.current;
-    return ctx && source ? { ctx, source } : null;
+    return ctx ? { ctx, source } : null;
   }, []);
 
   return { level, pitch, pitchHz, rms, debug, status, stream, levelRef, pitchRef, feed, graph, start, stop };

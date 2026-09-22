@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
 import { motion, useScroll, useTransform } from "motion/react";
 import { useRef } from "react";
 import StatCard from "./StatCard";
 import { SPRING_SOFT, SPRING_SNAP } from "./motion/primitives";
+import StartLink from "./StartLink";
 
 function Star({ delay = 0 }: { delay?: number }) {
   return (
@@ -48,8 +48,8 @@ function StarRow() {
 function CTAButton() {
   return (
     <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }} transition={SPRING_SNAP}>
-      <Link
-        href="/sign-up"
+      <StartLink
+        
         className="inline-flex h-12 items-center gap-3 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-soft)] transition-colors text-white pl-6 pr-2 text-[13px] uppercase tracking-[0.12em] font-medium shadow-[0_10px_30px_-10px_rgba(255,90,31,0.6)]"
       >
         Book Session
@@ -62,7 +62,7 @@ function CTAButton() {
             <path d="M5 12h14M13 6l6 6-6 6" />
           </svg>
         </motion.span>
-      </Link>
+      </StartLink>
     </motion.div>
   );
 }

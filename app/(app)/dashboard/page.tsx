@@ -9,10 +9,13 @@ import Card, { StatTile, DarkPanel } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Feedback";
 import MoodTrendChart from "@/components/app/MoodTrendChart";
+import CounsellorCard from "@/components/counsellors/CounsellorCard";
+import { Spinner } from "@/components/ui/Feedback";
+import { useMatches } from "@/lib/useMatches";
 import {
   IconMood,
   IconJournal,
-  IconPeople,
+  IconMic,
   IconResources,
 } from "@/components/ui/icons";
 import {
@@ -28,10 +31,11 @@ import type { JournalEntry, MoodEntry } from "@/lib/models";
 /**
  * Patient home.
  *
- * Ordered by what is most useful to someone opening the app on a bad day:
- * the check-in first (lowest effort, most benefit), then what they have
- * recorded, then routes to deeper support. Crisis help is reachable from here
- * without scrolling past anything.
+ * Counsellors first. The point of Talk is getting someone to the right person,
+ * so the first thing on the page is who fits them — picked from what they told
+ * Talk at onboarding — with "View all" one tap away. The check-in and journal
+ * follow for anyone who wants them. Crisis help is reachable from here without
+ * scrolling past anything.
  */
 
 function greeting(): string {
@@ -43,6 +47,8 @@ function greeting(): string {
 
 export default function DashboardPage() {
   const { user, profile } = useAuth();
+  const intake = profile?.intake ?? null;
+  const { matches, loading: matchesLoading } = useMatches(intake);
   const [moods, setMoods] = useState<MoodEntry[] | null>(null);
   const [journal, setJournal] = useState<JournalEntry[] | null>(null);
 
@@ -92,6 +98,49 @@ export default function DashboardPage() {
           {firstName ? `, ${firstName}.` : "."}
         </h1>
       </motion.div>
+
+      {/* Counsellors for you — the first option, always. */}
+      <section>
+        <div className="flex items-end justify-between gap-4 mb-4">
+          <h2 className="text-[20px] md:text-[24px] tracking-tight font-medium">Counsellors for you</h2>
+          <Link
+            href="/counsellors"
+            className="text-[12px] uppercase tracking-[0.14em] text-[var(--muted)] underline underline-offset-4 hover:text-[var(--foreground)] transition-colors shrink-0"
+          >
+            View all
+          </Link>
+        </div>
+        {matchesLoading ? (
+          <div className="flex justify-center py-10 text-[var(--muted)]">
+            <Spinner />
+          </div>
+        ) : matches && matches.length ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {matches.slice(0, 3).map((m, i) => (
+              <CounsellorCard
+                key={m.profile.uid}
+                profile={m.profile}
+                index={i}
+                reasons={intake ? m.reasons : undefined}
+                best={Boolean(intake) && i === 0 && m.reasons.length > 0}
+                compact
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="text-[14px] text-[var(--muted)]">
+            Counsellors are being verified — who fits you will appear here.
+          </p>
+        )}
+        {!intake ? (
+          <Link
+            href="/therapy?intake"
+            className="mt-4 inline-block text-[12px] uppercase tracking-[0.14em] underline underline-offset-4 hover:text-[var(--accent)] transition-colors"
+          >
+            Tell Talk what you need for better matches
+          </Link>
+        ) : null}
+      </section>
 
       {/* Check-in prompt */}
       {!checkedIn ? (
@@ -236,17 +285,17 @@ export default function DashboardPage() {
 
         <Card hover radius="md" padding="p-6" delay={0.1}>
           <span className="h-10 w-10 rounded-full bg-[var(--dark)] text-white flex items-center justify-center">
-            <IconPeople />
+            <IconMic />
           </span>
-          <h3 className="mt-5 text-[16px] font-medium">Talk to someone</h3>
+          <h3 className="mt-5 text-[16px] font-medium">Talk it through</h3>
           <p className="mt-2 text-[13px] text-[var(--muted)] leading-relaxed">
-            Browse verified counsellors by specialisation and language.
+            Talk listens any time, in your language.
           </p>
           <Link
-            href="/therapists"
+            href="/therapy"
             className="mt-4 inline-block text-[12px] uppercase tracking-[0.14em] underline underline-offset-4 hover:text-[var(--accent)] transition-colors"
           >
-            Find a counsellor
+            Open Talk
           </Link>
         </Card>
       </div>

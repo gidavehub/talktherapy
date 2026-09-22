@@ -6,6 +6,7 @@ import {
   IconPeople,
   IconSettings,
   IconResources,
+  IconMic,
 } from "../components/ui/icons";
 
 /**
@@ -16,16 +17,19 @@ import {
  * phone is the default device here rather than the exception. Everything else
  * stays reachable through the menu.
  *
- * Only routes that actually exist are listed. The AI companion and bookings
- * land in later phases and get added here then; a nav item that 404s is worse
- * than one that is not there yet.
+ * Only routes that actually exist are listed. Bookings land in a later phase
+ * and get added here then; a nav item that 404s is worse than one that is not
+ * there yet.
  */
 
 export const PATIENT_NAV: NavItem[] = [
   { href: "/dashboard", label: "Home", icon: <IconHome />, primary: true },
-  { href: "/mood", label: "Mood", icon: <IconMood />, primary: true },
-  { href: "/journal", label: "Journal", icon: <IconJournal />, primary: true },
-  { href: "/therapists", label: "Counsellors", icon: <IconPeople />, primary: true },
-  { href: "/resources", label: "Resources", icon: <IconResources />, primary: true },
-  { href: "/settings/profile", label: "Settings", icon: <IconSettings /> },
+  // The counsellors picked for this person — the point of the whole product.
+  { href: "/counsellors", label: "Counsellors", icon: <IconPeople />, primary: true },
+  { href: "/therapy", label: "Talk", icon: <IconMic />, primary: true },
+  { href: "/settings/profile", label: "Settings", icon: <IconSettings />, primary: true },
+  // Useful, but not what the MVP is for — reachable from the menu.
+  { href: "/mood", label: "Mood", icon: <IconMood /> },
+  { href: "/journal", label: "Journal", icon: <IconJournal /> },
+  { href: "/resources", label: "Resources", icon: <IconResources /> },
 ];

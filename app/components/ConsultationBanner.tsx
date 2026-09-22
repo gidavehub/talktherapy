@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { motion } from "motion/react";
 import { SPRING_SOFT, SPRING_SNAP } from "./motion/primitives";
+import StartLink from "./StartLink";
 
 /**
  * Slim full-width banner — about half a viewport at most. Sits between the
@@ -98,8 +98,8 @@ export default function ConsultationBanner() {
             className="md:justify-self-end"
           >
             <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }} transition={SPRING_SNAP}>
-              <Link
-                href="/sign-up"
+              <StartLink
+                
                 className="inline-flex h-12 md:h-14 items-center gap-3 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-soft)] transition-colors pl-6 md:pl-8 pr-2 text-white text-[12px] md:text-[13px] uppercase tracking-[0.14em] font-medium shadow-[0_18px_40px_-15px_rgba(255,90,31,0.65)]"
               >
                 Book Free Consult
@@ -112,7 +112,7 @@ export default function ConsultationBanner() {
                     <path d="M5 12h14M13 6l6 6-6 6" />
                   </svg>
                 </motion.span>
-              </Link>
+              </StartLink>
             </motion.div>
           </motion.div>
         </div>

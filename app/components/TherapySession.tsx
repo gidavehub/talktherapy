@@ -1,9 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { motion } from "motion/react";
 import { SPRING_SOFT, SPRING_SNAP } from "./motion/primitives";
+import StartLink from "./StartLink";
 
 const features = [
   {
@@ -111,8 +111,8 @@ export default function TherapySession() {
             className="mt-10"
           >
             <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }} transition={SPRING_SNAP} className="inline-block">
-              <Link
-                href="/sign-up"
+              <StartLink
+                
                 className="inline-flex h-12 items-center gap-3 rounded-full border border-[var(--foreground)] hover:bg-[var(--dark)] hover:text-white hover:border-[var(--dark)] transition-colors pl-6 pr-2 text-[12px] uppercase tracking-[0.14em] font-medium"
               >
                 Try a Session
@@ -125,7 +125,7 @@ export default function TherapySession() {
                     <path d="M5 12h14M13 6l6 6-6 6" />
                   </svg>
                 </motion.span>
-              </Link>
+              </StartLink>
             </motion.div>
           </motion.div>
         </motion.div>

@@ -46,20 +46,21 @@ export default function AppGate({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Signed in but no document yet — either the Firestore write is still in
-    // flight on a fresh sign-up, or rules refused the read. Onboarding
-    // recreates it either way.
+    // Signed in but no document yet — the Firestore write is still in flight
+    // on a fresh sign-up. Wait for it.
     if (!profile) return;
 
+    // Onboarding is a conversation with Talk; nobody reaches the app until
+    // she has learned what they need.
     if (!profile.onboarded) {
-      router.replace("/onboarding");
+      router.replace("/therapy");
     }
   }, [ready, user, profile, router, pathname]);
 
   if (!ready) return <Splash label="Checking your session" />;
   if (!user) return <Splash label="Taking you to sign in" />;
   if (!profile) return <Splash label="Loading your profile" />;
-  if (!profile.onboarded) return <Splash label="Finishing setup" />;
+  if (!profile.onboarded) return <Splash label="Taking you to Talk" />;
 
   return <AppShell nav={PATIENT_NAV}>{children}</AppShell>;
 }

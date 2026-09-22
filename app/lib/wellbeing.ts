@@ -23,7 +23,6 @@ import {
   orderBy,
   query,
   serverTimestamp,
-  setDoc,
   updateDoc,
 } from "firebase/firestore";
 import { firebaseConfigured, firestore } from "./firebase";
@@ -330,20 +329,3 @@ export async function deleteWellbeingData(uid: string): Promise<void> {
   ]);
 }
 
-/** Mark the profile as onboarded once the intake flow completes. */
-export async function completeOnboarding(
-  uid: string,
-  input: { locale: string; goals: string[]; consents: Partial<Consents> },
-): Promise<void> {
-  await setDoc(
-    doc(firestore(), COLLECTIONS.users, uid),
-    {
-      locale: input.locale,
-      onboarded: true,
-      goals: input.goals,
-      consents: input.consents,
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true },
-  );
-}

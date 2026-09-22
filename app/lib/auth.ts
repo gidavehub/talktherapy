@@ -31,6 +31,8 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { firebaseAuth, firebaseConfigured, firestore } from "./firebase";
+import { cleanIntake } from "./matching";
+import { LANGUAGES } from "./ai/protocol";
 import {
   COLLECTIONS,
   DEFAULT_CONSENTS,
@@ -78,6 +80,7 @@ export function toUserDoc(uid: string, data: Record<string, unknown>): UserDoc {
     onboarded: Boolean(data.onboarded),
     goals: (data.goals as string[]) ?? [],
     consents: { ...DEFAULT_CONSENTS, ...((data.consents as Consents) ?? {}) },
+    intake: data.intake ? cleanIntake(data.intake, LANGUAGES) : null,
     orgId: (data.orgId as string) ?? null,
     createdAt,
     updatedAt: millis(data.updatedAt, createdAt),
@@ -122,6 +125,7 @@ async function ensureUserDoc(user: User, role: SignUpRole): Promise<UserDoc> {
     onboarded: false,
     goals: [],
     consents: DEFAULT_CONSENTS,
+    intake: null,
     orgId: null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -139,6 +143,7 @@ async function ensureUserDoc(user: User, role: SignUpRole): Promise<UserDoc> {
     onboarded: false,
     goals: [],
     consents: DEFAULT_CONSENTS,
+    intake: null,
     orgId: null,
     createdAt: now,
     updatedAt: now,
@@ -240,7 +245,7 @@ export async function updateUserProfile(
   patch: Partial<
     Pick<
       UserDoc,
-      "displayName" | "photoURL" | "locale" | "onboarded" | "goals" | "consents"
+      "displayName" | "photoURL" | "locale" | "onboarded" | "goals" | "consents" | "intake"
     >
   >,
 ): Promise<void> {

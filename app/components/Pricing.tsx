@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { motion } from "motion/react";
 import { SPRING_SOFT, SPRING_SNAP } from "./motion/primitives";
+import StartLink from "./StartLink";
 
 type Tier = {
   name: string;
@@ -196,8 +196,8 @@ export default function Pricing() {
                 transition={SPRING_SNAP}
                 className="mt-8"
               >
-                <Link
-                  href="/sign-up"
+                <StartLink
+                  
                   className={
                     tier.featured
                       ? "inline-flex w-full h-12 items-center justify-center gap-3 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-soft)] transition-colors text-white text-[12px] uppercase tracking-[0.14em] font-medium"
@@ -208,7 +208,7 @@ export default function Pricing() {
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
                     <path d="M5 12h14M13 6l6 6-6 6" />
                   </svg>
-                </Link>
+                </StartLink>
               </motion.div>
             </motion.div>
           ))}

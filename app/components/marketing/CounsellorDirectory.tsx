@@ -1,13 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { motion } from "motion/react";
-import { SPRING_SOFT } from "../motion/primitives";
-import { Avatar, Badge, EmptyState, Pill, Spinner } from "../ui/Feedback";
+import CounsellorCard from "../counsellors/CounsellorCard";
+import { EmptyState, Pill, Spinner } from "../ui/Feedback";
 import Button from "../ui/Button";
 import { IconPeople } from "../ui/icons";
-import { formatDalasi } from "../../lib/money";
 import { LOCALE_LABELS, type CounsellorProfile, type Locale } from "../../lib/models";
 import {
   EMPTY_FILTERS,
@@ -29,69 +26,6 @@ import {
  */
 
 const LANGUAGES: Locale[] = ["en", "wo", "mnk", "ff"];
-
-function CounsellorCard({ profile, index }: { profile: CounsellorProfile; index: number }) {
-  return (
-    <motion.div
-      initial={{ y: 28, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ ...SPRING_SOFT, delay: Math.min(index, 8) * 0.05 }}
-      whileHover={{ y: -4 }}
-      className="rounded-[28px] bg-white shadow-[0_18px_40px_-22px_rgba(0,0,0,0.25)] p-6 flex flex-col"
-    >
-      <div className="flex items-start gap-4">
-        <Avatar name={profile.displayName} size={56} />
-        <div className="min-w-0 flex-1">
-          <h3 className="text-[16px] font-medium leading-tight truncate">
-            {profile.displayName}
-          </h3>
-          <p className="mt-1 text-[13px] text-[var(--muted)] leading-snug line-clamp-2">
-            {profile.headline}
-          </p>
-        </div>
-      </div>
-
-      {profile.specializations.length ? (
-        <div className="mt-5 flex flex-wrap gap-1.5">
-          {profile.specializations.slice(0, 3).map((s) => (
-            <Badge key={s} tone="neutral">
-              {SPECIALIZATION_LABELS[s as Specialization] ?? s}
-            </Badge>
-          ))}
-        </div>
-      ) : null}
-
-      <dl className="mt-6 grid grid-cols-2 gap-4 text-[12px]">
-        <div>
-          <dt className="text-[var(--muted)]">Session</dt>
-          <dd className="mt-1 text-[15px] font-medium">
-            {formatDalasi(profile.sessionRateMinor)}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-[var(--muted)]">Speaks</dt>
-          <dd className="mt-1 text-[13px]">
-            {profile.languages.map((l) => LOCALE_LABELS[l]).join(", ")}
-          </dd>
-        </div>
-      </dl>
-
-      <div className="mt-6 pt-5 border-t border-[var(--border)] flex items-center justify-between gap-3">
-        <span className="text-[12px] text-[var(--muted)]">
-          {profile.yearsExperience > 0
-            ? `${profile.yearsExperience} yrs experience`
-            : "Verified professional"}
-        </span>
-        <Link
-          href={`/therapists/${profile.uid}`}
-          className="text-[12px] uppercase tracking-[0.14em] font-medium underline underline-offset-4 hover:text-[var(--accent)] transition-colors"
-        >
-          View profile
-        </Link>
-      </div>
-    </motion.div>
-  );
-}
 
 export default function CounsellorDirectory() {
   const [profiles, setProfiles] = useState<CounsellorProfile[] | null>(null);

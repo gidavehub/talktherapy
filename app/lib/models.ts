@@ -10,6 +10,8 @@
  * See `app/lib/money.ts` for formatting.
  */
 
+import type { CounsellorGender, Intake, Profession, SessionFormat } from "./matching";
+
 // ---------------------------------------------------------------- collections
 
 export const COLLECTIONS = {
@@ -113,6 +115,11 @@ export type UserDoc = {
    */
   goals: string[];
   consents: Consents;
+  /**
+   * What Talk learned in the intake conversation — the basis for counsellor
+   * suggestions. Null until they have talked to her. Private to the user.
+   */
+  intake: Intake | null;
   /** Set when the user belongs to an institutional package. */
   orgId?: string | null;
   createdAt: number;
@@ -204,6 +211,19 @@ export type CounsellorProfile = {
   ratingAvg: number;
   ratingCount: number;
   timezone: string;
+  /** Which kind of professional — decides fit for the help someone asked for. */
+  profession: Profession | null;
+  /** Many people ask for a counsellor of a particular gender; null if unstated. */
+  gender: CounsellorGender | null;
+  /** How they meet clients. */
+  formats: SessionFormat[];
+  /** Town or area, e.g. "Serrekunda". */
+  location: string | null;
+  /**
+   * A sample profile for testing the product, not a real person. Always
+   * labelled as such wherever it is shown. See scripts/seed-sample-counsellors.
+   */
+  sample: boolean;
   createdAt: number;
   updatedAt: number;
 };

@@ -5,6 +5,8 @@
  * here may import server code — this file ships to the client.
  */
 
+import type { Intake } from "../matching";
+
 export const LANGUAGES = ["english", "wolof", "mandinka", "pulaar", "other"] as const;
 export type Language = (typeof LANGUAGES)[number];
 /** What the model reports when the audio held no intelligible speech. */
@@ -45,11 +47,32 @@ export const MAX_TURN_CHARS = 1500;
 /** ~60s of 16kHz 16-bit mono WAV, base64-encoded. */
 export const MAX_AUDIO_BASE64 = 2_800_000;
 
+/**
+ * companion — an open conversation.
+ * intake    — Talk is getting to know a new person (the onboarding), steering
+ *             toward what she needs to suggest counsellors.
+ */
+export type ConversationMode = "companion" | "intake";
+
 export type TurnRequest = {
-  /** The user's utterance: base64 WAV, 16kHz mono 16-bit. */
-  audio: string;
+  /** The user's utterance: base64 WAV, 16kHz mono 16-bit. Either this or `text`. */
+  audio?: string;
+  /** A typed message, for anyone who cannot or would rather not speak. */
+  text?: string;
   history: HistoryTurn[];
   summary: string;
+  mode?: ConversationMode;
+  /** Intake mode: everything learned so far (see lib/matching Intake). */
+  intake?: unknown;
+};
+
+export const MAX_TEXT_CHARS = 2000;
+
+export type GreetRequest = {
+  mode: ConversationMode;
+  intake?: unknown;
+  /** From the account, so Talk can greet by name when she knows it. */
+  displayName?: string | null;
 };
 
 /** What the model heard and what it will say. */
@@ -67,6 +90,12 @@ export type TurnResult = {
    * server appended them. Worth tracking: it means the prompt is losing.
    */
   helpAppended?: boolean;
+  /** Talk speaking first — nothing was heard. */
+  greeting?: boolean;
+  /** Intake mode: everything known after this turn (merged, validated). */
+  intake?: Intake;
+  /** Intake mode: everything needed has been learned; the page moves on. */
+  intakeComplete?: boolean;
 };
 
 /**

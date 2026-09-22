@@ -6,9 +6,11 @@ import { UtteranceCapture } from "../audio/capture";
 import { StreamPlayer } from "../audio/player";
 import type { AudioFeed } from "../audio/analysis";
 import type { BlobState } from "../../components/voice/TalkBlob";
+import { EMPTY_INTAKE, type Intake } from "../matching";
 import {
   FOLD_TURNS,
   MAX_HISTORY_TURNS,
+  type ConversationMode,
   type HistoryTurn,
   type Language,
   type Risk,
@@ -18,13 +20,17 @@ import {
 /**
  * The voice conversation, end to end, on the client.
  *
- *   listening ──(speech)──► hearing ──(pause)──► thinking ──► speaking ──┐
- *       ▲                                                              │
- *       └──────────────────────────────────────────────────────────────┘
+ *   (greeting) ─► listening ──(speech)──► hearing ──(pause)──► thinking ──► speaking ──┐
+ *                    ▲                                                               │
+ *                    └───────────────────────────────────────────────────────────────┘
  *
  * Turn-based on purpose: the microphone stays open (so the blob keeps
  * reacting) but utterances are only captured while listening. Tapping while
  * Talk is thinking or speaking interrupts her and hands the floor back.
+ *
+ * In intake mode this IS the onboarding: Talk speaks first, every turn
+ * carries what she has learned so far, and once she has everything she needs
+ * `onIntakeDone` fires after she finishes her closing line.
  */
 
 export type Phase = "idle" | "starting" | "listening" | "hearing" | "thinking" | "speaking";
@@ -44,13 +50,32 @@ export type ConversationError =
   | { kind: "failed"; message: string }
   | { kind: "voice"; message: string };
 
+type Options = {
+  getToken: () => Promise<string | null>;
+  mode?: ConversationMode;
+  /** Intake mode: what is already known (resuming a half-finished intake). */
+  initialIntake?: Intake | null;
+  displayName?: string | null;
+  /** Intake mode: fires after every turn that learned something. Persist it here. */
+  onIntake?: (intake: Intake) => void;
+  /** Intake mode: fires once Talk has everything and has finished speaking. */
+  onIntakeDone?: (intake: Intake) => void;
+};
+
 const RISK_RANK: Record<Risk, number> = { none: 0, low: 1, elevated: 2, urgent: 3 };
 /** Pause after Talk stops before listening again, so her tail is not heard. */
 const AFTER_SPEAKING_MS = 250;
 
 let lineId = 0;
 
-export function useConversation({ getToken }: { getToken: () => Promise<string | null> }) {
+export function useConversation({
+  getToken,
+  mode = "companion",
+  initialIntake = null,
+  displayName = null,
+  onIntake,
+  onIntakeDone,
+}: Options) {
   const mic = useAudioLevel();
   // The hook returns a fresh object every render; its functions are stable.
   // Depending on `mic` itself would re-create stop() each render, and the
@@ -60,9 +85,17 @@ export function useConversation({ getToken }: { getToken: () => Promise<string |
   const [lines, setLines] = useState<Line[]>([]);
   /** Highest risk seen this session. Sticky: help stays on screen once needed. */
   const [risk, setRisk] = useState<Risk>("none");
-  const [language, setLanguage] = useState<Language | null>(null);
+  const [heardLanguage, setLanguage] = useState<Language | null>(null);
   const [error, setError] = useState<ConversationError | null>(null);
   const [talkFeed, setTalkFeed] = useState<AudioFeed | null>(null);
+  /** The microphone was refused: Talk still speaks, the person types. */
+  const [textOnly, setTextOnly] = useState(false);
+  // What this session has learned. Until the first turn returns, the saved
+  // intake from the profile stands in — derived, not copied, so a profile
+  // that loads after mount needs no effect to sync it.
+  const [sessionIntake, setIntake] = useState<Intake | null>(null);
+  const intake = sessionIntake ?? initialIntake ?? EMPTY_INTAKE;
+  const language = heardLanguage ?? intake.language;
 
   const phaseRef = useRef<Phase>("idle");
   const activeRef = useRef(false);
@@ -72,13 +105,17 @@ export function useConversation({ getToken }: { getToken: () => Promise<string |
   const historyRef = useRef<HistoryTurn[]>([]);
   const summaryRef = useRef("");
   const foldingRef = useRef(false);
-  const tokenRef = useRef(getToken);
+  const intakeRef = useRef<Intake>(initialIntake ?? EMPTY_INTAKE);
+  const doneRef = useRef(false);
   const rafRef = useRef(0);
   const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Latest callbacks and settings, read at call time so the session never
+  // needs rebuilding when the page re-renders with new closures.
+  const opts = useRef({ getToken, mode, displayName, onIntake, onIntakeDone, intake });
 
   useEffect(() => {
-    tokenRef.current = getToken;
-  }, [getToken]);
+    opts.current = { getToken, mode, displayName, onIntake, onIntakeDone, intake };
+  }, [getToken, mode, displayName, onIntake, onIntakeDone, intake]);
 
   const go = useCallback((next: Phase) => {
     phaseRef.current = next;
@@ -93,8 +130,17 @@ export function useConversation({ getToken }: { getToken: () => Promise<string |
     go("listening");
   }, [go]);
 
+  /** Talk has finished a line: listen again — or, if the intake is done, hand over. */
+  const afterSpeaking = useCallback(() => {
+    if (doneRef.current) {
+      opts.current.onIntakeDone?.(intakeRef.current);
+      return;
+    }
+    listen();
+  }, [listen]);
+
   const authHeader = useCallback(async (): Promise<Record<string, string>> => {
-    const token = await tokenRef.current().catch(() => null);
+    const token = await opts.current.getToken().catch(() => null);
     return token ? { Authorization: `Bearer ${token}` } : {};
   }, []);
 
@@ -121,8 +167,12 @@ export function useConversation({ getToken }: { getToken: () => Promise<string |
     }
   }, [authHeader]);
 
-  const takeTurn = useCallback(
-    async (audio: string) => {
+  /**
+   * One request that makes Talk speak — a turn or the greeting. Streams the
+   * words, then her voice, then hands the floor back.
+   */
+  const speakRequest = useCallback(
+    async (path: string, body: Record<string, unknown>) => {
       if (!activeRef.current) return;
       captureRef.current?.setEnabled(false);
       go("thinking");
@@ -132,49 +182,45 @@ export function useConversation({ getToken }: { getToken: () => Promise<string |
       abortRef.current = controller;
       const player = playerRef.current;
       let replied = false;
+      let speaking = false;
 
       try {
-        const res = await fetch("/api/companion/turn", {
+        const res = await fetch(path, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...(await authHeader()) },
-          body: JSON.stringify({ audio, history: historyRef.current, summary: summaryRef.current }),
+          body: JSON.stringify(body),
           signal: controller.signal,
         });
 
         if (!res.ok || !res.body) {
-          const body = (await res.json().catch(() => ({}))) as { error?: string };
+          const payload = (await res.json().catch(() => ({}))) as { error?: string };
           if (res.status === 401) {
-            setError({ kind: "auth", message: body.error ?? "Sign in to talk to Talk." });
-            return; // stop() runs in the caller's effect below
+            setError({ kind: "auth", message: payload.error ?? "Sign in to talk to Talk." });
+            return; // the auth effect below ends the session
           }
           setError({
             kind: res.status === 429 ? "busy" : "failed",
-            message: body.error ?? "Talk couldn't respond just then. Please try again.",
+            message: payload.error ?? "Talk couldn't respond just then. Please try again.",
           });
           listen();
           return;
         }
 
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buf = "";
-        let speaking = false;
-
         const handle = (ev: TurnEvent) => {
           if (ev.type === "turn") {
-            if (!ev.transcript && !ev.blocked) return; // nothing intelligible was said
+            if (!ev.transcript && !ev.blocked && !ev.greeting) return; // nothing intelligible was said
+            const lang = ev.language === "none" ? undefined : ev.language;
             const heard: Line[] = ev.transcript
               ? [
                   {
                     id: ++lineId,
                     role: "user",
                     text: ev.transcript,
-                    english: ev.language !== "english" ? ev.english : undefined,
-                    language: ev.language === "none" ? undefined : ev.language,
+                    english: lang && lang !== "english" ? ev.english : undefined,
+                    language: lang,
                   },
                 ]
               : [];
-            const lang = ev.language === "none" ? undefined : ev.language;
             const said: Line[] = ev.reply
               ? [
                   {
@@ -187,18 +233,30 @@ export function useConversation({ getToken }: { getToken: () => Promise<string |
                 ]
               : [];
             setLines((prev) => [...prev, ...heard, ...said]);
-            if (lang) setLanguage(lang);
             setRisk((prev) => (RISK_RANK[ev.risk] > RISK_RANK[prev] ? ev.risk : prev));
+
+            if (ev.intake) {
+              intakeRef.current = ev.intake;
+              setIntake(ev.intake);
+              if (ev.intake.language) setLanguage(ev.intake.language);
+              if (ev.transcript) opts.current.onIntake?.(ev.intake);
+            } else if (lang) {
+              setLanguage(lang);
+            }
+            if (ev.intakeComplete) doneRef.current = true;
 
             if (ev.transcript) {
               historyRef.current.push({ role: "user", text: ev.transcript, english: ev.english, language: lang });
-              if (ev.reply) historyRef.current.push({ role: "talk", text: ev.reply, english: ev.replyEnglish, language: lang });
+            }
+            if (ev.reply) {
+              // The greeting is remembered too, so Talk knows what she asked.
+              historyRef.current.push({ role: "talk", text: ev.reply, english: ev.replyEnglish, language: lang });
             }
             if (ev.reply && player) {
               replied = true;
               player.begin(() => {
                 if (phaseRef.current !== "speaking") return;
-                resumeTimer.current = setTimeout(listen, AFTER_SPEAKING_MS);
+                resumeTimer.current = setTimeout(afterSpeaking, AFTER_SPEAKING_MS);
               });
             }
           } else if (ev.type === "audio" && player && replied) {
@@ -212,6 +270,9 @@ export function useConversation({ getToken }: { getToken: () => Promise<string |
           }
         };
 
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = "";
         for (;;) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -230,7 +291,7 @@ export function useConversation({ getToken }: { getToken: () => Promise<string |
           if (!speaking) go("speaking");
           player.end();
         } else {
-          listen();
+          afterSpeaking();
         }
         void maybeFold();
       } catch (e) {
@@ -242,7 +303,18 @@ export function useConversation({ getToken }: { getToken: () => Promise<string |
         if (abortRef.current === controller) abortRef.current = null;
       }
     },
-    [authHeader, go, listen, maybeFold],
+    [afterSpeaking, authHeader, go, listen, maybeFold],
+  );
+
+  const turnBody = useCallback(
+    (message: { audio: string } | { text: string }) => ({
+      ...message,
+      history: historyRef.current,
+      summary: summaryRef.current,
+      mode: opts.current.mode,
+      intake: opts.current.mode === "intake" ? intakeRef.current : undefined,
+    }),
+    [],
   );
 
   const stop = useCallback(() => {
@@ -263,6 +335,9 @@ export function useConversation({ getToken }: { getToken: () => Promise<string |
   const start = useCallback(async () => {
     if (activeRef.current) return;
     activeRef.current = true;
+    doneRef.current = false;
+    // Resume from whatever is known: the saved intake, or this session's.
+    intakeRef.current = opts.current.intake;
     setError(null);
     go("starting");
 
@@ -279,18 +354,21 @@ export function useConversation({ getToken }: { getToken: () => Promise<string |
     playerRef.current = player;
     setTalkFeed(player.feed);
 
-    try {
-      captureRef.current = await UtteranceCapture.attach(graph.ctx, graph.source, {
-        onSpeechStart: () => {
-          if (phaseRef.current === "listening") go("hearing");
-        },
-        onUtterance: (wav) => void takeTurn(wav),
-      });
-    } catch (e) {
-      console.error("[useConversation] capture", e);
-      setError({ kind: "failed", message: "This browser can't record for Talk. Try a recent Chrome, Edge or Safari." });
-      stop();
-      return;
+    // No microphone (refused, or none present): carry on by text rather than
+    // locking the person out of onboarding.
+    setTextOnly(!graph.source);
+    if (graph.source) {
+      try {
+        captureRef.current = await UtteranceCapture.attach(graph.ctx, graph.source, {
+          onSpeechStart: () => {
+            if (phaseRef.current === "listening") go("hearing");
+          },
+          onUtterance: (audio) => void speakRequest("/api/companion/turn", turnBody({ audio })),
+        });
+      } catch (e) {
+        console.error("[useConversation] capture", e);
+        setTextOnly(true);
+      }
     }
 
     // Talk's voice moves the blob too: analyse playback every frame.
@@ -300,8 +378,32 @@ export function useConversation({ getToken }: { getToken: () => Promise<string |
     };
     rafRef.current = requestAnimationFrame(loop);
 
+    // Onboarding opens with Talk's voice, not instructions on a screen.
+    if (opts.current.mode === "intake") {
+      await speakRequest("/api/companion/greet", {
+        mode: "intake",
+        intake: intakeRef.current,
+        displayName: opts.current.displayName,
+      });
+      return;
+    }
     listen();
-  }, [go, listen, micGraph, micStart, stop, takeTurn]);
+  }, [go, listen, micGraph, micStart, speakRequest, turnBody]);
+
+  /** A typed message, for anyone who cannot or would rather not speak right now. */
+  const sendText = useCallback(
+    (text: string) => {
+      const clean = text.trim();
+      if (!clean || !activeRef.current) return;
+      const p = phaseRef.current;
+      if (p === "thinking" || p === "speaking") {
+        abortRef.current?.abort();
+        playerRef.current?.stop();
+      }
+      void speakRequest("/api/companion/turn", turnBody({ text: clean }));
+    },
+    [speakRequest, turnBody],
+  );
 
   /**
    * A tap on the blob. While Talk thinks or speaks, it interrupts her; while
@@ -314,11 +416,12 @@ export function useConversation({ getToken }: { getToken: () => Promise<string |
       listen();
     } else if (p === "speaking") {
       playerRef.current?.stop();
-      listen();
+      // Cutting off her closing line still finishes the intake.
+      afterSpeaking();
     } else if (p === "hearing") {
       captureRef.current?.flush();
     }
-  }, [listen]);
+  }, [afterSpeaking, listen]);
 
   // An auth failure ends the session: nothing will succeed until sign-in.
   useEffect(() => {
@@ -346,11 +449,14 @@ export function useConversation({ getToken }: { getToken: () => Promise<string |
     lines,
     risk,
     language,
+    intake,
     error,
     mic,
     active: phase !== "idle",
+    textOnly,
     start,
     stop,
     interrupt,
+    sendText,
   };
 }

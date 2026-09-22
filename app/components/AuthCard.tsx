@@ -2,10 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { signInWithEmail, signInWithGoogle, signUpWithEmail } from "../lib/auth";
 import { SPRING_SOFT, SPRING_SNAP } from "./motion/primitives";
+import { useAuth } from "./AuthProvider";
+import { afterSignIn, safeNext } from "../lib/routing";
+import type { AppUser } from "../lib/auth";
 
 type Mode = "sign-in" | "sign-up";
 
@@ -32,21 +35,36 @@ function GoogleGlyph() {
   );
 }
 
+function nextParam(): string | null {
+  if (typeof window === "undefined") return null;
+  return safeNext(new URLSearchParams(window.location.search).get("next"));
+}
+
 export default function AuthCard({ mode }: { mode: Mode }) {
   const router = useRouter();
+  const { user, profile, ready } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
 
-  async function withCatch(fn: () => Promise<unknown>) {
+  // Already signed in? Then this page has nothing to offer — send them where
+  // they belong instead of asking them to log in again. This was the bug:
+  // every "get started" button led here, signed in or not.
+  useEffect(() => {
+    if (!ready || !user || !profile || busy) return;
+    router.replace(afterSignIn(profile, nextParam()));
+  }, [ready, user, profile, busy, router]);
+
+  async function withCatch(fn: () => Promise<AppUser>) {
     setBusy(true);
     setError(null);
     try {
-      await fn();
-      router.push("/onboarding");
-      router.refresh();
+      const signedIn = await fn();
+      // New accounts meet Talk, who does the onboarding by conversation;
+      // everyone else goes home (or back where they were headed).
+      router.push(afterSignIn(signedIn, nextParam()));
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg.replace("Firebase: ", ""));

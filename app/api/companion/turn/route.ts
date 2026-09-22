@@ -1,23 +1,20 @@
-import { runTurn, speak } from "@/lib/ai/server/talk";
+import { runTurn } from "@/lib/ai/server/talk";
 import { allow, requireUser } from "@/lib/server/requireUser";
-import { MAX_AUDIO_BASE64, type TurnEvent } from "@/lib/ai/protocol";
+import { LANGUAGES, MAX_AUDIO_BASE64, MAX_TEXT_CHARS } from "@/lib/ai/protocol";
+import { cleanIntake } from "@/lib/matching";
 import { cleanHistory, cleanSummary, json } from "../validate";
+import { speakingResponse } from "../stream";
 
 /**
- * One voice turn: the user's utterance in, Talk's words and voice out.
+ * One turn: the user's utterance (or typed message) in, Talk's words and
+ * voice out, streamed — see ../stream.ts for the event format.
  *
- * Streams newline-delimited JSON so the page can show what was heard and
- * start playing Talk's voice before the whole reply has been synthesised:
- *
- *   {"type":"turn", transcript, language, english, risk, reply, replyEnglish}
- *   {"type":"audio", pcm, sampleRate}   ← many, as the voice streams
- *   {"type":"done"}                     ← or {"type":"error", ...}
+ * In intake mode Talk is doing the onboarding: the request carries what she
+ * has learned so far, and the response carries the merged result and whether
+ * she now has everything she needs to suggest counsellors.
  */
 
 export const maxDuration = 60;
-
-/** Voice chunks arrive every ~10ms; batching to ~0.2s keeps the event count sane. */
-const MIN_AUDIO_BYTES = 9600;
 
 export async function POST(req: Request) {
   const user = await requireUser(req);
@@ -36,99 +33,21 @@ export async function POST(req: Request) {
   }
 
   const audio = typeof body.audio === "string" ? body.audio : "";
-  if (!audio || audio.length > MAX_AUDIO_BASE64 || !/^[A-Za-z0-9+/=]+$/.test(audio.slice(0, 64))) {
-    return json(400, { error: "Missing or oversized audio." });
+  const text = typeof body.text === "string" ? body.text.trim().slice(0, MAX_TEXT_CHARS) : "";
+  if (audio && (audio.length > MAX_AUDIO_BASE64 || !/^[A-Za-z0-9+/=]+$/.test(audio.slice(0, 64)))) {
+    return json(400, { error: "Oversized or malformed audio." });
   }
-  const history = cleanHistory(body.history);
-  const summary = cleanSummary(body.summary);
+  if (!audio && !text) return json(400, { error: "Say or type something first." });
 
-  const encoder = new TextEncoder();
-  const signal = req.signal;
+  const mode = body.mode === "intake" ? "intake" : "companion";
+  const input = {
+    audio: audio || undefined,
+    text: audio ? undefined : text,
+    history: cleanHistory(body.history),
+    summary: cleanSummary(body.summary),
+    mode,
+    intake: cleanIntake(body.intake, LANGUAGES),
+  } as const;
 
-  const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      let open = true;
-      const send = (event: TurnEvent) => {
-        if (!open) return;
-        try {
-          controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
-        } catch {
-          open = false; // client went away
-        }
-      };
-
-      const t0 = Date.now();
-      const log = (what: string) => {
-        if (process.env.NODE_ENV === "development") console.info(`[companion/turn] ${what} +${Date.now() - t0}ms`);
-      };
-      try {
-        const turn = await runTurn({ audio, history, summary }, signal);
-        log(`heard ${turn.language}, risk ${turn.risk}`);
-        send({ type: "turn", ...turn });
-
-        if (turn.reply && turn.language !== "none") {
-          try {
-            let pending: Buffer[] = [];
-            let pendingBytes = 0;
-            let rate = 24000;
-            let first = true;
-            const flush = () => {
-              if (!pendingBytes) return;
-              const all = Buffer.concat(pending);
-              // 16-bit samples: never split one across events.
-              const even = all.length - (all.length % 2);
-              send({ type: "audio", pcm: all.subarray(0, even).toString("base64"), sampleRate: rate });
-              pending = even < all.length ? [all.subarray(even)] : [];
-              pendingBytes = all.length - even;
-            };
-            for await (const chunk of speak(turn.reply, turn.language, signal)) {
-              rate = chunk.sampleRate;
-              pending.push(chunk.pcm);
-              pendingBytes += chunk.pcm.length;
-              // Ship the very first chunk at once — that is the latency the
-              // user hears — and batch the rest.
-              if (first || pendingBytes >= MIN_AUDIO_BYTES) {
-                if (first) log("first audio");
-                flush();
-                first = false;
-              }
-            }
-            flush();
-            log("voice done");
-          } catch (e) {
-            if (signal.aborted) throw e;
-            // The words already reached the page; say the voice failed rather
-            // than pretending the whole turn did.
-            send({ type: "error", stage: "voice", message: voiceError(e) });
-          }
-        }
-        send({ type: "done" });
-      } catch (e) {
-        if (!signal.aborted) {
-          console.error("[companion/turn]", e);
-          send({ type: "error", stage: "turn", message: "Talk couldn't respond just then. Please try again." });
-        }
-      } finally {
-        if (open) {
-          open = false;
-          try {
-            controller.close();
-          } catch {}
-        }
-      }
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "application/x-ndjson; charset=utf-8",
-      "Cache-Control": "no-store",
-      "X-Accel-Buffering": "no",
-    },
-  });
-}
-
-function voiceError(e: unknown) {
-  console.error("[companion/turn] voice", e);
-  return "Talk's voice didn't come through this time — her words are shown instead.";
+  return speakingResponse(req.signal, "companion/turn", () => runTurn(input, req.signal));
 }

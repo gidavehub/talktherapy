@@ -14,6 +14,7 @@ import {
   getCounsellor,
   type Specialization,
 } from "../../lib/counsellors";
+import { FORMAT_LABELS, PROFESSION_LABELS } from "../../lib/matching";
 
 /**
  * Public counsellor profile.
@@ -83,8 +84,20 @@ export default function CounsellorProfileView({ counsellorId }: { counsellorId: 
             <p className="mt-2 text-[14px] md:text-[15px] text-[var(--muted)] leading-relaxed">
               {profile.headline}
             </p>
+            {profile.profession || profile.location ? (
+              <p className="mt-1 text-[13px] text-[var(--foreground)]">
+                {[profile.profession ? PROFESSION_LABELS[profile.profession] : null, profile.location]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            ) : null}
             <div className="mt-4 flex flex-wrap gap-2">
-              <Badge tone="positive">Credentials verified</Badge>
+              {/* A sample is never presented as a verified professional. */}
+              {profile.sample ? (
+                <Badge tone="warning">Sample profile — not a real counsellor</Badge>
+              ) : (
+                <Badge tone="positive">Credentials verified</Badge>
+              )}
               {profile.yearsExperience > 0 ? (
                 <Badge tone="neutral">{profile.yearsExperience} yrs experience</Badge>
               ) : null}
@@ -160,23 +173,29 @@ export default function CounsellorProfileView({ counsellorId }: { counsellorId: 
             </dd>
           </div>
           <div className="flex justify-between gap-4">
-            <dt className="text-[var(--muted)]">Format</dt>
-            <dd className="text-right">Private video session</dd>
+            <dt className="text-[var(--muted)]">Meets by</dt>
+            <dd className="text-right">
+              {profile.formats.length ? profile.formats.map((f) => FORMAT_LABELS[f]).join(", ") : "Video"}
+            </dd>
           </div>
         </dl>
 
+        {/* Booking and live sessions are the next build; until then this is
+            honest rather than a link to a page that does not exist. */}
         <div className="mt-8">
-          <Button href={`/book/${profile.uid}`} fullWidth withArrow={false}>
-            Book a session
-          </Button>
+          <button
+            type="button"
+            disabled
+            className="w-full h-12 rounded-full bg-[var(--accent)]/40 text-white text-[12px] uppercase tracking-[0.14em] font-medium cursor-not-allowed"
+          >
+            Booking opens soon
+          </button>
         </div>
 
         <p className="mt-5 text-[12px] text-[var(--muted)] leading-relaxed">
-          You will not be charged until you confirm a time.{" "}
           <Link href="/plans" className="underline underline-offset-4">
-            See how pricing works
+            How pricing works
           </Link>
-          .
         </p>
       </motion.aside>
     </div>

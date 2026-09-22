@@ -25,37 +25,17 @@ import {
   type CounsellorProfile,
   type Locale,
 } from "./models";
+import {
+  PROFESSIONS,
+  SESSION_FORMATS,
+  type Profession,
+  type SessionFormat,
+  type Specialization,
+} from "./matching";
 
-/** Specialisations offered in the directory filters. */
-export const SPECIALIZATIONS = [
-  "anxiety",
-  "depression",
-  "grief",
-  "trauma",
-  "relationships",
-  "family",
-  "workplace",
-  "academic",
-  "self-esteem",
-  "substance",
-  "youth",
-] as const;
-
-export type Specialization = (typeof SPECIALIZATIONS)[number];
-
-export const SPECIALIZATION_LABELS: Record<Specialization, string> = {
-  anxiety: "Anxiety",
-  depression: "Depression",
-  grief: "Grief & loss",
-  trauma: "Trauma",
-  relationships: "Relationships",
-  family: "Family",
-  workplace: "Workplace stress",
-  academic: "Academic pressure",
-  "self-esteem": "Self-esteem",
-  substance: "Substance use",
-  youth: "Young people",
-};
+// The vocabulary lives in ./matching so the AI route and tests can share it
+// without pulling in the Firebase SDK. Re-exported for existing importers.
+export { SPECIALIZATIONS, SPECIALIZATION_LABELS, type Specialization } from "./matching";
 
 function toProfile(uid: string, data: Record<string, unknown>): CounsellorProfile {
   return {
@@ -73,6 +53,13 @@ function toProfile(uid: string, data: Record<string, unknown>): CounsellorProfil
     ratingAvg: (data.ratingAvg as number) ?? 0,
     ratingCount: (data.ratingCount as number) ?? 0,
     timezone: (data.timezone as string) ?? "Africa/Banjul",
+    profession: PROFESSIONS.includes(data.profession as Profession) ? (data.profession as Profession) : null,
+    gender: data.gender === "woman" || data.gender === "man" ? data.gender : null,
+    formats: ((data.formats as string[]) ?? ["video"]).filter((f): f is SessionFormat =>
+      SESSION_FORMATS.includes(f as SessionFormat),
+    ),
+    location: (data.location as string) ?? null,
+    sample: data.sample === true,
     createdAt: (data.createdAt as number) ?? 0,
     updatedAt: (data.updatedAt as number) ?? 0,
   };

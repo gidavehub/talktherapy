@@ -1,21 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useState, type CSSProperties } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { SPRING_SOFT, SPRING_SNAP } from "@/components/motion/primitives";
 import TalkBlob from "@/components/voice/TalkBlob";
 import { useAuth } from "@/components/AuthProvider";
+import { updateUserProfile } from "@/lib/auth";
 import { useConversation, type Line, type Phase } from "@/lib/ai/useConversation";
 import { LANGUAGE_LABEL } from "@/lib/ai/protocol";
+import { REQUIRED_FIELDS, localeOf, missingFields, type Intake } from "@/lib/matching";
 
 /**
- * The voice surface — a spoken conversation with Talk.
+ * Talk — the voice surface, and for a new person, the whole onboarding.
+ *
+ * Someone who has just created an account lands here and Talk simply starts
+ * talking: who she is, then one question at a time, in whatever language they
+ * answer in. No forms, no steps, no instructions on screen. When she has what
+ * she needs she says so, and they are taken straight to the counsellors who
+ * fit. Everyone else gets the open companion conversation.
  *
  * You speak; gemini-3.8-flash hears the audio, transcribes and translates it
- * and writes Talk's reply in the language you used; gemini-3.1-flash-tts
- * speaks it. The blob follows whoever is talking. See useConversation for the
- * turn cycle and /api/companion/turn for the server half.
+ * and writes Talk's reply in your language; gemini-3.1-flash-tts speaks it.
  */
 
 /**
@@ -33,44 +40,114 @@ const BLOB_VARS = {
 } as CSSProperties;
 
 const STATUS: Record<Phase, string> = {
-  idle: "Tap to begin. You can stop at any time.",
+  idle: "Tap to begin.",
   starting: "Opening your microphone…",
-  listening: "Listening — speak whenever you're ready.",
+  listening: "Listening…",
   hearing: "Listening…",
   thinking: "Thinking…",
-  speaking: "Talk is speaking. Tap to interrupt.",
+  speaking: "Tap to interrupt.",
 };
 
+/**
+ * Signed-out visitors are sent to sign in — except under `next dev`, where the
+ * page stays usable so the conversation can be exercised locally (the API
+ * then decides, via TALK_DEV_ALLOW_ANON_AI). NODE_ENV is inlined at build
+ * time, so a production bundle always redirects.
+ */
+const DEV_ANON = process.env.NODE_ENV === "development";
+
 export default function TherapyPage() {
-  const { user } = useAuth();
+  const router = useRouter();
+  const { user, profile, ready } = useAuth();
+
+  // Read once, lazily, from the URL: ?intake redoes the intake for someone
+  // already set up; ?debug shows capture diagnostics.
+  const [params] = useState(() =>
+    typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams(),
+  );
+  const intakeMode = params.has("intake") || Boolean(profile && !profile.onboarded);
+  const showDebug = params.has("debug");
+  const [showEnglish, setShowEnglish] = useState(true);
+  const [typing, setTyping] = useState(false);
+  const [draft, setDraft] = useState("");
+
+  useEffect(() => {
+    if (ready && !user && !DEV_ANON) router.replace("/sign-in?next=%2Ftherapy");
+  }, [ready, user, router]);
+
+  const uid = user?.uid ?? null;
   const getToken = useCallback(() => (user ? user.getIdToken() : Promise.resolve(null)), [user]);
-  const talk = useConversation({ getToken });
+
+  // Progress is saved after every answer, so leaving halfway and coming back
+  // picks up where Talk left off rather than starting again.
+  const onIntake = useCallback(
+    (intake: Intake) => {
+      if (!uid) return;
+      const locale = localeOf(intake.language);
+      void updateUserProfile(uid, { intake, ...(locale ? { locale } : {}) }).catch(() => {});
+    },
+    [uid],
+  );
+
+  const onIntakeDone = useCallback(
+    async (intake: Intake) => {
+      if (uid) {
+        const locale = localeOf(intake.language);
+        await updateUserProfile(uid, { intake, onboarded: true, ...(locale ? { locale } : {}) }).catch(() => {});
+      }
+      router.replace("/counsellors?welcome=1");
+    },
+    [router, uid],
+  );
+
+  const talk = useConversation({
+    getToken,
+    mode: intakeMode ? "intake" : "companion",
+    initialIntake: profile?.intake ?? null,
+    displayName: profile?.displayName ?? user?.displayName ?? null,
+    onIntake,
+    onIntakeDone,
+  });
   const { mic } = talk;
 
-  // Capture diagnostics only with ?debug in the URL. Read once, lazily: the
-  // gated markup renders only after Begin (client state), so the server and
-  // first client render agree and there is nothing to mismatch on hydration.
-  const [showDebug] = useState(
-    () => typeof window !== "undefined" && new URLSearchParams(window.location.search).has("debug"),
-  );
-  const [showEnglish, setShowEnglish] = useState(true);
+  const begin = useCallback(async () => {
+    // Pressing Start under "By starting you agree…" is the consent. Recorded
+    // once, with the time, the first time it happens.
+    if (uid && profile && !profile.consents.acceptedTermsAt) {
+      void updateUserProfile(uid, {
+        consents: { ...profile.consents, dataProcessing: true, aiDisclosure: true, acceptedTermsAt: Date.now() },
+      }).catch(() => {});
+    }
+    await talk.start();
+  }, [profile, talk, uid]);
 
   const denied = mic.status === "denied" || mic.status === "unsupported" || mic.status === "error";
+  // Without a microphone the keyboard is the only way to answer, so it is open.
+  const showKeyboard = typing || talk.textOnly;
   const lastUser = findLast(talk.lines, "user");
   const lastTalk = findLast(talk.lines, "talk");
   const translated = Boolean(lastUser?.english || lastTalk?.english);
+  const learned = REQUIRED_FIELDS.length - missingFields(talk.intake).length;
+  const canStart = ready || DEV_ANON;
 
   // A tap on the blob never ends the session — that is the button's job. A
   // tap meant to interrupt Talk that lands a moment after she finished would
   // otherwise throw the whole conversation away.
-  const onBlob = talk.active ? talk.interrupt : talk.start;
+  const onBlob = talk.active ? talk.interrupt : begin;
   const blobLabel = !talk.active
-    ? "Begin session"
+    ? "Begin"
     : talk.phase === "hearing"
       ? "I'm done speaking"
       : talk.phase === "thinking" || talk.phase === "speaking"
         ? "Interrupt Talk"
         : "Talk is listening";
+
+  function submitDraft(e: React.FormEvent) {
+    e.preventDefault();
+    if (!draft.trim()) return;
+    talk.sendText(draft);
+    setDraft("");
+  }
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[var(--dark)] text-white" style={BLOB_VARS}>
@@ -90,8 +167,11 @@ export default function TherapyPage() {
           <span className="block">TALK</span>
           <span className="block">THERAPY</span>
         </Link>
+        {/* Mid-onboarding, "home" is the only way out: the dashboard would
+            send them straight back here. */}
         <Link
-          href="/dashboard"
+          href={intakeMode && !profile?.onboarded ? "/" : "/dashboard"}
+          onClick={() => talk.stop()}
           className="h-10 px-4 rounded-full border border-white/20 text-[12px] uppercase tracking-[0.14em] font-medium flex items-center hover:bg-white/10 transition-colors"
         >
           Exit
@@ -105,15 +185,29 @@ export default function TherapyPage() {
           transition={SPRING_SOFT}
           className="relative z-10 text-[12px] uppercase tracking-[0.22em] text-white/65"
         >
-          AI companion
+          Talk
           {talk.language && talk.language !== "other" ? (
             <span className="text-white/40"> · {LANGUAGE_LABEL[talk.language]}</span>
           ) : null}
         </motion.p>
 
+        {/* Intake progress — four dots, no words. */}
+        {intakeMode ? (
+          <div className="relative z-10 mt-3 flex gap-1.5" aria-label={`${learned} of ${REQUIRED_FIELDS.length}`}>
+            {REQUIRED_FIELDS.map((f, i) => (
+              <motion.span
+                key={f}
+                className="h-1.5 w-1.5 rounded-full"
+                animate={{ backgroundColor: i < learned ? "rgba(255,90,31,1)" : "rgba(255,255,255,0.2)" }}
+                transition={SPRING_SOFT}
+              />
+            ))}
+          </div>
+        ) : null}
+
         <motion.button
           type="button"
-          onClick={onBlob}
+          onClick={canStart ? onBlob : undefined}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           transition={SPRING_SNAP}
@@ -139,12 +233,12 @@ export default function TherapyPage() {
             status line on this surface has to be correct before it is pretty. */}
         <p
           className={`relative z-10 mt-8 text-[13px] md:text-[14px] text-center max-w-[440px] ${
-            denied ? "text-[var(--accent)]" : "text-white/60"
+            denied ? "text-[var(--accent)]" : "text-white/50"
           }`}
           aria-live="polite"
         >
           {denied
-            ? "Talk cannot hear you — your browser blocked microphone access. Allow the microphone for this site and press Begin again."
+            ? "Microphone blocked — type your answers below, or allow the microphone and start again."
             : STATUS[talk.phase]}
         </p>
 
@@ -173,7 +267,7 @@ export default function TherapyPage() {
             {talk.error.kind === "auth" ? (
               <>
                 {" "}
-                <Link href="/sign-in" className="underline underline-offset-4 text-white">
+                <Link href="/sign-in?next=%2Ftherapy" className="underline underline-offset-4 text-white">
                   Sign in
                 </Link>
               </>
@@ -256,26 +350,91 @@ export default function TherapyPage() {
           </div>
         ) : null}
 
-        <div className="relative z-10 mt-8 flex flex-col sm:flex-row items-center gap-3">
+        {/* Typing, for a noisy room, a shared space, or a blocked microphone. */}
+        <AnimatePresence>
+          {showKeyboard && talk.active ? (
+            <motion.form
+              key="type"
+              onSubmit={submitDraft}
+              initial={{ y: 8, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={SPRING_SOFT}
+              className="relative z-10 mt-6 w-full max-w-[440px] flex items-center gap-2"
+            >
+              <input
+                autoFocus
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                aria-label="Type to Talk"
+                className="flex-1 h-12 rounded-full bg-white/10 border border-white/15 px-5 text-[14px] text-white placeholder:text-white/35 outline-none focus:border-[var(--accent)] transition-colors"
+                placeholder="Type…"
+              />
+              <button
+                type="submit"
+                aria-label="Send"
+                className="h-12 w-12 shrink-0 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-soft)] flex items-center justify-center transition-colors"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+                  <path d="M5 12h14M13 6l6 6-6 6" />
+                </svg>
+              </button>
+            </motion.form>
+          ) : null}
+        </AnimatePresence>
+
+        <div className="relative z-10 mt-8 flex items-center gap-3">
           <button
             type="button"
-            onClick={talk.active ? talk.stop : talk.start}
-            className="h-12 px-7 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-soft)] text-white text-[12px] uppercase tracking-[0.14em] font-medium transition-colors"
+            disabled={!canStart}
+            onClick={talk.active ? talk.stop : begin}
+            className="h-12 px-7 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-soft)] disabled:opacity-40 text-white text-[12px] uppercase tracking-[0.14em] font-medium transition-colors"
           >
-            {talk.active ? "End session" : "Begin"}
+            {talk.active ? "End" : intakeMode ? "Start" : "Begin"}
           </button>
-          <Link
-            href="/therapists"
-            className="h-12 px-6 rounded-full border border-white/20 text-[12px] uppercase tracking-[0.14em] font-medium flex items-center hover:bg-white/10 transition-colors"
-          >
-            Talk to a human
-          </Link>
+          {talk.active && !talk.textOnly ? (
+            <button
+              type="button"
+              onClick={() => setTyping((v) => !v)}
+              aria-label={typing ? "Hide keyboard" : "Type instead"}
+              aria-pressed={typing}
+              className={`h-12 w-12 rounded-full border flex items-center justify-center transition-colors ${
+                typing ? "bg-white text-[var(--dark)] border-white" : "border-white/20 hover:bg-white/10"
+              }`}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                <rect x="2.5" y="6" width="19" height="12" rx="2.5" />
+                <path d="M6.5 10h.01M10 10h.01M13.5 10h.01M17 10h.01M8 14h8" strokeLinecap="round" />
+              </svg>
+            </button>
+          ) : !intakeMode ? (
+            <Link
+              href="/counsellors"
+              className="h-12 px-6 rounded-full border border-white/20 text-[12px] uppercase tracking-[0.14em] font-medium flex items-center hover:bg-white/10 transition-colors"
+            >
+              Talk to a human
+            </Link>
+          ) : null}
         </div>
+
+        {intakeMode && !talk.active ? (
+          <p className="relative z-10 mt-4 text-[11px] text-white/40 text-center max-w-[320px] leading-relaxed">
+            By starting, you agree to our{" "}
+            <Link href="/terms" className="underline underline-offset-2 text-white/60">
+              Terms
+            </Link>{" "}
+            and{" "}
+            <Link href="/privacy" className="underline underline-offset-2 text-white/60">
+              Privacy Policy
+            </Link>
+            .
+          </p>
+        ) : null}
 
         {/* Never further than one line away, on the surface most likely to
             be open when someone is struggling. */}
         <p className="relative z-10 mt-10 text-[11px] uppercase tracking-[0.18em] text-white/45 text-center max-w-[460px] leading-relaxed">
-          Talk is an AI companion, not a therapist, and cannot respond to an emergency.{" "}
+          Talk is an AI, not a therapist, and cannot respond to an emergency.{" "}
           <Link href="/crisis" className="underline underline-offset-4 text-white/70">
             Urgent help
           </Link>

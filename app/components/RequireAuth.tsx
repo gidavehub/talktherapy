@@ -87,11 +87,8 @@ export function RequireRole({
     }
 
     // Signed in but no profile document yet — the Firestore write is still in
-    // flight, or rules rejected the read. Onboarding recreates it.
-    if (!profile) {
-      router.replace("/onboarding");
-      return;
-    }
+    // flight on a fresh sign-up. Wait for it rather than bouncing.
+    if (!profile) return;
 
     if (!permitted) {
       // A counsellor with the right role but pending credentials gets the

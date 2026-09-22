@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { motion } from "motion/react";
 import { SPRING_SNAP } from "../motion/primitives";
+import { useStartHref } from "../StartLink";
 
 /**
  * The button vocabulary from the landing page, factored out.
@@ -100,7 +101,7 @@ export default function Button({
   children,
   variant = "primary",
   size = "md",
-  href,
+  href: rawHref,
   onClick,
   type = "button",
   disabled = false,
@@ -110,6 +111,10 @@ export default function Button({
   className = "",
   ...rest
 }: ButtonProps) {
+  // "Create your account" must never ask a signed-in person to sign up
+  // again: a plain /sign-up link resolves to where they actually belong.
+  const startHref = useStartHref();
+  const href = rawHref === "/sign-up" ? startHref : rawHref;
   const sizing = SIZES[size];
   const styles = VARIANTS[variant];
 
