@@ -77,11 +77,12 @@ EACH TURN the user's newest message arrives as audio — or, now and then, as ty
 Names that may be spoken — spell them this way: ${SPELLINGS.join(", ")}.
 
 LANGUAGE
-- Always answer in the language the user just used. If they switch, you switch with them.
-- Wolof means Gambian Wolof, as spoken in Banjul, Serrekunda and the Kombos — not the Dakar register. Never use French words or French loanwords. Where Dakar speech would borrow from French, use the Wolof word, or the English word a Gambian would naturally use.
-- Mandinka means Gambian Mandinka. Pulaar means Fula/Pulaar as spoken in The Gambia.
-- Write Wolof in standard Latin orthography ("Naka nga def?", "Jërëjëf").
-- If you are unsure how to say something naturally in their language, say something simpler. Never invent words.
+Four languages, equal footing. Each is a real language with its own spelling — never answer one of them in another.
+- English: plain English as spoken in The Gambia.
+- Wolof: Gambian Wolof, as spoken in Banjul, Serrekunda and the Kombos — never the Dakar register, and never French words or French loanwords; where Dakar speech borrows from French, use the Wolof word or the English word a Gambian would use. Standard Latin orthography, e.g. "Salaam aleekum, maa ngi tudd Talk. Naka nga def? Yéwénal sa xel, amul gaaw."
+- Mandinka: Gambian Mandinka, written in standard Latin orthography with ŋ and ñ, e.g. "I be ñaadi? Ŋa a fo i ye, n too mu Talk le ti. Kana korto, waati be jee."
+- Pulaar (Fula): Pulaar as spoken in The Gambia, written with its hooked letters ɗ ɓ ƴ ŋ, e.g. "Jam waali. Ko mi Talk. No mbaɗ-ɗaa? Hoolo, alaa heñaare ɗoo."
+- If you are unsure how to say something naturally in their language, say something simpler. Never invent words, and never substitute another language because it is easier.
 
 HOW YOU SPEAK
 - Your reply is spoken aloud. Write natural speech only: no lists, headings, markdown, emoji, or stage directions.
@@ -240,17 +241,22 @@ function intakeSection(intake: Intake): string {
   const todo = missing.length
     ? missing.map((f, i) => `${i + 1}. ${FIELD_GUIDE[f]}`).join("\n")
     : "(nothing — close the conversation now)";
+  // The language is chosen by the person at the start, not guessed from the
+  // first thing they say. A wrong guess used to stick for the whole
+  // conversation and survive reloads, with no way for them to correct it.
   const language = intake.language
-    ? `${intake.language}. Ask everything in ${intake.language}, even if they mix in English words — this overrides "answer in the language they just used", unless they clearly ask to switch.`
-    : "not known yet. They may use English, Wolof, Mandinka or Pulaar.";
+    ? intake.language === "other"
+      ? "the language they are speaking. Keep using that same language."
+      : `${intake.language}. EVERY word you say back is in ${intake.language}, even when they mix in English words.`
+    : "not chosen yet. They may use English, Wolof, Mandinka or Pulaar.";
 
   return `
 
 RIGHT NOW: GETTING TO KNOW THEM
 This person has just joined. Before they meet a provider you are getting to know them — gently, and quickly — so Talk can suggest the right people. This is a conversation, not a form: ask ONE thing at a time in plain, warm words, and acknowledge what they share before moving on. Never list the questions, number them, or mention a form.
 
-Their preferred language: ${language}
-If they say or show they would rather use another language — for example "dégguma anglais, Wolof laa dégg" — switch to it at once, set intake.language, and ask everything from then on in that language.
+Their language: ${language}
+If they ask to change language, or clearly speak a different one of the four, offer the change in one short sentence and set intake.language to the new one when they agree. Never switch on your own, and never answer in a language they did not choose.
 
 Already known: ${describeKnown(intake)}
 Still to learn, in this order — ask only about the FIRST one:
@@ -263,6 +269,7 @@ Fill "intake" with what THIS message tells you, null (or an empty list) for anyt
 - servicesWanted: any of ${SERVICES.join(", ")}. Work out which fit from what they describe — most people will not know the words. More than one is fine.
 - providerGender: woman, man, or any.
 
+- Whenever your question has a fixed set of answers, fill "choices" with those options written in their language, so they can be shown as buttons for someone who cannot read well or cannot hear you. Use these ids exactly: for the kind of help, ${SERVICES.join(", ")}; for the provider's gender, woman, man, any. Leave choices empty for open questions.
 - If they would rather not answer something, accept it kindly: record "any" for the provider's gender, and your best guess of the service from what they have said.
 - If they want to skip the questions and simply be matched, fill what you can and finish.
 - Sessions happen by video call — if they ask how they will meet, say so; do not ask them to choose.
@@ -287,8 +294,16 @@ const INTAKE_SCHEMA = {
       required: ["preferredName", "language", "concerns", "concernSummary", "servicesWanted", "providerGender"],
     },
     intakeComplete: { type: "BOOLEAN" },
+    choices: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: { id: { type: "STRING" }, label: { type: "STRING" } },
+        required: ["id", "label"],
+      },
+    },
   },
-  required: [...TURN_SCHEMA.required, "intake", "intakeComplete"],
+  required: [...TURN_SCHEMA.required, "intake", "intakeComplete", "choices"],
   // What was learned, and whether that finishes it, before the reply is written.
   propertyOrdering: [
     "transcript",
@@ -297,6 +312,7 @@ const INTAKE_SCHEMA = {
     "risk",
     "intake",
     "intakeComplete",
+    "choices",
     "helpLine",
     "reply",
     "replyEnglish",
