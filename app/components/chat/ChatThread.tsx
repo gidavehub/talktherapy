@@ -50,7 +50,8 @@ import type { Chat, ChatMessage } from "../../lib/models";
  * the browser locale.
  */
 export default function ChatThread({ chatId }: { chatId: string }) {
-  const { user, profile } = useAuth();
+  const { user, profile, role } = useAuth();
+  const isProvider = role === "provider";
   const uid = user?.uid ?? null;
 
   const [chat, setChat] = useState<Chat | null>(null);
@@ -73,7 +74,11 @@ export default function ChatThread({ chatId }: { chatId: string }) {
   // The name stored on the chat is the fallback, not the first choice: a live
   // read of the provider directory reflects a name that has since changed. It
   // is also the only name the provider side has for a patient.
-  const peer = useChatPeer(peerUid, (chat && nameOf(chat, peerUid)) || "Your provider");
+  const peer = useChatPeer(
+    peerUid,
+    (chat && nameOf(chat, peerUid)) ||
+      (isProvider ? "Someone you are working with" : "Your provider"),
+  );
 
   useEffect(() => watchChat(chatId, setChat), [chatId]);
   useEffect(() => watchMessages(chatId, setMessages), [chatId]);
@@ -188,7 +193,13 @@ export default function ChatThread({ chatId }: { chatId: string }) {
             {isGroup ? "Group conversation" : peer.name}
           </p>
           <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--muted)]">
-            {typingUids.length > 0 ? "Typing" : isGroup ? `${chat?.participants.length} people` : "Provider"}
+            {typingUids.length > 0
+              ? "Typing"
+              : isGroup
+                ? `${chat?.participants.length} people`
+                : isProvider
+                  ? "In your care"
+                  : "Provider"}
           </p>
         </div>
       </div>

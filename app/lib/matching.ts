@@ -167,6 +167,30 @@ export function areaOf(town: string | null | undefined): Area | null {
   return town ? (TOWN_AREA[town.trim().toLowerCase()] ?? null) : null;
 }
 
+/**
+ * Every town this file can place, grouped by area, for the provider profile
+ * form to offer.
+ *
+ * Exported so that form can be a list rather than a text box. A provider who
+ * types "Westfield" gets no area, and silently loses the proximity bonus that
+ * puts them in front of the people nearest to them — the failure is invisible
+ * to everyone, which is the worst kind. Choosing from this list cannot miss.
+ */
+export const TOWNS_BY_AREA: Array<{ area: Area; towns: string[] }> = AREAS.filter(
+  (area) => area !== "outside",
+).map((area) => ({
+  area,
+  towns: Object.entries(TOWN_AREA)
+    .filter(([, a]) => a === area)
+    .map(([town]) => town)
+    .sort(),
+}));
+
+/** "serrekunda" -> "Serrekunda". Stored lower-case; shown as a name. */
+export function townLabel(town: string): string {
+  return town.charAt(0).toUpperCase() + town.slice(1);
+}
+
 export const USER_GENDERS = ["woman", "man", "other", "unsaid"] as const;
 export type UserGender = (typeof USER_GENDERS)[number];
 

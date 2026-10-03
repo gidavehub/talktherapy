@@ -5,15 +5,21 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "../AuthProvider";
 import AppShell from "../ui/AppShell";
 import Orb from "../Orb";
-import { PATIENT_NAV } from "../../lib/nav";
+import { PATIENT_NAV, PROVIDER_NAV } from "../../lib/nav";
 
 /**
- * Gate + chrome for the patient area.
+ * Gate + chrome for the signed-in app, both sides of it.
  *
  * Three things have to be true before a screen here renders: auth has settled,
- * someone is signed in, and they have finished onboarding. Each failure routes
- * somewhere specific rather than to a generic bounce, because "you are signed
- * out" and "you have not finished setting up" need different answers.
+ * someone is signed in, and — for a patient — they have finished onboarding.
+ * Each failure routes somewhere specific rather than to a generic bounce,
+ * because "you are signed out" and "you have not finished setting up" need
+ * different answers.
+ *
+ * Patients and providers share this gate and this shell, and differ only in
+ * which navigation they get. The alternative — a second route group with its
+ * own gate — would mean two copies of the chat surface, and the first thing a
+ * provider needs is the conversation a patient has already started.
  *
  * This is a UX layer, not a security boundary — Firebase auth state is
  * client-side, so there is no server redirect to lean on. Enforcement is
@@ -50,9 +56,11 @@ export default function AppGate({ children }: { children: React.ReactNode }) {
     // on a fresh sign-up. Wait for it.
     if (!profile) return;
 
-    // Onboarding is a conversation with Talk; nobody reaches the app until
-    // she has learned what they need.
-    if (!profile.onboarded) {
+    // Onboarding is a conversation with Talk; no PATIENT reaches the app until
+    // she has learned what they need. A provider has no intake to do — sending
+    // them to /therapy would ask a clinician what brings them here today, and
+    // then file the answer as their own case notes.
+    if (profile.role !== "provider" && !profile.onboarded) {
       router.replace("/therapy");
     }
   }, [ready, user, profile, router, pathname]);
@@ -60,7 +68,11 @@ export default function AppGate({ children }: { children: React.ReactNode }) {
   if (!ready) return <Splash label="Checking your session" />;
   if (!user) return <Splash label="Taking you to sign in" />;
   if (!profile) return <Splash label="Loading your profile" />;
-  if (!profile.onboarded) return <Splash label="Taking you to Talk" />;
 
-  return <AppShell nav={PATIENT_NAV}>{children}</AppShell>;
+  const isProvider = profile.role === "provider";
+  if (!isProvider && !profile.onboarded) return <Splash label="Taking you to Talk" />;
+
+  return (
+    <AppShell nav={isProvider ? PROVIDER_NAV : PATIENT_NAV}>{children}</AppShell>
+  );
 }

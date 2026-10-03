@@ -38,3 +38,21 @@ export const PATIENT_NAV: NavItem[] = [
   { href: "/journal", label: "Journal", icon: <IconJournal /> },
   { href: "/resources", label: "Resources", icon: <IconResources /> },
 ];
+
+/**
+ * A provider's side of the app.
+ *
+ * Short, because a provider only has two jobs here today: answer the people
+ * who have written to them, and keep the listing that lets those people find
+ * them in the first place. Messages comes first — it is the one thing that is
+ * waiting on them, and the one thing that is urgent.
+ *
+ * Mood, journal and the companion are deliberately absent. They are a
+ * patient's tools, and putting a provider's own notes in the same place as the
+ * people they treat is how records end up in the wrong file.
+ */
+export const PROVIDER_NAV: NavItem[] = [
+  { href: "/chats", label: "Messages", icon: <IconChat />, primary: true },
+  { href: "/pro/profile", label: "Profile", icon: <IconPeople />, primary: true },
+  { href: "/settings", label: "Settings", icon: <IconSettings />, primary: true },
+];

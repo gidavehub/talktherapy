@@ -57,16 +57,19 @@ function ChatRow({
   index,
   onRead,
   speaking,
+  fallbackName,
 }: {
   chat: Chat;
   selfUid: string;
   index: number;
   onRead: (id: string, text: string) => void;
   speaking: boolean;
+  /** Shown until the name resolves, and for ever on the provider's side. */
+  fallbackName: string;
 }) {
   const peerUid = otherParticipant(chat, selfUid);
   const isGroup = chat.participants.length > 2;
-  const peer = useChatPeer(peerUid, nameOf(chat, peerUid) || "Your provider");
+  const peer = useChatPeer(peerUid, nameOf(chat, peerUid) || fallbackName);
   const name = isGroup ? "Group conversation" : peer.name;
   const unread = unreadFor(chat, selfUid);
 
@@ -132,7 +135,8 @@ function ChatRow({
 }
 
 export default function ChatList() {
-  const { user, profile } = useAuth();
+  const { user, profile, role } = useAuth();
+  const isProvider = role === "provider";
   const [chats, setChats] = useState<Chat[] | null>(null);
   const { read, speakingId } = useReadAloud(profile?.intake?.language ?? null);
 
@@ -150,7 +154,16 @@ export default function ChatList() {
   }
 
   if (chats.length === 0) {
-    return (
+    // A provider is waiting to be written to, not looking for someone to write
+    // to — the patient's empty state would send them shopping for a provider.
+    return isProvider ? (
+      <EmptyState
+        icon={<IconChat />}
+        title="Nobody has written to you yet"
+        description="When somebody picks you, their conversation appears here. You will see their name, what they told Talk they are going through, and whatever they write."
+        action={<Button href="/pro/profile">Check your profile</Button>}
+      />
+    ) : (
       <EmptyState
         icon={<IconChat />}
         title="No conversations yet"
@@ -170,6 +183,7 @@ export default function ChatList() {
           index={index}
           onRead={read}
           speaking={speakingId === chat.id}
+          fallbackName={isProvider ? "Someone you are working with" : "Your provider"}
         />
       ))}
     </div>

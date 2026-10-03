@@ -17,6 +17,9 @@ import {
   getDocs,
   limit,
   query,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
   where,
 } from "firebase/firestore";
 import { firebaseConfigured, firestore } from "./firebase";
@@ -181,6 +184,90 @@ export async function getProvider(uid: string): Promise<ProviderProfile | null> 
   } catch {
     return null;
   }
+}
+
+/**
+ * A provider's own profile, whatever state it is in.
+ *
+ * `getProvider` above deliberately hides anything not yet verified, because it
+ * serves the public directory. A provider editing their own listing has to be
+ * able to see it before an admin has approved it, which is every provider on
+ * their first day.
+ */
+export async function getOwnProviderProfile(uid: string): Promise<ProviderProfile | null> {
+  if (!firebaseConfigured()) return null;
+  const snap = await getDoc(doc(firestore(), COLLECTIONS.providerProfiles, uid));
+  return snap.exists() ? toProfile(snap.id, snap.data()) : null;
+}
+
+/** The fields a provider fills in. Everything else is set by us or by review. */
+export type ProviderDraft = {
+  displayName: string;
+  headline: string;
+  bio: string;
+  services: Service[];
+  languages: Locale[];
+  specializations: Specialization[];
+  qualifications: string[];
+  yearsExperience: number;
+  sessionRateMinor: number;
+  gender: "woman" | "man" | null;
+  /** A town from TOWNS_BY_AREA, lower-case, so matching can place it. */
+  location: string | null;
+};
+
+/**
+ * Create or update a provider's own public listing.
+ *
+ * `status` is never in the draft, and that is the point. firestore.rules lets
+ * a provider create their profile only as `draft` or `pending`, and lets an
+ * update through only when the status is unchanged — so a provider cannot
+ * approve themselves. A new profile is therefore created as `pending`, and an
+ * update simply omits the field, which leaves whatever review decided.
+ *
+ * `formats` is always video: Talk's sessions happen in the app, and the type
+ * keeps the other values only so the field does not need a migration when
+ * that changes.
+ */
+export async function saveProviderProfile(uid: string, draft: ProviderDraft): Promise<void> {
+  const ref = doc(firestore(), COLLECTIONS.providerProfiles, uid);
+  const existing = await getDoc(ref);
+
+  const fields = {
+    displayName: draft.displayName.trim(),
+    headline: draft.headline.trim(),
+    bio: draft.bio.trim(),
+    services: draft.services,
+    languages: draft.languages,
+    specializations: draft.specializations,
+    qualifications: draft.qualifications.map((q) => q.trim()).filter(Boolean),
+    yearsExperience: draft.yearsExperience,
+    sessionRateMinor: draft.sessionRateMinor,
+    gender: draft.gender,
+    location: draft.location,
+    formats: ["video"] as SessionFormat[],
+    updatedAt: serverTimestamp(),
+  };
+
+  if (existing.exists()) {
+    await updateDoc(ref, fields);
+    return;
+  }
+
+  await setDoc(ref, {
+    ...fields,
+    uid,
+    // Straight to pending: there is no save-as-draft in the UI, so a profile
+    // that exists is one its owner wants reviewed.
+    status: "pending",
+    photoPath: null,
+    ratingAvg: 0,
+    ratingCount: 0,
+    timezone: "Africa/Banjul",
+    // Never true from the app. Only the seed script writes sample profiles.
+    sample: false,
+    createdAt: serverTimestamp(),
+  });
 }
 
 export type DirectoryFilters = {

@@ -8,7 +8,7 @@ import { signInWithEmail, signInWithGoogle, signUpWithEmail } from "../lib/auth"
 import { SPRING_SOFT, SPRING_SNAP } from "./motion/primitives";
 import { useAuth } from "./AuthProvider";
 import { afterSignIn, safeNext } from "../lib/routing";
-import type { AppUser } from "../lib/auth";
+import type { AppUser, SignUpRole } from "../lib/auth";
 
 type Mode = "sign-in" | "sign-up";
 
@@ -40,7 +40,22 @@ function nextParam(): string | null {
   return safeNext(new URLSearchParams(window.location.search).get("next"));
 }
 
-export default function AuthCard({ mode }: { mode: Mode }) {
+/**
+ * `role` comes from the URL, resolved by the server component above this one,
+ * rather than from a toggle on the form: a patient who ticks the wrong box
+ * lands in a provider account with no way back, and the people arriving here
+ * are overwhelmingly patients.
+ *
+ * It settles `role` on the user document, which only an admin can change
+ * afterwards — so this is the one moment it is decided.
+ */
+export default function AuthCard({
+  mode,
+  role = "patient",
+}: {
+  mode: Mode;
+  role?: SignUpRole;
+}) {
   const router = useRouter();
   const { user, profile, ready } = useAuth();
   const [busy, setBusy] = useState(false);
@@ -74,6 +89,7 @@ export default function AuthCard({ mode }: { mode: Mode }) {
   }
 
   const isSignUp = mode === "sign-up";
+  const asProvider = isSignUp && role === "provider";
 
   return (
     <motion.div
@@ -89,7 +105,7 @@ export default function AuthCard({ mode }: { mode: Mode }) {
         transition={{ ...SPRING_SOFT, delay: 0.15 }}
         className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]"
       >
-        {isSignUp ? "Create your account" : "Welcome back"}
+        {asProvider ? "Join as a provider" : isSignUp ? "Create your account" : "Welcome back"}
       </motion.p>
       <motion.h1
         initial={{ y: 30, opacity: 0 }}
@@ -97,13 +113,17 @@ export default function AuthCard({ mode }: { mode: Mode }) {
         transition={{ ...SPRING_SOFT, delay: 0.2 }}
         className="mt-3 text-[32px] md:text-[36px] leading-[1.05] tracking-tight font-medium whitespace-pre-line"
       >
-        {isSignUp ? "Start your\nfirst session." : "Continue your\njourney."}
+        {asProvider
+          ? "Offer your\nwork here."
+          : isSignUp
+            ? "Start your\nfirst session."
+            : "Continue your\njourney."}
       </motion.h1>
 
       <motion.button
         type="button"
         disabled={busy}
-        onClick={() => withCatch(() => signInWithGoogle("patient"))}
+        onClick={() => withCatch(() => signInWithGoogle(isSignUp ? role : "patient"))}
         initial={{ y: 24, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ ...SPRING_SOFT, delay: 0.3 }}
@@ -125,7 +145,7 @@ export default function AuthCard({ mode }: { mode: Mode }) {
         onSubmit={(e) => {
           e.preventDefault();
           if (isSignUp) {
-            void withCatch(() => signUpWithEmail(email, password, name, "patient"));
+            void withCatch(() => signUpWithEmail(email, password, name, role));
           } else {
             void withCatch(() => signInWithEmail(email, password));
           }

@@ -52,6 +52,27 @@ const message = {
   readBy: [PATIENT],
 };
 
+/** A provider's public listing, as the profile form saves it. */
+const listing = {
+  uid: PROVIDER,
+  displayName: "Awa Ceesay",
+  headline: "Mental health counselling",
+  bio: "",
+  services: ["mental-health-counselling"],
+  languages: ["wo", "en"],
+  specializations: ["grief"],
+  qualifications: [],
+  yearsExperience: 9,
+  sessionRateMinor: 80000,
+  status: "pending",
+  gender: "woman",
+  location: "banjul",
+  formats: ["video"],
+  sample: false,
+  ratingAvg: 0,
+  ratingCount: 0,
+};
+
 /** A payment as the server records it before the shopper is redirected. */
 const payment = {
   paymentIntentId: "pi_1",
@@ -133,6 +154,32 @@ const CASES = [
   ["pre-recording a webhook event key", "DENY", PATIENT, "create", `${DOCS}/paymentEvents/evt_1`, null,
     { eventKey: "evt_1", paymentIntentId: "pi_1" }],
   ["reading the event ledger", "DENY", PATIENT, "get", `${DOCS}/paymentEvents/evt_1`, { eventKey: "evt_1" }],
+
+  // --- a provider's own listing ------------------------------------------
+  // The whole point of "verified" is that somebody else checked, so the one
+  // thing a provider must not be able to write is that word.
+  ["listing yourself for review", "ALLOW", PROVIDER, "create", `${DOCS}/providerProfiles/${PROVIDER}`,
+    null, listing],
+  ["listing yourself as already verified", "DENY", PROVIDER, "create", `${DOCS}/providerProfiles/${PROVIDER}`,
+    null, { ...listing, status: "verified" }],
+  ["editing your own listing", "ALLOW", PROVIDER, "update", `${DOCS}/providerProfiles/${PROVIDER}`,
+    listing, { ...listing, headline: "Grief and loss" }],
+  ["verifying yourself by editing", "DENY", PROVIDER, "update", `${DOCS}/providerProfiles/${PROVIDER}`,
+    listing, { ...listing, status: "verified" }],
+  ["listing somebody else", "DENY", STRANGER, "create", `${DOCS}/providerProfiles/${PROVIDER}`,
+    null, listing],
+  ["editing somebody else's listing", "DENY", STRANGER, "update", `${DOCS}/providerProfiles/${PROVIDER}`,
+    listing, { ...listing, headline: "Not theirs to write" }],
+  ["a patient listing themselves as a provider", "DENY", PATIENT, "create", `${DOCS}/providerProfiles/${PATIENT}`,
+    null, { ...listing, uid: PATIENT }],
+  // The public directory: a verified profile is readable by anyone, including
+  // somebody who has not signed in. One that is still being checked is not.
+  ["anyone reads a verified listing", "ALLOW", null, "get", `${DOCS}/providerProfiles/${PROVIDER}`,
+    { ...listing, status: "verified" }],
+  ["a stranger reads a listing still being checked", "DENY", STRANGER, "get",
+    `${DOCS}/providerProfiles/${PROVIDER}`, listing],
+  ["a provider reads their own listing before it is checked", "ALLOW", PROVIDER, "get",
+    `${DOCS}/providerProfiles/${PROVIDER}`, listing],
 ];
 
 /**
@@ -147,6 +194,21 @@ const parentChatMock = {
   result: { value: { data: chat } },
 };
 
+/**
+ * `hasRole()` and `isAdmin()` read the caller's user document, so any rule
+ * that uses them needs that read answered. Mocked by path, so one set covers
+ * whoever is acting.
+ */
+const userDocMocks = [
+  [PROVIDER, "provider"],
+  [PATIENT, "patient"],
+  [STRANGER, "patient"],
+].map(([uid, role]) => ({
+  function: "get",
+  args: [{ exactValue: `${DOCS}/users/${uid}` }],
+  result: { value: { data: { uid, role } } },
+}));
+
 const testCase = ([, expectation, uid, method, path, existing, incoming]) => ({
   expectation,
   request: {
@@ -160,6 +222,7 @@ const testCase = ([, expectation, uid, method, path, existing, incoming]) => ({
   ...(method === "create" && path.includes("/messages/")
     ? { functionMocks: [parentChatMock] }
     : {}),
+  ...(path.includes("/providerProfiles/") ? { functionMocks: userDocMocks } : {}),
 });
 
 /**
