@@ -26,6 +26,7 @@ export const COLLECTIONS = {
   slots: "slots",
   bookings: "bookings",
   sessions: "sessions",
+  chats: "chats",
   messages: "messages",
   notes: "notes",
   calls: "calls",
@@ -573,4 +574,97 @@ export type AuditLog = {
   targetPath: string;
   metadata: Record<string, unknown>;
   createdAt: number;
+};
+
+// ---------------------------------------------------------------------- chat
+
+/**
+ * A conversation. One document per thread, carrying enough denormalised state
+ * to render the whole chat list without reading a single message.
+ *
+ * `participants` is the entire access control story: firestore.rules tests
+ * membership of this array and nothing else, which is why the rules forbid
+ * changing it after create. Adding a uid to a live chat would retroactively
+ * hand over every message in it.
+ *
+ * Shaped for groups from the start even though the UI is 1:1 — group sessions
+ * are coming, and the only thing that changes is the length of this array.
+ */
+export type Chat = {
+  id: string;
+  participants: string[];
+  /**
+   * uid -> display name, written once when the chat is opened.
+   *
+   * Denormalised because there is no other way for a provider to learn a
+   * patient's name: firestore.rules refuses `users/{uid}` to everyone but its
+   * owner and an admin, and that is worth keeping. Whoever opens the chat can
+   * read both names at that moment — their own profile and the provider
+   * directory — so writing them here costs nothing and spares the provider
+   * side a thread full of "Patient".
+   *
+   * Only the people in the chat can read it. May be missing on a chat opened
+   * before this field existed, so every reader needs a fallback.
+   */
+  names: Record<string, string>;
+  /** Preview line for the chat list. For media this is a label, not a caption. */
+  lastMessage: string;
+  lastMessageAt: number;
+  /**
+   * Messages each participant has not opened yet, keyed by uid. Kept on the
+   * chat so the list badge costs no message reads: a sender increments
+   * everyone else's counter in the same batch that writes the message.
+   */
+  unread: Record<string, number>;
+  /**
+   * uid -> client clock reading when they were last seen typing. A timestamp
+   * rather than a boolean because a tab closed mid-sentence can never clear a
+   * boolean, and the thread would then show "typing…" for ever. Readers treat
+   * anything older than TYPING_TTL_MS as not typing.
+   */
+  typing: Record<string, number>;
+  createdAt: number;
+};
+
+export type ChatMessageKind = "text" | "voice" | "image" | "file";
+
+/**
+ * One message.
+ *
+ * `participants` is copied from the parent chat onto every message, exactly as
+ * `SessionMessage` does it and for the same reason: the obvious rule — get()
+ * the parent chat — bills a document read per message, and a conversation that
+ * is actually working produces hundreds against a 50k/day free quota.
+ */
+export type ChatMessage = {
+  id: string;
+  senderId: string;
+  participants: string[];
+  kind: ChatMessageKind;
+  /** The body for `text`; for media kinds, a label that can stand in for it. */
+  text: string;
+  /**
+   * Storage object path — NOT a download URL. A `getDownloadURL()` token is a
+   * capability that bypasses storage.rules entirely, so storing the path and
+   * fetching through `getBlob()` is what actually keeps a voice note private
+   * to the people in the chat. See the `chat-media/` block in storage.rules.
+   */
+  mediaPath: string | null;
+  /** Voice notes only. */
+  durationSec: number | null;
+  /**
+   * Set once a voice note has been transcribed, so it can be read aloud or
+   * read as text. Nothing writes it yet — transcription is a later phase — but
+   * the field exists so switching it on needs no migration.
+   */
+  transcript: string | null;
+  createdAt: number;
+  /** uids who have opened the thread since this arrived. Includes the sender. */
+  readBy: string[];
+  /**
+   * Local only — never written, never read back. True while Firestore has the
+   * write queued but the server has not acknowledged it, which is the real
+   * distinction behind the one-tick / two-tick state.
+   */
+  pending?: boolean;
 };

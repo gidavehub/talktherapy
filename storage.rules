@@ -33,6 +33,10 @@ service firebase.storage {
       return request.resource.contentType.matches('image/.*');
     }
 
+    function isAudio() {
+      return request.resource.contentType.matches('audio/.*');
+    }
+
     function underMB(n) {
       return request.resource.size < n * 1024 * 1024;
     }
@@ -82,6 +86,48 @@ service firebase.storage {
       allow read: if isSignedIn();
       allow write: if isOwner(uid) && underMB(10);
       allow delete: if isOwner(uid);
+    }
+
+    // ------------------------------------------------------------ chat media
+    // Voice notes and photos sent in a conversation. `fileName` is the id of
+    // the message that carries the file — see `app/lib/chat.ts`.
+    //
+    // Limitation (1) at the top of this file is the whole story here: these
+    // rules cannot read Firestore, so there is no way to ask "is this person
+    // in that chat". Two things stand in for it, and both matter:
+    //
+    //  - The object name is a Firestore-generated message id, so a path is not
+    //    guessable from the chat id alone. The chat id IS guessable — it is
+    //    the two uids sorted — which is precisely why the file is named after
+    //    the message and not after, say, a timestamp.
+    //  - The path is only ever learned by reading the message document, and
+    //    firestore.rules restricts that to the chat's participants. That
+    //    Firestore rule is the real access control; this is the backstop.
+    //
+    // Chat media is therefore read with getBlob(), not getDownloadURL(): a
+    // download token is a capability that bypasses this file completely and
+    // keeps working for anyone it is ever forwarded to. No bucket CORS
+    // configuration is needed for that — see chatMediaUrl().
+    //
+    // TODO(security): if group sessions make the guessable-path backstop feel
+    // too thin, move chat media behind an Admin-SDK signed URL, or add the
+    // uploader's uid to the path so writes can be owner-gated.
+    match /chat-media/{chatId}/{fileName} {
+      allow read: if isSignedIn();
+
+      // `resource == null` means "no object here yet", so this is create-only:
+      // a voice note can be uploaded once and never replaced. Worth having
+      // beyond tidiness — the message that points at it is immutable, so a
+      // replaceable file would let a sender change what a message says after
+      // the other person had read it.
+      allow write: if isSignedIn()
+        && resource == null
+        && underMB(10)
+        && (isImage() || isAudio());
+
+      // No deletes. The message referencing the file cannot be deleted either,
+      // so a missing object would only ever render as a broken message.
+      allow delete: if false;
     }
 
     // ------------------------------------------------------------- catch-all

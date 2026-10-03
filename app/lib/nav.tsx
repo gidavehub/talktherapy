@@ -7,6 +7,7 @@ import {
   IconSettings,
   IconResources,
   IconMic,
+  IconChat,
 } from "../components/ui/icons";
 
 /**
@@ -26,6 +27,10 @@ export const PATIENT_NAV: NavItem[] = [
   { href: "/dashboard", label: "Home", icon: <IconHome />, primary: true },
   // The providers picked for this person — the point of the whole product.
   { href: "/matches", label: "Providers", icon: <IconPeople />, primary: true },
+  // Sits next to Providers because it is the step straight after finding one.
+  // This takes the bottom bar to exactly five; anything added later has to
+  // take a slot rather than extend the row.
+  { href: "/chats", label: "Messages", icon: <IconChat />, primary: true },
   { href: "/therapy", label: "Talk", icon: <IconMic />, primary: true },
   { href: "/settings/profile", label: "Settings", icon: <IconSettings />, primary: true },
   // Useful, but not what the MVP is for — reachable from the menu.

@@ -233,6 +233,121 @@ service cloud.firestore {
       }
     }
 
+    // ---------------------------------------------------------------- chats
+
+    // Conversations between a person and the provider they are working with.
+    // This collection holds the same class of disclosure as a journal entry,
+    // so "deny unless you are in the participant list" is doing real work
+    // here, not paperwork.
+    //
+    // There is no admin read. An admin can already escalate a crisis without
+    // reading the conversation, and a support team able to open anyone's
+    // therapy chat is a far bigger liability than the occasional support
+    // ticket it would resolve.
+    match /chats/{chatId} {
+      function isChatParticipant() {
+        return isSignedIn() && request.auth.uid in resource.data.participants;
+      }
+
+      // `list` is safe to allow on the same condition because Firestore
+      // evaluates it against every document a query actually returns: the
+      // chat-list query filters on `participants array-contains <me>`, and a
+      // query that reached somebody else's chat would be refused outright
+      // rather than filtered.
+      allow get, list: if isChatParticipant();
+
+      // Whoever opens the conversation must be in it. Two is the minimum; the
+      // ceiling is a brake on a script creating a thousand-person thread, not
+      // a product limit — group sessions are nowhere near 50.
+      //
+      // The last clause is the one that is easy to miss: a two-person chat's
+      // id IS its participants, sorted and joined with "__" (see
+      // directChatId), and that has to be enforced here rather than trusted.
+      // Without it a stranger can create the document at the id two other
+      // people's chat WOULD have, with themselves as the only participant.
+      // They could never read it — but the real patient could never open it
+      // either, because `openChat` would then be making an update to a chat
+      // it is not a participant of, and be refused for ever. A conversation
+      // that can be pre-emptively broken by anybody who knows two uids is not
+      // a conversation.
+      //
+      // Group chats get a generated id with nothing to check it against, so
+      // the clause only applies to the pair case.
+      allow create: if isSignedIn()
+        && request.auth.uid in request.resource.data.participants
+        && request.resource.data.participants.size() >= 2
+        && request.resource.data.participants.size() <= 50
+        && (request.resource.data.participants.size() > 2
+            || chatId == request.resource.data.participants.join('__'));
+
+      // Participants are immutable, and this is the most important line in the
+      // block. Everything else here — the preview, the unread counters, the
+      // typing timestamps — is written by both sides in the ordinary course of
+      // sending a message, so the rule has to stay permissive about those.
+      // But adding a uid to a live chat would retroactively hand that person
+      // every message already in it, because the message rule below trusts the
+      // same array. Pinning it is what stops a participant doing that.
+      allow update: if isChatParticipant()
+        && request.resource.data.participants == resource.data.participants;
+
+      // Nobody deletes a conversation from the client. One side deleting the
+      // thread would destroy the other person's copy of it, and a therapeutic
+      // record is not one party's to erase.
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        // `participants` is copied from the parent chat onto every message ON
+        // PURPOSE, exactly as the session transcript above does it. The
+        // obvious rule — get() the parent chat on every read — bills a
+        // document read per message read, and a conversation that is working
+        // produces hundreds against a 50k reads/day quota.
+        //
+        // Reads therefore trust the copied array. What makes that safe is the
+        // create rule below, which is the only thing that ever writes it.
+        allow read: if isSignedIn()
+          && request.auth.uid in resource.data.participants;
+
+        // You may only write a message as yourself, into a chat you are in,
+        // carrying that chat's real participant list.
+        //
+        // This get() is the one read this design does pay for, and it is not
+        // optional. Checking only `request.resource.data.participants` tests
+        // an array the sender just made up: anybody signed in could write a
+        // message into any chat id they can derive from two uids, listing
+        // whoever they like. They still could not read the thread — but
+        // "rules are not filters" means a single injected message that omits
+        // one participant makes that person's whole thread query fail, and
+        // their conversation vanishes. Verified against the live evaluator in
+        // scripts/test-chat-rules.mjs, which is where this hole was found.
+        //
+        // The cost is one document read per message SENT, never per message
+        // read, so the quota argument above is untouched.
+        allow create: if isSignedIn()
+          && request.resource.data.senderId == request.auth.uid
+          && request.auth.uid in request.resource.data.participants
+          && request.resource.data.participants
+               == get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+
+        // Read receipts are the single permitted mutation, and only your own.
+        // The diff must touch nothing but `readBy`, and the only uid it may
+        // add is the caller's: without that last clause a participant could
+        // mark a message read on someone else's behalf, which is a small lie
+        // with an outsized effect on whether a person feels heard.
+        //
+        // Everything else about a message stays immutable once written, for
+        // the same reason the session transcript does.
+        allow update: if isSignedIn()
+          && request.auth.uid in resource.data.participants
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy'])
+          && request.resource.data.readBy is list
+          && request.resource.data.readBy.hasAll(resource.data.readBy)
+          && request.resource.data.readBy.removeAll(resource.data.readBy)
+               .hasOnly([request.auth.uid]);
+
+        allow delete: if false;
+      }
+    }
+
     // ------------------------------------------------- WebRTC call signaling
 
     // Short-lived SDP offer/answer and ICE candidates. Contents are useless

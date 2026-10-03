@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { SPRING_SOFT } from "../motion/primitives";
+import { SPRING_SNAP, SPRING_SOFT } from "../motion/primitives";
 import { Avatar, Badge, EmptyState, Spinner, CheckItem } from "../ui/Feedback";
 import Button from "../ui/Button";
-import { IconPeople } from "../ui/icons";
+import { IconChat, IconPeople } from "../ui/icons";
+import { useAuth } from "../AuthProvider";
+import { openChat } from "../../lib/chat";
 import { formatDalasi } from "../../lib/money";
 import { LOCALE_LABELS, type ProviderProfile } from "../../lib/models";
 import {
@@ -28,6 +31,47 @@ import { FORMAT_LABELS, SERVICE_LABELS } from "../../lib/matching";
 export default function ProviderProfileView({ providerId }: { providerId: string }) {
   const [profile, setProfile] = useState<ProviderProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const { user, profile: account, role } = useAuth();
+  const router = useRouter();
+  const [opening, setOpening] = useState(false);
+  const [messageError, setMessageError] = useState<string | null>(null);
+
+  /**
+   * Open the conversation with this provider, creating it if it is their first.
+   *
+   * The chat id is derived from the two uids, so this is idempotent — tapping
+   * twice, or coming back next week, lands in the same thread rather than
+   * starting a second one.
+   *
+   * Patients only. A provider viewing a colleague's public profile has no
+   * business opening a patient-facing thread from here, and the shape of a
+   * provider-to-provider conversation is not a decision to make by accident.
+   */
+  const startChat = useCallback(async () => {
+    if (!user || opening) return;
+    setOpening(true);
+    setMessageError(null);
+    try {
+      // Both names are written onto the chat as it is created. This is the
+      // only moment anyone can read both — the provider's from the public
+      // directory, the patient's from their own user document — and without
+      // it the provider opens a thread that cannot name who is in it.
+      //
+      // The name Talk was given in the conversation wins over the one on the
+      // account: it is what this person asked to be called.
+      const mine = account?.intake?.preferredName || account?.displayName;
+      const chatId = await openChat(user.uid, providerId, {
+        ...(mine ? { [user.uid]: mine } : {}),
+        ...(profile?.displayName ? { [providerId]: profile.displayName } : {}),
+      });
+      router.push(`/chats/${chatId}`);
+    } catch {
+      setOpening(false);
+      setMessageError("Could not open the conversation. Please try again.");
+    }
+  }, [account, opening, profile, providerId, router, user]);
+
+  const canMessage = Boolean(user) && role === "patient";
 
   useEffect(() => {
     let cancelled = false;
@@ -181,8 +225,36 @@ export default function ProviderProfileView({ providerId }: { providerId: string
         </dl>
 
         {/* Booking and live sessions are the next build; until then this is
-            honest rather than a link to a page that does not exist. */}
-        <div className="mt-8">
+            honest rather than a link to a page that does not exist.
+
+            Messaging, however, works now — so it is the live button and
+            booking is the dimmed one beside it. Someone who has just read a
+            profile and wants to reach this person can, today. */}
+        <div className="mt-8 space-y-2.5">
+          {canMessage ? (
+            <motion.button
+              type="button"
+              onClick={() => void startChat()}
+              disabled={opening}
+              whileHover={opening ? undefined : { scale: 1.03 }}
+              whileTap={opening ? undefined : { scale: 0.97 }}
+              transition={SPRING_SNAP}
+              className="w-full h-12 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-soft)] text-white text-[12px] uppercase tracking-[0.14em] font-medium flex items-center justify-center gap-2.5 shadow-[0_10px_30px_-10px_rgba(255,90,31,0.6)] transition-colors disabled:opacity-70"
+            >
+              {opening ? (
+                <>
+                  <Spinner size={14} />
+                  Opening
+                </>
+              ) : (
+                <>
+                  <IconChat size={15} />
+                  Message
+                </>
+              )}
+            </motion.button>
+          ) : null}
+
           <button
             type="button"
             disabled
@@ -190,6 +262,24 @@ export default function ProviderProfileView({ providerId }: { providerId: string
           >
             Booking opens soon
           </button>
+
+          {messageError ? (
+            <p className="text-[12px] text-[var(--accent)] leading-snug">{messageError}</p>
+          ) : null}
+
+          {/* Not signed in: say what the button would do rather than hiding
+              that messaging exists at all. */}
+          {!user ? (
+            <p className="text-[12px] text-[var(--muted)] leading-relaxed">
+              <Link
+                href={`/sign-in?next=${encodeURIComponent("/providers/" + providerId)}`}
+                className="underline underline-offset-4 text-[var(--foreground)]"
+              >
+                Sign in
+              </Link>{" "}
+              to message {profile.displayName.split(" ")[0] || "this provider"}.
+            </p>
+          ) : null}
         </div>
 
         <p className="mt-5 text-[12px] text-[var(--muted)] leading-relaxed">

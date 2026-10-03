@@ -1,15 +1,23 @@
 /**
  * Firebase client (browser-side singletons).
  *
- * Free-tier stack: Auth + Firestore + Realtime Database (+ optional Analytics).
- * We deliberately avoid Storage — user media is stored as base64 in Firestore
- * via `app/lib/base64.ts` and `app/lib/media.ts`.
+ * Free-tier stack: Auth + Firestore + Realtime Database + Storage (+ optional
+ * Analytics).
+ *
+ * Small user media — avatars — is still base64 in Firestore via
+ * `app/lib/base64.ts` and `app/lib/media.ts`, because a 20KB thumbnail is
+ * cheaper as a field than as an object with its own round trip. Anything that
+ * can be large goes to Storage instead: a one-minute voice note is roughly
+ * 120KB of Opus, and base64 inflates by a third against a 1MB hard ceiling on
+ * a Firestore document. Chat media is the first of those — see
+ * `app/lib/chat.ts` and the `chat-media/` block in storage.rules.
  */
 
 import { getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
 import { getDatabase, type Database } from "firebase/database";
+import { getStorage, type FirebaseStorage } from "firebase/storage";
 
 const config = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -45,6 +53,10 @@ export function firestore(): Firestore {
 
 export function realtimeDb(): Database {
   return getDatabase(getFirebaseApp());
+}
+
+export function firebaseStorage(): FirebaseStorage {
+  return getStorage(getFirebaseApp());
 }
 
 export function firebaseConfigured(): boolean {
