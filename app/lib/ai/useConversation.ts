@@ -439,6 +439,19 @@ export function useConversation({
   );
 
   /**
+   * Talk introduces the providers she found, aloud. The intake is over at
+   * this point, so `doneRef` is cleared — the page stays here while they
+   * choose rather than being handed on again.
+   */
+  const present = useCallback(
+    (providers: unknown[], intake: Intake) => {
+      doneRef.current = false;
+      void speakRequest("/api/companion/present", { providers, intake });
+    },
+    [speakRequest],
+  );
+
+  /**
    * A tapped answer. Everything is also answerable out loud — this is for a
    * noisy room, a quiet one, and for anyone who finds a button easier than a
    * sentence.
@@ -524,6 +537,7 @@ export function useConversation({
     choices,
     awaitingLanguage,
     choose,
+    present,
     start,
     stop,
     interrupt,

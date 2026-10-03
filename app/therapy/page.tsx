@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { SPRING_SOFT, SPRING_SNAP } from "@/components/motion/primitives";
 import TalkBlob from "@/components/voice/TalkBlob";
@@ -10,7 +10,18 @@ import { useAuth } from "@/components/AuthProvider";
 import { updateUserProfile } from "@/lib/auth";
 import { useConversation, type Line, type Phase } from "@/lib/ai/useConversation";
 import { LANGUAGE_LABEL } from "@/lib/ai/protocol";
-import { REQUIRED_FIELDS, localeOf, missingFields, type Intake } from "@/lib/matching";
+import {
+  REQUIRED_FIELDS,
+  SERVICE_LABELS,
+  localeOf,
+  missingFields,
+  rankProviders,
+  type Intake,
+} from "@/lib/matching";
+import { LOCALE_LABELS } from "@/lib/models";
+import { formatDalasi } from "@/lib/money";
+import { useMatches } from "@/lib/useMatches";
+import ProviderCard from "@/components/providers/ProviderCard";
 
 /**
  * Talk — the voice surface, and for a new person, the whole onboarding.
@@ -70,6 +81,8 @@ export default function TherapyPage() {
   const [showEnglish, setShowEnglish] = useState(true);
   const [typing, setTyping] = useState(false);
   const [draft, setDraft] = useState("");
+  /** Set once the conversation is finished; the shortlist derives from it. */
+  const [finished, setFinished] = useState<Intake | null>(null);
 
   useEffect(() => {
     if (ready && !user && !DEV_ANON) router.replace("/sign-in?next=%2Ftherapy");
@@ -95,11 +108,14 @@ export default function TherapyPage() {
         const locale = localeOf(intake.language);
         await updateUserProfile(uid, { intake, onboarded: true, ...(locale ? { locale } : {}) }).catch(() => {});
       }
-      router.replace("/matches?welcome=1");
+      setFinished(intake);
     },
-    [router, uid],
+    [uid],
   );
 
+  // Ranked live against what Talk has learned so far, so the shortlist is
+  // ready the moment the conversation finishes.
+  const { matches } = useMatches(null);
   const talk = useConversation({
     getToken,
     mode: intakeMode ? "intake" : "companion",
@@ -109,6 +125,39 @@ export default function TherapyPage() {
     onIntakeDone,
   });
   const { mic } = talk;
+
+  // The three she will introduce: ranked against everything she just learned,
+  // derived rather than stored so it cannot fall out of step with the intake.
+  const shortlist = useMemo(
+    () => (finished && matches ? rankProviders(matches.map((m) => m.profile), finished).slice(0, 3) : null),
+    [finished, matches],
+  );
+  const presentedFor = useRef<Intake | null>(null);
+
+  // She says the names out loud, once, rather than dropping a list on someone
+  // who may not read it.
+  useEffect(() => {
+    if (!finished || !shortlist?.length || presentedFor.current === finished) return;
+    presentedFor.current = finished;
+    talk.present(
+      shortlist.map((m) => ({
+        uid: m.profile.uid,
+        name: m.profile.displayName,
+        services: m.profile.services.map((x) => SERVICE_LABELS[x]),
+        languages: m.profile.languages.map((l) => LOCALE_LABELS[l]),
+        location: m.profile.location ?? "",
+        fee: formatDalasi(m.profile.sessionRateMinor),
+        reasons: m.reasons,
+      })),
+      finished,
+    );
+  }, [finished, shortlist, talk]);
+
+  // Nobody to introduce — the directory is empty. Hand over rather than
+  // leaving them on a finished conversation.
+  useEffect(() => {
+    if (finished && matches && matches.length === 0) router.replace("/matches?welcome=1");
+  }, [finished, matches, router]);
 
   const begin = useCallback(async () => {
     // Pressing Start under "By starting you agree…" is the consent. Recorded
@@ -120,6 +169,23 @@ export default function TherapyPage() {
     }
     await talk.start();
   }, [profile, talk, uid]);
+
+  // Picking out loud: she just read the names, so match what they say back
+  // against them. Deliberately forgiving — first name, surname, or the whole
+  // thing — and it never guesses between two names it hears equally.
+  useEffect(() => {
+    if (!shortlist) return;
+    const lastUser = [...talk.lines].reverse().find((l) => l.role === "user");
+    if (!lastUser) return;
+    const said = lastUser.text.toLowerCase();
+    const hits = shortlist.filter((m) =>
+      m.profile.displayName
+        .toLowerCase()
+        .split(/[ ]+/)
+        .some((part) => part.length > 2 && said.includes(part)),
+    );
+    if (hits.length === 1) router.push(`/providers/${hits[0].profile.uid}`);
+  }, [shortlist, talk.lines, router]);
 
   const denied = mic.status === "denied" || mic.status === "unsupported" || mic.status === "error";
   // Without a microphone the keyboard is the only way to answer, so it is open.
@@ -141,6 +207,18 @@ export default function TherapyPage() {
       : talk.phase === "thinking" || talk.phase === "speaking"
         ? "Interrupt Talk"
         : "Talk is listening";
+
+  /**
+   * A tapped answer. Once Talk has introduced the shortlist, the options are
+   * the providers themselves, and tapping one opens their profile.
+   */
+  function handleChoice(choice: { id: string; label: string }) {
+    if (shortlist?.some((m) => m.profile.uid === choice.id)) {
+      router.push(`/providers/${choice.id}`);
+      return;
+    }
+    talk.choose(choice);
+  }
 
   function submitDraft(e: React.FormEvent) {
     e.preventDefault();
@@ -279,7 +357,7 @@ export default function TherapyPage() {
                 <motion.button
                   key={choice.id}
                   type="button"
-                  onClick={() => talk.choose(choice)}
+                  onClick={() => handleChoice(choice)}
                   whileHover={{ y: -2 }}
                   whileTap={{ scale: 0.97 }}
                   transition={SPRING_SNAP}
@@ -291,6 +369,26 @@ export default function TherapyPage() {
             </motion.div>
           ) : null}
         </AnimatePresence>
+
+        {shortlist ? (
+          <motion.div
+            initial={{ y: 16, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={SPRING_SOFT}
+            className="relative z-10 mt-6 w-full max-w-[1000px] grid grid-cols-1 md:grid-cols-3 gap-4"
+          >
+            {shortlist.map((m, i) => (
+              <ProviderCard
+                key={m.profile.uid}
+                profile={m.profile}
+                index={i}
+                reasons={m.reasons}
+                best={i === 0}
+                compact
+              />
+            ))}
+          </motion.div>
+        ) : null}
 
         {talk.error ? (
           <div className="relative z-10 mt-4 max-w-[440px] text-center text-[13px] text-[var(--accent-soft)]">

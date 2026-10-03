@@ -526,6 +526,61 @@ const LANGUAGE_PROMPT =
   "Salaam aleekum, and welcome to Talk. Which language would you like to speak — English, Wolof, Mandinka, or Pulaar?";
 
 /**
+ * Talk introduces the people she found.
+ *
+ * Spoken, in their language, because the person this is built for may not be
+ * able to read the cards beside it. Each provider gets one line — who they
+ * are, where they are, and why they fit — and then she asks which one.
+ */
+export type PresentedProvider = {
+  uid: string;
+  name: string;
+  services: string[];
+  languages: string[];
+  location: string;
+  fee: string;
+  reasons: string[];
+};
+
+export async function presentProviders(
+  intake: Intake,
+  providers: PresentedProvider[],
+  signal?: AbortSignal,
+): Promise<TurnResult> {
+  const language: Language = intake.language ?? "english";
+  const lines = providers
+    .map(
+      (p, i) =>
+        `${i + 1}. ${p.name}${p.location ? `, ${p.location}` : ""}${
+          p.services.length ? ` — ${p.services.join(", ")}` : ""
+        }${p.languages.length ? `, speaks ${p.languages.join(" and ")}` : ""}${p.fee ? `, ${p.fee} a session` : ""}${
+          p.reasons.length ? ` (fits because: ${p.reasons.join(", ")})` : ""
+        }`,
+    )
+    .join("\n");
+
+  const said = await sayInLanguage(
+    language,
+    `Tell ${intake.preferredName ?? "them"} you have found some people who could help, then introduce each of these in ONE short sentence each — the name exactly as written, where they are, and the single best reason they fit. Do not read out the fee or list every service; that is on the screen beside you. Finish by asking which one they would like to talk to.\n${lines}`,
+    signal,
+  );
+  const reply = said.reply || `I found ${providers.length} people who could help. Which one would you like?`;
+
+  return {
+    transcript: "",
+    language,
+    english: "",
+    risk: "none",
+    reply,
+    replyEnglish: said.replyEnglish || reply,
+    greeting: true,
+    intake,
+    // The names as buttons, in the order she said them.
+    choices: providers.map((p) => ({ id: p.uid, label: p.name })),
+  };
+}
+
+/**
  * English text as it would be said in another language — for reading the
  * screen aloud. Not a literal translation: it is meant to be heard, so names,
  * numbers and prices stay as they are.
