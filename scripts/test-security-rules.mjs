@@ -1,7 +1,7 @@
 /**
- * Security-rule tests for the chat block in firestore.rules.
+ * Security-rule tests: conversations, payments, and the user document.
  *
- *   node scripts/test-chat-rules.mjs
+ *   node scripts/test-security-rules.mjs
  *
  * Runs against Firebase's own rules evaluator (firebaserules.googleapis.com
  * :test), which takes the rules source and a synthetic request and tells you
@@ -9,8 +9,11 @@
  * data — and it is the same evaluator that serves production, so a pass here
  * is not an approximation of the rule, it is the rule.
  *
- * These are the invariants a therapy conversation depends on. If one of them
- * ever goes red, somebody can read a conversation they are not in.
+ * These are the invariants the product depends on: nobody reads a
+ * conversation they are not in, nobody writes a message into one, and no
+ * client can mark its own payment as settled. Two holes in the chat rules
+ * were found by writing these rather than by reading the rules again — see
+ * the create rules in firestore.rules for both.
  */
 
 import { readFile } from "node:fs/promises";
@@ -47,6 +50,19 @@ const message = {
   transcript: null,
   createdAt: "2026-10-03T12:01:00Z",
   readBy: [PATIENT],
+};
+
+/** A payment as the server records it before the shopper is redirected. */
+const payment = {
+  paymentIntentId: "pi_1",
+  provider: "modempay",
+  uid: PATIENT,
+  purpose: "ai_initial",
+  amountMinor: 200_00,
+  currency: "GMD",
+  status: "pending",
+  fulfilled: false,
+  needsReview: false,
 };
 
 const CASES = [
@@ -102,6 +118,21 @@ const CASES = [
   // --- the one that was already broken once ------------------------------
   ["a stranger reading somebody's user document", "DENY", STRANGER, "get", `${DOCS}/users/${PATIENT}`,
     { uid: PATIENT, role: "patient", displayName: "Fatou" }],
+
+  // --- payments ----------------------------------------------------------
+  // Only the signed webhook may move payment state, and it runs with the
+  // Admin SDK, which bypasses these rules. From a client, everything is shut.
+  ["reading your own payment", "ALLOW", PATIENT, "get", `${DOCS}/payments/pi_1`, payment],
+  ["reading somebody else's payment", "DENY", STRANGER, "get", `${DOCS}/payments/pi_1`, payment],
+  ["listing payments", "DENY", PATIENT, "list", `${DOCS}/payments/pi_1`, payment],
+  ["marking your own payment fulfilled", "DENY", PATIENT, "update", `${DOCS}/payments/pi_1`, payment,
+    { ...payment, fulfilled: true }],
+  ["creating a payment from the client", "DENY", PATIENT, "create", `${DOCS}/payments/pi_2`, null, payment],
+  // Pre-recording a real event's key would make the genuine webhook skip it as
+  // a duplicate: money taken, nothing delivered.
+  ["pre-recording a webhook event key", "DENY", PATIENT, "create", `${DOCS}/paymentEvents/evt_1`, null,
+    { eventKey: "evt_1", paymentIntentId: "pi_1" }],
+  ["reading the event ledger", "DENY", PATIENT, "get", `${DOCS}/paymentEvents/evt_1`, { eventKey: "evt_1" }],
 ];
 
 /**
@@ -147,7 +178,7 @@ const source = await readFile("firestore.rules", "utf8");
  * also takes a token from the environment:
  *
  *   RULES_TEST_ACCESS_TOKEN=$(gcloud auth print-access-token --account=<owner>) \
- *     node scripts/test-chat-rules.mjs
+ *     node scripts/test-security-rules.mjs
  *
  * An owner's own gcloud credential already has the permission, which beats
  * widening the service account's. The call only ever evaluates rules source
@@ -195,7 +226,7 @@ if (!res.ok) {
       [
         "The service account cannot call the rules evaluator: it is missing",
         "firebaserules.rulesets.test. See the note above this message in",
-        "scripts/test-chat-rules.mjs for the one command that fixes it.",
+        "scripts/test-security-rules.mjs for the one command that fixes it.",
       ].join("\n"),
     );
     process.exitCode = 2;

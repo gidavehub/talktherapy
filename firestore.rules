@@ -318,7 +318,7 @@ service cloud.firestore {
         // "rules are not filters" means a single injected message that omits
         // one participant makes that person's whole thread query fail, and
         // their conversation vanishes. Verified against the live evaluator in
-        // scripts/test-chat-rules.mjs, which is where this hole was found.
+        // scripts/test-security-rules.mjs, which is where this hole was found.
         //
         // The cost is one document read per message SENT, never per message
         // read, so the quota argument above is untouched.
@@ -396,6 +396,52 @@ service cloud.firestore {
         resource.data.providerId == request.auth.uid
       ) || isAdmin();
       allow write: if false;
+    }
+
+    // ------------------------------------------------------------- payments
+
+    // payments/{paymentIntentId} — the payment gateway's state for one
+    // checkout: status, who paid, the amount asked for, and whether the thing
+    // paid for has been granted.
+    //
+    // Written ONLY by the server, with the Admin SDK, from
+    // app/lib/payments/store.ts. Admin writes bypass these rules entirely, so
+    // the rules here exist to lock out everyone else.
+    match /payments/{paymentIntentId} {
+      // `get` only, never `list`. The owner needs to poll their own payment
+      // while the wallet confirms, and the document id is the provider's
+      // payment-intent id — which they already have, because the server just
+      // handed it to them. Withholding `list` means nobody can enumerate the
+      // collection to discover other people's payment ids or how much the
+      // platform is taking in.
+      allow get: if isSignedIn() && resource.data.uid == request.auth.uid;
+
+      // Admins can work the review queue: a payment that arrived but could not
+      // be matched to an account, or whose amount did not match, is parked
+      // with needsReview and somebody has to find it. That needs `list`.
+      allow get, list: if isAdmin();
+
+      // NO CLIENT WRITES, EVER — not create, not update, not delete, and not
+      // by an admin either. A client that could write here could mark its own
+      // payment `fulfilled` and take a D200 consultation for nothing. The only
+      // thing that may move payment state is the signed Modem Pay webhook
+      // (app/api/payments/modem/webhook), which runs server-side with the
+      // Admin SDK and so is not subject to this rule.
+      allow write: if false;
+    }
+
+    // paymentEvents/{eventKey} — the webhook idempotency ledger. One document
+    // per delivery acted on, keyed by the provider's event id or a hash of the
+    // raw body.
+    //
+    // Nobody reads it but the server, inside the transaction that writes it.
+    // Exposing it to a client would be handing out a list of event keys, and a
+    // client that could CREATE one could pre-record a real event's key and
+    // make the genuine webhook skip it as a duplicate — a payment taken and
+    // never fulfilled. So this one is closed completely, including to admins,
+    // who have the Firebase console if they ever genuinely need to look.
+    match /paymentEvents/{eventKey} {
+      allow read, write: if false;
     }
 
     // ------------------------------------------------------------ resources

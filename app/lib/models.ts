@@ -33,6 +33,15 @@ export const COLLECTIONS = {
   callerCandidates: "callerCandidates",
   calleeCandidates: "calleeCandidates",
   transactions: "transactions",
+  /** `payments/{paymentIntentId}` — server-written payment state. */
+  payments: "payments",
+  /**
+   * `paymentEvents/{eventKey}` — the webhook idempotency ledger. One document
+   * per delivery acted on; its only job is to exist. See
+   * app/lib/payments/store.ts for why it is written in the same transaction as
+   * the fulfilment it guards.
+   */
+  paymentEvents: "paymentEvents",
   resources: "resources",
   escalations: "escalations",
   organizations: "organizations",
@@ -439,6 +448,49 @@ export type Transaction = {
   feeMinor: number;
   currency: "GMD";
   status: TransactionStatus;
+  createdAt: number;
+  updatedAt: number;
+};
+
+// -------------------------------------------------------------- payments
+
+/**
+ * `payments/{paymentIntentId}` — one document per payment intent.
+ *
+ * WRITTEN ONLY BY THE SERVER, with the Admin SDK, from
+ * app/lib/payments/store.ts. firestore.rules lets the owner read their own and
+ * lets no client write any of it, because this document is what decides
+ * whether someone received the thing they paid for.
+ *
+ * Distinct from `Transaction` above, which is the ledger a user and a provider
+ * see for their own history. This is the gateway's state machine.
+ */
+export type PaymentDoc = {
+  /** The provider's payment-intent id, and this document's own id. */
+  paymentIntentId: string;
+  provider: "modempay" | "simulated";
+  /** Who paid. Null only while a payment is held for review unmatched. */
+  uid: string | null;
+  /** What was bought, e.g. "ai_initial". Matches `PaymentPurpose`. */
+  purpose: string | null;
+  /** What we asked for, in bututs. The figure the webhook checks against. */
+  amountMinor: number | null;
+  currency: "GMD";
+  /** Rails the hosted page offered, e.g. ["wallet", "card"]. */
+  paymentMethods: string[];
+  status: "pending" | "succeeded" | "failed";
+  /** Last event name applied, for tracing a payment's history. */
+  event: string | null;
+  /** True once the thing paid for has actually been granted. */
+  fulfilled: boolean;
+  /**
+   * Money arrived but something did not add up — the payer could not be
+   * matched, or the amount differed. Deliberately NOT auto-activated; a human
+   * resolves it with the money already safely received.
+   */
+  needsReview: boolean;
+  reviewReason: string | null;
+  customerEmail: string | null;
   createdAt: number;
   updatedAt: number;
 };
