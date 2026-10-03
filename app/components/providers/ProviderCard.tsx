@@ -15,12 +15,30 @@ import { SERVICE_LABELS, SPECIALIZATION_LABELS, type Specialization } from "../.
  * With `reasons`, the card leads with why this person was suggested — "Speaks
  * Wolof · Grief & loss · Video" says more to someone choosing than a bio does.
  */
+/**
+ * Everything on the card as one spoken sentence, for someone who cannot read
+ * it. Kept in the same order the card shows it, so hearing it and seeing it
+ * match.
+ */
+export function providerSummary(profile: ProviderProfile, reasons?: string[]): string {
+  const parts = [profile.displayName];
+  if (profile.services.length) parts.push(`offers ${profile.services.map((s) => SERVICE_LABELS[s]).join(" and ")}`);
+  if (profile.location) parts.push(`based in ${profile.location}`);
+  if (profile.languages.length) parts.push(`speaks ${profile.languages.map((l) => LOCALE_LABELS[l]).join(" and ")}`);
+  if (profile.yearsExperience > 0) parts.push(`${profile.yearsExperience} years of experience`);
+  parts.push(`${formatDalasi(profile.sessionRateMinor)} a session`);
+  if (reasons?.length) parts.push(`suggested because: ${reasons.join(", ")}`);
+  return `${parts.join(". ")}.`;
+}
+
 export default function ProviderCard({
   profile,
   index = 0,
   reasons,
   best = false,
   compact = false,
+  onRead,
+  speaking = false,
 }: {
   profile: ProviderProfile;
   index?: number;
@@ -29,6 +47,9 @@ export default function ProviderCard({
   best?: boolean;
   /** Dashboard size: drops the fee/language footer. */
   compact?: boolean;
+  /** Read this provider aloud. Omitted where speech is not available. */
+  onRead?: (id: string, text: string) => void;
+  speaking?: boolean;
 }) {
   // What they offer, then where they are — the two things someone scanning a
   // list actually chooses on.
@@ -57,6 +78,31 @@ export default function ProviderCard({
           {kind ? <p className="mt-1 text-[12px] text-[var(--muted)] truncate">{kind}</p> : null}
         </div>
         {best ? <Badge tone="accent">Best fit</Badge> : null}
+        {onRead ? (
+          <button
+            type="button"
+            // Above the card-wide link, or the tap opens the profile instead.
+            className="relative z-10 -mr-1 -mt-1 h-9 w-9 shrink-0 rounded-full border border-[var(--border)] flex items-center justify-center hover:bg-black/5 transition-colors"
+            aria-label={speaking ? `Stop reading ${profile.displayName} aloud` : `Read ${profile.displayName} aloud`}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onRead(profile.uid, providerSummary(profile, reasons));
+            }}
+          >
+            {speaking ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                <rect x="6" y="5" width="4" height="14" rx="1" />
+                <rect x="14" y="5" width="4" height="14" rx="1" />
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                <path d="M4 9v6h4l5 4V5L8 9H4z" />
+                <path d="M17 8.5a5 5 0 0 1 0 7" strokeLinecap="round" />
+              </svg>
+            )}
+          </button>
+        ) : null}
       </div>
 
       {reasons && reasons.length ? (

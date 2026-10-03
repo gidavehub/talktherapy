@@ -525,6 +525,25 @@ function firstName(displayName: string | null | undefined): string | null {
 const LANGUAGE_PROMPT =
   "Salaam aleekum, and welcome to Talk. Which language would you like to speak — English, Wolof, Mandinka, or Pulaar?";
 
+/**
+ * English text as it would be said in another language — for reading the
+ * screen aloud. Not a literal translation: it is meant to be heard, so names,
+ * numbers and prices stay as they are.
+ */
+export async function renderInLanguage(
+  language: Language,
+  text: string,
+  signal?: AbortSignal,
+): Promise<string> {
+  const said = await sayInLanguage(
+    language,
+    `Say this naturally, as speech, keeping every name, number and price exactly as written: "${text}"`,
+    signal,
+  );
+  // If the model gives nothing back, the English is still better than silence.
+  return said.reply || text;
+}
+
 /** One short line, written by the model in a given language. */
 async function sayInLanguage(
   language: Language,
