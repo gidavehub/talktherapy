@@ -19,10 +19,11 @@ const P = (
   specializations: string[],
   ratingAvg = 4.5,
   yearsExperience = 5,
+  location: string | null = null,
 ): ProviderProfile => ({
   uid, displayName: uid, headline: "", bio: "", specializations, languages, qualifications: [], yearsExperience,
   sessionRateMinor: 100000, status: "verified", photoPath: null, ratingAvg, ratingCount: 0, timezone: "Africa/Banjul",
-  services, gender, formats: ["video"], location: null, sample: true, createdAt: 0, updatedAt: 0,
+  services, gender, formats: ["video"], location, sample: true, createdAt: 0, updatedAt: 0,
 });
 
 const PROFILES = [
@@ -44,7 +45,24 @@ function check(ok: boolean, what: string) {
   if (!ok) failures += 1;
 }
 
-console.log("Fatou — Wolof, grief + sleep, mental health counselling, a woman");
+console.log("Area — among equal providers, the one in their part of the country comes first");
+{
+  const here = P("serrekunda-one", ["therapy"], "woman", ["en"], ["anxiety"], 4.5, 5, "Serrekunda");
+  const away = P("basse-one", ["therapy"], "woman", ["en"], ["anxiety"], 4.5, 5, "Basse");
+  const m = rankProviders([away, here], intake({ language: "english", concerns: ["anxiety"], servicesWanted: ["therapy"], providerGender: "any", location: "kanifing" }));
+  check(m[0].profile.uid === "serrekunda-one", `nearer provider first (got ${m[0].profile.uid})`);
+  check(m[0].reasons.includes("Kanifing and Serrekunda"), `and says why: ${m[0].reasons.join(" · ")}`);
+}
+
+console.log("\nUnder 18 — someone who works with young people comes first");
+{
+  const youth = P("youth-worker", ["mental-health-counselling"], "woman", ["en"], ["youth", "anxiety"], 4.4, 4);
+  const adult = P("adults-only", ["mental-health-counselling"], "woman", ["en"], ["anxiety"], 4.9, 20);
+  const m = rankProviders([adult, youth], intake({ language: "english", ageRange: "under-18", concerns: ["anxiety"], servicesWanted: ["mental-health-counselling"], providerGender: "any" }));
+  check(m[0].profile.uid === "youth-worker", `young-people specialist first, despite a lower rating (got ${m[0].profile.uid})`);
+}
+
+console.log("\nFatou — Wolof, grief + sleep, mental health counselling, a woman");
 {
   const m = rankProviders(PROFILES, intake({ language: "wolof", concerns: ["grief", "sleep"], servicesWanted: ["mental-health-counselling"], providerGender: "woman" }));
   console.log(`  order: ${m.map((x) => x.profile.uid).join(", ")}`);
@@ -103,7 +121,10 @@ console.log("\nIntake plumbing");
   check(merged.preferredName === "Fatou", "a turn that says nothing never erases an answer");
   check(merged.concerns.join() === "grief,sleep", "concerns accumulate");
   check(merged.servicesWanted.join() === "therapy,psychotherapy", "services accumulate");
-  check(missingFields(merged).join() === "providerGender", `missing: ${missingFields(merged).join(", ") || "(none)"}`);
+  check(
+    missingFields(merged).join() === "ageRange,location,gender,providerGender",
+    `missing: ${missingFields(merged).join(", ") || "(none)"}`,
+  );
 }
 
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");

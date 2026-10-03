@@ -59,6 +59,24 @@ const SCRIPT = [
     wolofReply: true,
   },
   {
+    say: "Am naa 32 at.",
+    expect: (i) => i.ageRange === "25-34",
+    what: "age range captured from a number",
+    wolofReply: true,
+  },
+  {
+    say: "Serrekunda laa dëkk.",
+    expect: (i) => i.location === "kanifing",
+    what: "town resolved to its area",
+    wolofReply: true,
+  },
+  {
+    say: "Jigéen laa.",
+    expect: (i) => i.gender === "woman",
+    what: "their own gender captured",
+    wolofReply: true,
+  },
+  {
     say: "Sama yaay dafa faatu weer wi weesu, te duma mëna nelaw guddi.",
     expect: (i) => i.concerns?.includes("grief"),
     what: "concerns include grief",

@@ -17,8 +17,11 @@ import {
   type TurnResult,
 } from "../protocol";
 import {
+  AGE_RANGES,
+  AREAS,
   GENDER_PREFS,
   SERVICES,
+  USER_GENDERS,
   SERVICE_BLURBS,
   SPECIALIZATIONS,
   cleanIntake,
@@ -226,6 +229,9 @@ function systemFor(summary: string, mode: ConversationMode, intake: Intake, rema
 const SERVICE_CHOICES = SERVICES.map((s) => `${s} (${SERVICE_BLURBS[s]})`).join(", ");
 
 const FIELD_GUIDE: Record<RequiredField, string> = {
+  ageRange: `roughly how old they are — one of ${AGE_RANGES.join(", ")}. Ask it lightly, the way a person would, not as a form field.`,
+  location: `which part of the country they are in — ${AREAS.filter((a) => a !== "outside").join(", ")}, or outside The Gambia. A town name is enough; work out the area yourself.`,
+  gender: 'whether they are a woman, a man, or would describe themselves another way — and "unsaid" is a perfectly good answer if they would rather not say.',
   concerns: "what has been weighing on them, and what brings them to Talk",
   servicesWanted: `what kind of help they are looking for — ${SERVICE_CHOICES}. Describe the kinds in their own words; never read out the labels as a list.`,
   providerGender: "whether they would prefer to talk to a woman or a man, or it does not matter",
@@ -234,6 +240,9 @@ const FIELD_GUIDE: Record<RequiredField, string> = {
 function describeKnown(intake: Intake): string {
   const known: string[] = [];
   if (intake.preferredName) known.push(`name: ${intake.preferredName}`);
+  if (intake.ageRange) known.push(`age: ${intake.ageRange}`);
+  if (intake.location) known.push(`area: ${intake.location}`);
+  if (intake.gender) known.push(`gender: ${intake.gender}`);
   if (intake.concerns.length) {
     known.push(`concerns: ${intake.concerns.join(", ")}${intake.concernSummary ? ` (${intake.concernSummary})` : ""}`);
   }
@@ -281,12 +290,13 @@ ${todo}
 
 Fill "intake" with what THIS message tells you, null (or an empty list) for anything it does not:
 - preferredName: what they want to be called.
+- ageRange, location, gender: the background above, as the exact ids listed.
 - language: english, wolof, mandinka, pulaar or other — the language they want to be supported in.
 - concerns: any of ${SPECIALIZATIONS.join(", ")} ("depression" covers low mood; "youth" means they are young or a student). concernSummary: one short English sentence in their own terms.
 - servicesWanted: any of ${SERVICES.join(", ")}. Work out which fit from what they describe — most people will not know the words. More than one is fine.
 - providerGender: woman, man, or any.
 
-- Whenever your question has a fixed set of answers, fill "choices" with those options written in their language, so they can be shown as buttons for someone who cannot read well or cannot hear you. Use these ids exactly: for the kind of help, ${SERVICES.join(", ")}; for the provider's gender, woman, man, any. Leave choices empty for open questions.
+- Whenever your question has a fixed set of answers, fill "choices" with those options written in their language, so they can be shown as buttons for someone who cannot read well or cannot hear you. Use these ids exactly: age, ${AGE_RANGES.join(", ")}; area, ${AREAS.join(", ")}; their own gender, ${USER_GENDERS.join(", ")}; the kind of help, ${SERVICES.join(", ")}; the provider's gender, woman, man, any. Leave choices empty for open questions.
 - If they would rather not answer something, accept it kindly: record "any" for the provider's gender, and your best guess of the service from what they have said.
 - If they want to skip the questions and simply be matched, fill what you can and finish.
 - Sessions happen by video call — if they ask how they will meet, say so; do not ask them to choose.
@@ -303,12 +313,25 @@ const INTAKE_SCHEMA = {
       properties: {
         preferredName: { type: "STRING", nullable: true },
         language: { type: "STRING", enum: [...LANGUAGES], nullable: true },
+        ageRange: { type: "STRING", enum: [...AGE_RANGES], nullable: true },
+        location: { type: "STRING", enum: [...AREAS], nullable: true },
+        gender: { type: "STRING", enum: [...USER_GENDERS], nullable: true },
         concerns: { type: "ARRAY", items: { type: "STRING", enum: [...SPECIALIZATIONS] } },
         concernSummary: { type: "STRING", nullable: true },
         servicesWanted: { type: "ARRAY", items: { type: "STRING", enum: [...SERVICES] } },
         providerGender: { type: "STRING", enum: [...GENDER_PREFS], nullable: true },
       },
-      required: ["preferredName", "language", "concerns", "concernSummary", "servicesWanted", "providerGender"],
+      required: [
+        "preferredName",
+        "language",
+        "ageRange",
+        "location",
+        "gender",
+        "concerns",
+        "concernSummary",
+        "servicesWanted",
+        "providerGender",
+      ],
     },
     intakeComplete: { type: "BOOLEAN" },
     choices: {
@@ -385,7 +408,17 @@ function cleanChoices(raw: unknown, intake: Intake): Choice[] {
   if (!Array.isArray(raw)) return [];
   const next = missingFields(intake)[0];
   const allowed: readonly string[] =
-    next === "servicesWanted" ? SERVICES : next === "providerGender" ? GENDER_PREFS : [];
+    next === "servicesWanted"
+      ? SERVICES
+      : next === "providerGender"
+        ? GENDER_PREFS
+        : next === "ageRange"
+          ? AGE_RANGES
+          : next === "location"
+            ? AREAS
+            : next === "gender"
+              ? USER_GENDERS
+              : [];
   if (!allowed.length) return [];
   const out: Choice[] = [];
   for (const c of raw) {

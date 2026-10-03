@@ -99,6 +99,84 @@ export const ACTIVE_FORMATS: SessionFormat[] = ["video"];
 
 export type ProviderGender = "woman" | "man";
 
+/**
+ * Background Talk takes before anything else, because who someone is changes
+ * what help fits them — and because a provider meeting them should not have
+ * to ask again.
+ */
+export const AGE_RANGES = ["under-18", "18-24", "25-34", "35-49", "50-64", "65+"] as const;
+export type AgeRange = (typeof AGE_RANGES)[number];
+
+export const AGE_LABELS: Record<AgeRange, string> = {
+  "under-18": "Under 18",
+  "18-24": "18 to 24",
+  "25-34": "25 to 34",
+  "35-49": "35 to 49",
+  "50-64": "50 to 64",
+  "65+": "65 or older",
+};
+
+/** Where they are. Video sessions, so this is a preference, not a constraint. */
+export const AREAS = [
+  "banjul",
+  "kanifing",
+  "west-coast",
+  "north-bank",
+  "lower-river",
+  "central-river",
+  "upper-river",
+  "outside",
+] as const;
+export type Area = (typeof AREAS)[number];
+
+export const AREA_LABELS: Record<Area, string> = {
+  banjul: "Banjul",
+  kanifing: "Kanifing and Serrekunda",
+  "west-coast": "West Coast",
+  "north-bank": "North Bank",
+  "lower-river": "Lower River",
+  "central-river": "Central River",
+  "upper-river": "Upper River",
+  outside: "Outside The Gambia",
+};
+
+/** Provider profiles carry a town; this is how a town becomes an area. */
+const TOWN_AREA: Record<string, Area> = {
+  banjul: "banjul",
+  kanifing: "kanifing",
+  serrekunda: "kanifing",
+  bakau: "kanifing",
+  bijilo: "kanifing",
+  fajara: "kanifing",
+  brikama: "west-coast",
+  lamin: "west-coast",
+  gunjur: "west-coast",
+  tujereng: "west-coast",
+  sanyang: "west-coast",
+  barra: "north-bank",
+  kerewan: "north-bank",
+  farafenni: "north-bank",
+  soma: "lower-river",
+  mansakonko: "lower-river",
+  janjanbureh: "central-river",
+  bansang: "central-river",
+  basse: "upper-river",
+};
+
+export function areaOf(town: string | null | undefined): Area | null {
+  return town ? (TOWN_AREA[town.trim().toLowerCase()] ?? null) : null;
+}
+
+export const USER_GENDERS = ["woman", "man", "other", "unsaid"] as const;
+export type UserGender = (typeof USER_GENDERS)[number];
+
+export const USER_GENDER_LABELS: Record<UserGender, string> = {
+  woman: "Woman",
+  man: "Man",
+  other: "Another way",
+  unsaid: "Rather not say",
+};
+
 export const GENDER_PREFS = ["woman", "man", "any"] as const;
 export type GenderPref = (typeof GENDER_PREFS)[number];
 
@@ -122,6 +200,11 @@ export type Intake = {
   preferredName: string | null;
   /** The language they want support in — chosen, not guessed. */
   language: Language | null;
+  ageRange: AgeRange | null;
+  /** Their part of the country. */
+  location: Area | null;
+  /** Their own gender, not the one they want to be seen by. */
+  gender: UserGender | null;
   concerns: Specialization[];
   /** One English sentence, in their terms. Private to them. */
   concernSummary: string | null;
@@ -134,6 +217,9 @@ export type Intake = {
 export const EMPTY_INTAKE: Intake = {
   preferredName: null,
   language: null,
+  ageRange: null,
+  location: null,
+  gender: null,
   concerns: [],
   concernSummary: null,
   servicesWanted: [],
@@ -146,13 +232,30 @@ export const EMPTY_INTAKE: Intake = {
  * Name and language are gathered along the way rather than as questions:
  * the greeting asks the name, and the language is chosen up front.
  */
-export const REQUIRED_FIELDS = ["concerns", "servicesWanted", "providerGender"] as const;
+/**
+ * Asked in this order: who they are before what is wrong with them. Walking
+ * someone straight into "what has been weighing on you" is a lot to open
+ * with, and a provider needs the background anyway.
+ */
+export const REQUIRED_FIELDS = [
+  "ageRange",
+  "location",
+  "gender",
+  "concerns",
+  "servicesWanted",
+  "providerGender",
+] as const;
 export type RequiredField = (typeof REQUIRED_FIELDS)[number];
 
 function isEmptyField(intake: Intake, field: RequiredField): boolean {
   if (field === "concerns") return intake.concerns.length === 0;
   if (field === "servicesWanted") return intake.servicesWanted.length === 0;
   return intake[field] == null;
+}
+
+/** Under-18 answers put a flag in front of whoever takes the session. */
+export function isMinor(intake: Intake | null): boolean {
+  return intake?.ageRange === "under-18";
 }
 
 export function missingFields(intake: Intake): RequiredField[] {
@@ -185,6 +288,9 @@ export function cleanIntake(raw: unknown, languages: readonly Language[]): Intak
   return {
     preferredName: text(r.preferredName, 60),
     language: oneOf(r.language, languages),
+    ageRange: oneOf(r.ageRange, AGE_RANGES),
+    location: oneOf(r.location, AREAS),
+    gender: oneOf(r.gender, USER_GENDERS),
     concerns: manyOf(r.concerns, SPECIALIZATIONS),
     concernSummary: text(r.concernSummary),
     servicesWanted: manyOf(r.servicesWanted, SERVICES),
@@ -253,6 +359,23 @@ export function rankProviders(profiles: ProviderProfile[], intake: Intake | null
       score += Math.min(sharedConcerns.length, 3) * 14;
       for (const c of sharedConcerns.slice(0, 2)) reasons.push(SPECIALIZATION_LABELS[c]);
 
+      // Same part of the country. Sessions are by video, so this is a nudge
+      // rather than a filter — but people would rather talk to someone who
+      // knows their town.
+      if (want.location && want.location !== "outside") {
+        const area = areaOf(profile.location);
+        if (area && area === want.location) {
+          score += 8;
+          reasons.push(AREA_LABELS[area]);
+        }
+      }
+
+      // A child should be matched with someone who works with young people.
+      if (want.ageRange === "under-18") {
+        if (profile.specializations.includes("youth")) score += 18;
+        else score -= 12;
+      }
+
       const sharedServices = want.servicesWanted.filter((s) => profile.services.includes(s));
       if (want.servicesWanted.length) {
         if (sharedServices.length) {
@@ -286,6 +409,7 @@ export function intakeChips(intake: Intake | null): string[] {
   if (locale) chips.push(LOCALE_NAME[locale]);
   for (const c of intake.concerns.slice(0, 3)) chips.push(SPECIALIZATION_LABELS[c]);
   for (const s of intake.servicesWanted.slice(0, 2)) chips.push(SERVICE_LABELS[s]);
+  if (intake.location) chips.push(AREA_LABELS[intake.location]);
   if (intake.providerGender && intake.providerGender !== "any") {
     chips.push(intake.providerGender === "woman" ? "A woman" : "A man");
   }
