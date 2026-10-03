@@ -18,7 +18,7 @@ const AUDIENCES = [
   },
   {
     title: "Universities & schools",
-    body: "Extend student wellbeing provision beyond a single overstretched counsellor, with support available outside office hours.",
+    body: "Extend student wellbeing provision beyond a single overstretched provider, with support available outside office hours.",
   },
   {
     title: "NGOs & development partners",
@@ -71,7 +71,7 @@ const FAQS = [
   },
   {
     q: "Do you work with organisations outside The Gambia?",
-    a: "Our counsellor network is currently Gambian, so the service is most useful for people in-country. Talk to us about regional needs and we will be straight with you about what we can cover today.",
+    a: "Our provider network is currently Gambian, so the service is most useful for people in-country. Talk to us about regional needs and we will be straight with you about what we can cover today.",
   },
 ];
 
@@ -140,7 +140,7 @@ export default function ForInstitutionsPage() {
             />
             <ul className="mt-8 space-y-5">
               <BulletItem>
-                Access to the full verified counsellor directory, filterable by
+                Access to the full verified provider directory, filterable by
                 language and specialisation.
               </BulletItem>
               <BulletItem>

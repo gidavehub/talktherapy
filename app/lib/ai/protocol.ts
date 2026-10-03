@@ -50,7 +50,7 @@ export const MAX_AUDIO_BASE64 = 2_800_000;
 /**
  * companion — an open conversation.
  * intake    — Talk is getting to know a new person (the onboarding), steering
- *             toward what she needs to suggest counsellors.
+ *             toward what she needs to suggest providers.
  */
 export type ConversationMode = "companion" | "intake";
 

@@ -3,7 +3,7 @@
  * directly, and owns the shape of `users/{uid}`.
  *
  * Role handling is deliberately one-directional here: sign-up may request
- * `patient` or `counsellor`, and that is all the client can ever set.
+ * `patient` or `provider`, and that is all the client can ever set.
  * `verified` and any promotion to `admin` are refused by firestore.rules —
  * see the privilege-escalation guard in that file. Do not add a client path
  * that writes either field.
@@ -44,7 +44,7 @@ import {
 } from "./models";
 
 /** Roles a person may choose for themselves at sign-up. */
-export type SignUpRole = Extract<AppRole, "patient" | "counsellor">;
+export type SignUpRole = Extract<AppRole, "patient" | "provider">;
 
 export type AppUser = UserDoc;
 
@@ -111,7 +111,7 @@ async function ensureUserDoc(user: User, role: SignUpRole): Promise<UserDoc> {
   }
 
   // `verified` is meaningless for patients, so it is set true to keep the
-  // field non-null. Counsellors start false and can only be flipped by an
+  // field non-null. Providers start false and can only be flipped by an
   // admin through the verification queue.
   const verified = role === "patient";
 
@@ -212,7 +212,7 @@ export function watchAuthState(
  * Live subscription to `users/{uid}`.
  *
  * A snapshot listener rather than a one-shot read so that an admin verifying a
- * counsellor, or the user completing onboarding in another tab, updates the UI
+ * provider, or the user completing onboarding in another tab, updates the UI
  * without a reload. `cb(null)` means "no document yet" — the caller decides
  * whether that is a loading state or a missing profile.
  */

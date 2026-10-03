@@ -18,7 +18,7 @@ import { REQUIRED_FIELDS, localeOf, missingFields, type Intake } from "@/lib/mat
  * Someone who has just created an account lands here and Talk simply starts
  * talking: who she is, then one question at a time, in whatever language they
  * answer in. No forms, no steps, no instructions on screen. When she has what
- * she needs she says so, and they are taken straight to the counsellors who
+ * she needs she says so, and they are taken straight to the providers who
  * fit. Everyone else gets the open companion conversation.
  *
  * You speak; gemini-3.8-flash hears the audio, transcribes and translates it
@@ -95,7 +95,7 @@ export default function TherapyPage() {
         const locale = localeOf(intake.language);
         await updateUserProfile(uid, { intake, onboarded: true, ...(locale ? { locale } : {}) }).catch(() => {});
       }
-      router.replace("/counsellors?welcome=1");
+      router.replace("/matches?welcome=1");
     },
     [router, uid],
   );
@@ -409,7 +409,7 @@ export default function TherapyPage() {
             </button>
           ) : !intakeMode ? (
             <Link
-              href="/counsellors"
+              href="/matches"
               className="h-12 px-6 rounded-full border border-white/20 text-[12px] uppercase tracking-[0.14em] font-medium flex items-center hover:bg-white/10 transition-colors"
             >
               Talk to a human

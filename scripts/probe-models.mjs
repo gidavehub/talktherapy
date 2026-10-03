@@ -211,7 +211,7 @@ const CANDIDATES = [
 
 const TALK_STYLE =
   "a warm, calm Gambian woman in her thirties speaking gently and unhurriedly, " +
-  "like a trusted counsellor — soft-spoken, steady, never bright or presenterly";
+  "like a trusted provider — soft-spoken, steady, never bright or presenterly";
 
 // Gambian Wolof, not Senegalese: no French loanwords.
 const LINES = {

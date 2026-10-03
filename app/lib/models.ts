@@ -10,7 +10,7 @@
  * See `app/lib/money.ts` for formatting.
  */
 
-import type { CounsellorGender, Intake, Profession, SessionFormat } from "./matching";
+import type { Intake, ProviderGender, Service, SessionFormat } from "./matching";
 
 // ---------------------------------------------------------------- collections
 
@@ -19,7 +19,7 @@ export const COLLECTIONS = {
   moodEntries: "moodEntries",
   journalEntries: "journalEntries",
   consentEvents: "consentEvents",
-  counsellorProfiles: "counsellorProfiles",
+  providerProfiles: "providerProfiles",
   privateDocs: "privateDocs",
   verificationRequests: "verificationRequests",
   availability: "availability",
@@ -43,19 +43,21 @@ export const COLLECTIONS = {
 // ---------------------------------------------------------------------- roles
 
 /**
- * `therapist` is retained as a deprecated alias: the original auth.ts shipped
+ * `therapist` and `counsellor` are retained as deprecated aliases: earlier
+ * versions shipped
  * with it and existing user documents may carry it. Read paths normalise it to
- * `counsellor` via `normaliseRole`; nothing new should write it.
+ * `provider` via `normaliseRole`; nothing new should write it.
  */
-export type AppRole = "patient" | "counsellor" | "admin" | "org_admin";
+export type AppRole = "patient" | "provider" | "admin" | "org_admin";
 
-export type StoredRole = AppRole | "therapist";
+/** Both older names for the same role still exist in stored documents. */
+export type StoredRole = AppRole | "therapist" | "counsellor";
 
 export function normaliseRole(role: string | undefined | null): AppRole {
-  if (role === "therapist") return "counsellor";
+  if (role === "therapist" || role === "counsellor") return "provider";
   if (
     role === "patient" ||
-    role === "counsellor" ||
+    role === "provider" ||
     role === "admin" ||
     role === "org_admin"
   ) {
@@ -104,19 +106,19 @@ export type UserDoc = {
   displayName: string | null;
   photoURL: string | null;
   role: AppRole;
-  /** Counsellors only: cleared credential review. Always true for patients. */
+  /** Providers only: cleared credential review. Always true for patients. */
   verified: boolean;
   locale: Locale;
   onboarded: boolean;
   /**
    * What the person said brought them here, captured at intake. Used to
-   * suggest resources and, later, to shortlist counsellors — never shown to
+   * suggest resources and, later, to shortlist providers — never shown to
    * anyone but the user themselves.
    */
   goals: string[];
   consents: Consents;
   /**
-   * What Talk learned in the intake conversation — the basis for counsellor
+   * What Talk learned in the intake conversation — the basis for provider
    * suggestions. Null until they have talked to her. Private to the user.
    */
   intake: Intake | null;
@@ -186,16 +188,16 @@ export type ConsentEvent = {
   recordedAt: number;
 };
 
-// --------------------------------------------------------------- counsellors
+// ----------------------------------------------------------------- providers
 
-export type CounsellorStatus =
+export type ProviderStatus =
   | "draft"
   | "pending"
   | "verified"
   | "rejected"
   | "suspended";
 
-export type CounsellorProfile = {
+export type ProviderProfile = {
   uid: string;
   displayName: string;
   headline: string;
@@ -206,22 +208,26 @@ export type CounsellorProfile = {
   yearsExperience: number;
   /** Per-session fee in bututs. Concept note range: D700–D3,000. */
   sessionRateMinor: number;
-  status: CounsellorStatus;
+  status: ProviderStatus;
   photoPath: string | null;
   ratingAvg: number;
   ratingCount: number;
   timezone: string;
-  /** Which kind of professional — decides fit for the help someone asked for. */
-  profession: Profession | null;
-  /** Many people ask for a counsellor of a particular gender; null if unstated. */
-  gender: CounsellorGender | null;
+  /**
+   * What this person offers — therapy, psychotherapy, mental health
+   * counselling, psychosocial support, social work. Matched directly against
+   * what someone asks Talk for.
+   */
+  services: Service[];
+  /** Many people ask for a provider of a particular gender; null if unstated. */
+  gender: ProviderGender | null;
   /** How they meet clients. */
   formats: SessionFormat[];
   /** Town or area, e.g. "Serrekunda". */
   location: string | null;
   /**
    * A sample profile for testing the product, not a real person. Always
-   * labelled as such wherever it is shown. See scripts/seed-sample-counsellors.
+   * labelled as such wherever it is shown. See scripts/seed-sample-providers.
    */
   sample: boolean;
   createdAt: number;
@@ -241,7 +247,7 @@ export type CredentialDoc = {
 
 export type VerificationRequest = {
   id: string;
-  counsellorId: string;
+  providerId: string;
   status: "pending" | "approved" | "rejected";
   /** Admin's note on the decision. Shown to the applicant on rejection. */
   reviewNote: string | null;
@@ -256,7 +262,7 @@ export type SlotStatus = "open" | "held" | "booked" | "cancelled";
 
 export type AvailabilitySlot = {
   id: string;
-  counsellorId: string;
+  providerId: string;
   startsAt: number;
   endsAt: number;
   status: SlotStatus;
@@ -275,9 +281,9 @@ export type PaymentStatus = "unpaid" | "processing" | "paid" | "refunded" | "fai
 export type Booking = {
   id: string;
   patientId: string;
-  counsellorId: string;
+  providerId: string;
   /**
-   * Denormalised `[patientId, counsellorId]`. Load-bearing: one composite
+   * Denormalised `[patientId, providerId]`. Load-bearing: one composite
    * index serves "my bookings" for both roles, and the security rule becomes
    * a membership test with no extra document reads.
    */
@@ -307,7 +313,7 @@ export type TalkSession = {
   kind: SessionKind;
   patientId: string;
   /** Null for AI sessions. */
-  counsellorId: string | null;
+  providerId: string | null;
   /** Denormalised participant uids — see `Booking.participants`. */
   participants: string[];
   bookingId: string | null;
@@ -340,7 +346,7 @@ export type SessionMessage = {
 
 export type SessionNote = {
   id: string;
-  counsellorId: string;
+  providerId: string;
   body: string;
   createdAt: number;
   updatedAt: number;
@@ -349,17 +355,16 @@ export type SessionNote = {
 // ------------------------------------------------------------------- pricing
 
 /**
- * AI consultation tiers, straight from the concept note. Pricing is set so a
- * human counsellor is the cheaper and therefore encouraged path — the AI is a
- * bridge, not a destination.
+ * AI consultation tiers. Pricing is set so a human provider is the cheaper and
+ * therefore encouraged path — the AI is a bridge, not a destination.
  */
 export const AI_TIERS = {
   initial: {
     id: "initial",
     label: "Initial consultation",
-    amountMinor: 250_00,
-    durationSec: 7 * 60,
-    blurb: "A first 5–7 minute conversation that ends with a referral.",
+    amountMinor: 200_00,
+    durationSec: 8 * 60,
+    blurb: "A first conversation, up to 8 minutes, that ends with matched providers.",
   },
   extended: {
     id: "extended",
@@ -382,7 +387,7 @@ export const HUMAN_RATE_MAX_MINOR = 3_000_00;
  * Signaling document at `calls/{sessionId}`. Holds only the SDP handshake;
  * ICE candidates live in the two subcollections beside it.
  *
- * Counsellor is always the impolite peer (initiator) and the patient always
+ * Provider is always the impolite peer (initiator) and the patient always
  * polite, derived from the session rather than negotiated — that resolves
  * glare without the two sides having to agree on a coin flip.
  */
@@ -422,7 +427,7 @@ export type TransactionStatus =
 export type Transaction = {
   id: string;
   userId: string;
-  counsellorId: string | null;
+  providerId: string | null;
   bookingId: string | null;
   sessionId: string | null;
   provider: "modempay" | "simulated";
@@ -534,7 +539,7 @@ export type SupportTopic =
   | "general"
   | "account"
   | "booking"
-  | "counsellor"
+  | "provider"
   | "organisation"
   | "safety";
 
@@ -542,7 +547,7 @@ export const SUPPORT_TOPIC_LABELS: Record<SupportTopic, string> = {
   general: "General question",
   account: "My account",
   booking: "A booking or payment",
-  counsellor: "Joining as a counsellor",
+  provider: "Joining as a provider",
   organisation: "Institutional packages",
   safety: "Reporting a concern",
 };

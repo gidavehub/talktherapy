@@ -164,7 +164,7 @@ export default function PrivacySettingsPage() {
       </Card>
 
       <Alert tone="info">
-        Nobody at Talk can read your journal or mood entries — not counsellors,
+        Nobody at Talk can read your journal or mood entries — not providers,
         not administrators. That is enforced by the database access rules, not
         by policy.
       </Alert>

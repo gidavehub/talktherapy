@@ -24,8 +24,8 @@ import {
 
 export const PATIENT_NAV: NavItem[] = [
   { href: "/dashboard", label: "Home", icon: <IconHome />, primary: true },
-  // The counsellors picked for this person — the point of the whole product.
-  { href: "/counsellors", label: "Counsellors", icon: <IconPeople />, primary: true },
+  // The providers picked for this person — the point of the whole product.
+  { href: "/matches", label: "Providers", icon: <IconPeople />, primary: true },
   { href: "/therapy", label: "Talk", icon: <IconMic />, primary: true },
   { href: "/settings/profile", label: "Settings", icon: <IconSettings />, primary: true },
   // Useful, but not what the MVP is for — reachable from the menu.

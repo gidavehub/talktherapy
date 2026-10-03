@@ -85,8 +85,8 @@ export default function ConsultationBanner() {
               transition={{ ...SPRING_SOFT, delay: 0.4 }}
               className="mt-4 text-[14px] md:text-[15px] text-white/70 max-w-[460px] leading-relaxed"
             >
-              Fifteen minutes with our AI to understand what you&apos;re going
-              through, then a free intro call with a matched therapist.
+              Up to eight minutes with Talk to understand what you&apos;re going
+              through, then a free intro call with a matched provider.
             </motion.p>
           </div>
 

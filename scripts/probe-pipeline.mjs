@@ -54,7 +54,7 @@ function pcmToWav(pcm, rate) {
   return Buffer.concat([h, pcm]);
 }
 
-const STYLE = "a warm, calm Gambian woman speaking gently and unhurriedly, like a trusted counsellor";
+const STYLE = "a warm, calm Gambian woman speaking gently and unhurriedly, like a trusted provider";
 const ttsBody = (text) => ({
   contents: [{ role: "user", parts: [{ text: `${STYLE}:\n\n${text}` }] }],
   generationConfig: {

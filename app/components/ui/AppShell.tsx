@@ -17,7 +17,7 @@ import { Avatar } from "./Feedback";
  * Mobile: a slim top bar plus a bottom tab bar — thumb-reachable, which matters
  * because phone is the default device for this audience, not the exception.
  *
- * Nav is injected rather than hardcoded so patient / counsellor / admin / org
+ * Nav is injected rather than hardcoded so patient / provider / admin / org
  * all share one shell with four different rails.
  */
 

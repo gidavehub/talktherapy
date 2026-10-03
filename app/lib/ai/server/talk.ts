@@ -11,10 +11,10 @@ import {
   type TurnResult,
 } from "../protocol";
 import {
-  FORMAT_PREFS,
   GENDER_PREFS,
+  SERVICES,
+  SERVICE_BLURBS,
   SPECIALIZATIONS,
-  SUPPORT_TYPES,
   cleanIntake,
   mergeIntake,
   missingFields,
@@ -90,14 +90,14 @@ HOW YOU SPEAK
 - Warm, unhurried and plain. Not clinical, not preachy, not falsely cheerful.
 - Respect Gambian life — family, community, faith, work and money pressure. Never assume someone's religion; follow their lead if they bring faith in.
 - Do not diagnose. Do not give advice about medication. Simple grounding or breathing ideas are fine when they would help.
-- When it would genuinely help, mention gently that they can speak with a human counsellor through Talk.
+- When it would genuinely help, mention gently that they can speak with a human provider through Talk.
 
 SAFETY — this overrides everything above
 - urgent: they may harm or kill themselves or someone else, are being harmed right now, or describe a medical emergency.
 - elevated: thoughts of self-harm or suicide without immediate intent, abuse, or feeling unsafe.
 - low: real distress without danger.
 - none: everything else.
-- When risk is elevated or urgent: stay calm and caring and take them seriously. Your reply MUST say the numbers out loud — call 117 for the police or 116 for an ambulance — in their language, and also point them to someone near them they trust and to a human counsellor. This is the one time a longer reply is right; never drop the numbers to keep it short. Ask whether they are safe right now. Never give information about methods or means of harm. Never promise that what they say stays secret if someone is in danger.`;
+- When risk is elevated or urgent: stay calm and caring and take them seriously. Your reply MUST say the numbers out loud — call 117 for the police or 116 for an ambulance — in their language, and also point them to someone near them they trust and to a human provider. This is the one time a longer reply is right; never drop the numbers to keep it short. Ask whether they are safe right now. Never give information about methods or means of harm. Never promise that what they say stays secret if someone is in danger.`;
 
 /**
  * Style line for the TTS model. The "audio profile" is just this sentence
@@ -115,7 +115,7 @@ const VOICE_LANGUAGE: Record<Language, string> = {
 function voiceStyle(language: Language) {
   return (
     "Speak as a warm, calm Gambian woman in her thirties — gentle, unhurried and steady, " +
-    `like a trusted counsellor, never bright or presenterly — in ${VOICE_LANGUAGE[language]}`
+    `like a trusted provider, never bright or presenterly — in ${VOICE_LANGUAGE[language]}`
   );
 }
 
@@ -216,12 +216,12 @@ function systemFor(summary: string, mode: ConversationMode, intake: Intake) {
  * server merges and validates them, and decides completion itself from the
  * merged result rather than trusting the model's say-so.
  */
+const SERVICE_CHOICES = SERVICES.map((s) => `${s} (${SERVICE_BLURBS[s]})`).join(", ");
+
 const FIELD_GUIDE: Record<RequiredField, string> = {
   concerns: "what has been weighing on them, and what brings them to Talk",
-  supportType:
-    "what kind of help they want — therapy (working through something deeper with a professional), counselling (talking things through with someone), coaching (goals, confidence, direction), or social support (practical help with family, work, money or housing)",
-  counsellorGender: "whether they would prefer to talk to a woman or a man, or it does not matter",
-  format: "how they would like to meet — video call, voice call, chat (typed messages), or in person",
+  servicesWanted: `what kind of help they are looking for — ${SERVICE_CHOICES}. Describe the kinds in their own words; never read out the labels as a list.`,
+  providerGender: "whether they would prefer to talk to a woman or a man, or it does not matter",
 };
 
 function describeKnown(intake: Intake): string {
@@ -230,9 +230,8 @@ function describeKnown(intake: Intake): string {
   if (intake.concerns.length) {
     known.push(`concerns: ${intake.concerns.join(", ")}${intake.concernSummary ? ` (${intake.concernSummary})` : ""}`);
   }
-  if (intake.supportType) known.push(`support type: ${intake.supportType}`);
-  if (intake.counsellorGender) known.push(`counsellor gender: ${intake.counsellorGender}`);
-  if (intake.format) known.push(`format: ${intake.format}`);
+  if (intake.servicesWanted.length) known.push(`services wanted: ${intake.servicesWanted.join(", ")}`);
+  if (intake.providerGender) known.push(`provider gender: ${intake.providerGender}`);
   return known.length ? known.join("; ") : "nothing yet";
 }
 
@@ -248,7 +247,7 @@ function intakeSection(intake: Intake): string {
   return `
 
 RIGHT NOW: GETTING TO KNOW THEM
-This person has just joined. Before they meet a counsellor you are getting to know them — gently, and quickly — so Talk can suggest the right people. This is a conversation, not a form: ask ONE thing at a time in plain, warm words, and acknowledge what they share before moving on. Never list the questions, number them, or mention a form.
+This person has just joined. Before they meet a provider you are getting to know them — gently, and quickly — so Talk can suggest the right people. This is a conversation, not a form: ask ONE thing at a time in plain, warm words, and acknowledge what they share before moving on. Never list the questions, number them, or mention a form.
 
 Their preferred language: ${language}
 If they say or show they would rather use another language — for example "dégguma anglais, Wolof laa dégg" — switch to it at once, set intake.language, and ask everything from then on in that language.
@@ -261,13 +260,13 @@ Fill "intake" with what THIS message tells you, null (or an empty list) for anyt
 - preferredName: what they want to be called.
 - language: english, wolof, mandinka, pulaar or other — the language they want to be supported in.
 - concerns: any of ${SPECIALIZATIONS.join(", ")} ("depression" covers low mood; "youth" means they are young or a student). concernSummary: one short English sentence in their own terms.
-- supportType: therapy, counselling, coaching, social-support, or unsure. Offer these as simple choices in their language.
-- counsellorGender: woman, man, or any.
-- format: video, voice, chat, in-person, or any.
+- servicesWanted: any of ${SERVICES.join(", ")}. Work out which fit from what they describe — most people will not know the words. More than one is fine.
+- providerGender: woman, man, or any.
 
-- If they would rather not answer something, accept it kindly and record unsure / any.
-- If they want to skip the questions and simply be matched, record unsure / any for whatever is left and finish.
-- When this message answers the last thing still to learn: set intakeComplete true, ask nothing more, thank them (by name if you know it), and tell them you will now show them some counsellors who could be a good fit. Otherwise intakeComplete is false.
+- If they would rather not answer something, accept it kindly: record "any" for the provider's gender, and your best guess of the service from what they have said.
+- If they want to skip the questions and simply be matched, fill what you can and finish.
+- Sessions happen by video call — if they ask how they will meet, say so; do not ask them to choose.
+- When this message answers the last thing still to learn: set intakeComplete true, ask nothing more, thank them (by name if you know it), and tell them you will now show them some providers who could be a good fit. Otherwise intakeComplete is false.
 - Safety comes first: if they share something heavy or unsafe, respond to that with care before any question, and follow the SAFETY rules.`;
 }
 
@@ -282,11 +281,10 @@ const INTAKE_SCHEMA = {
         language: { type: "STRING", enum: [...LANGUAGES], nullable: true },
         concerns: { type: "ARRAY", items: { type: "STRING", enum: [...SPECIALIZATIONS] } },
         concernSummary: { type: "STRING", nullable: true },
-        supportType: { type: "STRING", enum: [...SUPPORT_TYPES], nullable: true },
-        counsellorGender: { type: "STRING", enum: [...GENDER_PREFS], nullable: true },
-        format: { type: "STRING", enum: [...FORMAT_PREFS], nullable: true },
+        servicesWanted: { type: "ARRAY", items: { type: "STRING", enum: [...SERVICES] } },
+        providerGender: { type: "STRING", enum: [...GENDER_PREFS], nullable: true },
       },
-      required: ["preferredName", "language", "concerns", "concernSummary", "supportType", "counsellorGender", "format"],
+      required: ["preferredName", "language", "concerns", "concernSummary", "servicesWanted", "providerGender"],
     },
     intakeComplete: { type: "BOOLEAN" },
   },
@@ -425,7 +423,7 @@ function firstName(displayName: string | null | undefined): string | null {
 // welcome. Who she is, what happens next, that any language works — then the
 // first question.
 const OPENING = (name: string | null) =>
-  "Salaam aleekum. I'm Talk, an AI companion — let's find you the right counsellor. " +
+  "Salaam aleekum. I'm Talk, an AI companion — let's find you the right provider. " +
   "Speak English, Wolof, Mandinka or Pulaar. " +
   (name ? `Shall I call you ${name}?` : "What should I call you?");
 
@@ -442,7 +440,7 @@ export async function runGreeting(
   const { intake } = input;
   const name = intake.preferredName ?? firstName(input.displayName);
   const language: Language = intake.language ?? "english";
-  const started = intake.preferredName || intake.concerns.length || intake.supportType;
+  const started = intake.preferredName || intake.concerns.length || intake.servicesWanted.length;
 
   if (input.mode === "intake" && !started) {
     const reply = OPENING(firstName(input.displayName));

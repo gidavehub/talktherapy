@@ -29,7 +29,7 @@
       ]
     },
     {
-      "collectionGroup": "counsellorProfiles",
+      "collectionGroup": "providerProfiles",
       "queryScope": "COLLECTION",
       "fields": [
         {
@@ -47,7 +47,7 @@
       ]
     },
     {
-      "collectionGroup": "counsellorProfiles",
+      "collectionGroup": "providerProfiles",
       "queryScope": "COLLECTION",
       "fields": [
         {
@@ -69,7 +69,7 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "counsellorId",
+          "fieldPath": "providerId",
           "order": "ASCENDING"
         },
         {
@@ -93,26 +93,6 @@
         {
           "fieldPath": "startsAt",
           "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "moodEntries",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "recordedAt",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "journalEntries",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
         }
       ]
     },

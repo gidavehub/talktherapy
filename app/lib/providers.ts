@@ -1,5 +1,5 @@
 /**
- * Counsellor directory queries.
+ * Provider directory queries.
  *
  * Search is deliberately client-side. With the size of the professional
  * network in The Gambia — realistically tens, not thousands — fetching the
@@ -22,13 +22,13 @@ import {
 import { firebaseConfigured, firestore } from "./firebase";
 import {
   COLLECTIONS,
-  type CounsellorProfile,
+  type ProviderProfile,
   type Locale,
 } from "./models";
 import {
-  PROFESSIONS,
+  SERVICES,
   SESSION_FORMATS,
-  type Profession,
+  type Service,
   type SessionFormat,
   type Specialization,
 } from "./matching";
@@ -37,7 +37,7 @@ import {
 // without pulling in the Firebase SDK. Re-exported for existing importers.
 export { SPECIALIZATIONS, SPECIALIZATION_LABELS, type Specialization } from "./matching";
 
-function toProfile(uid: string, data: Record<string, unknown>): CounsellorProfile {
+function toProfile(uid: string, data: Record<string, unknown>): ProviderProfile {
   return {
     uid,
     displayName: (data.displayName as string) ?? "",
@@ -48,12 +48,12 @@ function toProfile(uid: string, data: Record<string, unknown>): CounsellorProfil
     qualifications: (data.qualifications as string[]) ?? [],
     yearsExperience: (data.yearsExperience as number) ?? 0,
     sessionRateMinor: (data.sessionRateMinor as number) ?? 0,
-    status: (data.status as CounsellorProfile["status"]) ?? "draft",
+    status: (data.status as ProviderProfile["status"]) ?? "draft",
     photoPath: (data.photoPath as string) ?? null,
     ratingAvg: (data.ratingAvg as number) ?? 0,
     ratingCount: (data.ratingCount as number) ?? 0,
     timezone: (data.timezone as string) ?? "Africa/Banjul",
-    profession: PROFESSIONS.includes(data.profession as Profession) ? (data.profession as Profession) : null,
+    services: ((data.services as string[]) ?? []).filter((s): s is Service => SERVICES.includes(s as Service)),
     gender: data.gender === "woman" || data.gender === "man" ? data.gender : null,
     formats: ((data.formats as string[]) ?? ["video"]).filter((f): f is SessionFormat =>
       SESSION_FORMATS.includes(f as SessionFormat),
@@ -123,13 +123,13 @@ function classify(error: unknown): DirectoryError {
 }
 
 /**
- * Every publicly visible counsellor.
+ * Every publicly visible provider.
  *
  * The `status == 'verified'` predicate is not a convenience — it mirrors the
  * read rule in firestore.rules, so an unverified profile is not merely hidden
  * from this list, it is unreadable.
  */
-export async function listVerifiedCounsellors(): Promise<CounsellorProfile[]> {
+export async function listVerifiedProviders(): Promise<ProviderProfile[]> {
   if (!firebaseConfigured()) return [];
 
   try {
@@ -140,7 +140,7 @@ export async function listVerifiedCounsellors(): Promise<CounsellorProfile[]> {
     // nothing and removes a deploy step between code and a working directory.
     const snap = await getDocs(
       query(
-        collection(firestore(), COLLECTIONS.counsellorProfiles),
+        collection(firestore(), COLLECTIONS.providerProfiles),
         where("status", "==", "verified"),
         limit(200),
       ),
@@ -157,7 +157,7 @@ export async function listVerifiedCounsellors(): Promise<CounsellorProfile[]> {
   } catch (error) {
     const classified = classify(error);
     if (process.env.NODE_ENV !== "production") {
-      console.error(`[counsellors] ${classified.kind}: ${classified.message}`, error);
+      console.error(`[providers] ${classified.kind}: ${classified.message}`, error);
     }
     throw classified;
   }
@@ -167,14 +167,14 @@ export async function listVerifiedCounsellors(): Promise<CounsellorProfile[]> {
  * One profile by uid.
  *
  * Returns null both when the document is absent and when rules refuse the
- * read — an unverified counsellor is genuinely unreadable to the public, so
+ * read — an unverified provider is genuinely unreadable to the public, so
  * "not found" is the honest answer either way.
  */
-export async function getCounsellor(uid: string): Promise<CounsellorProfile | null> {
+export async function getProvider(uid: string): Promise<ProviderProfile | null> {
   if (!firebaseConfigured()) return null;
 
   try {
-    const snap = await getDoc(doc(firestore(), COLLECTIONS.counsellorProfiles, uid));
+    const snap = await getDoc(doc(firestore(), COLLECTIONS.providerProfiles, uid));
     if (!snap.exists()) return null;
     const profile = toProfile(snap.id, snap.data());
     return profile.status === "verified" ? profile : null;
@@ -197,10 +197,10 @@ export const EMPTY_FILTERS: DirectoryFilters = {
   maxRateMinor: null,
 };
 
-export function filterCounsellors(
-  profiles: CounsellorProfile[],
+export function filterProviders(
+  profiles: ProviderProfile[],
   filters: DirectoryFilters,
-): CounsellorProfile[] {
+): ProviderProfile[] {
   const term = filters.search.trim().toLowerCase();
 
   return profiles.filter((profile) => {

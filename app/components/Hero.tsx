@@ -40,7 +40,7 @@ function StarRow() {
           <Star key={i} delay={0.95 + i * 0.06} />
         ))}
       </div>
-      <p className="text-[13px] text-[var(--muted)]">Trusted By 3,000+ Users</p>
+      <p className="text-[13px] text-[var(--muted)]">Built in The Gambia, for The Gambia</p>
     </div>
   );
 }
@@ -197,10 +197,9 @@ export default function Hero() {
           className="mb-3"
         >
           <StatCard
-            label="Stress Reduction"
-            value="96"
-            suffix="%"
-            caption="Feel More Relaxed"
+            label="Talk in"
+            value="4"
+            caption="English, Wolof, Mandinka, Pulaar"
             icon={<BrainIcon />}
           />
         </motion.div>
@@ -213,7 +212,7 @@ export default function Hero() {
             whileHover={{ y: -4, scale: 1.02 }}
             transition={SPRING_SNAP}
           >
-            <StatCard label="Mental Clarity" value="92" caption="Improvement" />
+            <StatCard label="First conversation" value="D200" caption="Up to 8 minutes" />
           </motion.div>
           <motion.div
             variants={{
@@ -223,7 +222,7 @@ export default function Hero() {
             whileHover={{ y: -4, scale: 1.02 }}
             transition={SPRING_SNAP}
           >
-            <StatCard label="Sleep Quality" value="84" caption="Better Rest" />
+            <StatCard label="Open" value="24/7" caption="Whenever it is hard" />
           </motion.div>
         </div>
       </motion.div>

@@ -3,7 +3,7 @@
  *
  * Covers the server render and the route's JS chunk only — it will not cover
  * data a client component fetches in an effect. Those screens own their own
- * skeletons (see `CounsellorDirectory`), which is why this stays a light
+ * skeletons (see `ProviderDirectory`), which is why this stays a light
  * placeholder rather than trying to mimic any particular page.
  */
 export default function MarketingLoading() {

@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 const COMMITMENTS = [
   {
     title: "Professional verification",
-    body: "Counsellors submit identity documents and qualification evidence before their profile can go live. An administrator reviews every application. An unverified profile is invisible to patients — not merely flagged.",
+    body: "Providers submit identity documents and qualification evidence before their profile can go live. An administrator reviews every application. An unverified profile is invisible to patients — not merely flagged.",
   },
   {
     title: "Human oversight of AI",
@@ -26,11 +26,11 @@ const COMMITMENTS = [
   },
   {
     title: "Confidentiality by default",
-    body: "Journal entries and mood check-ins are visible only to you. Counsellors see what you choose to share in a session, and nothing else.",
+    body: "Journal entries and mood check-ins are visible only to you. Providers see what you choose to share in a session, and nothing else.",
   },
   {
     title: "Reporting",
-    body: "Any session, professional or interaction can be reported. Reports are reviewed, and a counsellor can be suspended from the directory pending investigation.",
+    body: "Any session, professional or interaction can be reported. Reports are reviewed, and a provider can be suspended from the directory pending investigation.",
   },
   {
     title: "Ongoing review",
@@ -86,7 +86,7 @@ export default function SafetyPage() {
               <strong className="font-medium text-[var(--foreground)]">
                 Verification is not a guarantee of outcome.
               </strong>{" "}
-              We check that a counsellor is who they say they are and holds the
+              We check that a provider is who they say they are and holds the
               qualifications they claim. We cannot guarantee that any particular
               professional is the right fit for you — and you are free to change.
             </p>

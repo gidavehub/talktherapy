@@ -24,7 +24,7 @@ const instrumentSerif = Instrument_Serif({
 export const metadata: Metadata = {
   title: "Talk Therapy — AI-guided therapy matching",
   description:
-    "Calm your mind. Elevate your clarity. Talk Therapy uses conversational AI to match you with the right therapist in minutes.",
+    "Calm your mind. Elevate your clarity. Talk Therapy uses conversational AI to match you with the right provider in minutes.",
   icons: {
     icon: "/tablogo.png",
     shortcut: "/tablogo.png",

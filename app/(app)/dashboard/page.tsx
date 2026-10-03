@@ -9,7 +9,7 @@ import Card, { StatTile, DarkPanel } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Feedback";
 import MoodTrendChart from "@/components/app/MoodTrendChart";
-import CounsellorCard from "@/components/counsellors/CounsellorCard";
+import ProviderCard from "@/components/providers/ProviderCard";
 import { Spinner } from "@/components/ui/Feedback";
 import { useMatches } from "@/lib/useMatches";
 import {
@@ -31,7 +31,7 @@ import type { JournalEntry, MoodEntry } from "@/lib/models";
 /**
  * Patient home.
  *
- * Counsellors first. The point of Talk is getting someone to the right person,
+ * Providers first. The point of Talk is getting someone to the right person,
  * so the first thing on the page is who fits them — picked from what they told
  * Talk at onboarding — with "View all" one tap away. The check-in and journal
  * follow for anyone who wants them. Crisis help is reachable from here without
@@ -99,12 +99,12 @@ export default function DashboardPage() {
         </h1>
       </motion.div>
 
-      {/* Counsellors for you — the first option, always. */}
+      {/* Providers for you — the first option, always. */}
       <section>
         <div className="flex items-end justify-between gap-4 mb-4">
-          <h2 className="text-[20px] md:text-[24px] tracking-tight font-medium">Counsellors for you</h2>
+          <h2 className="text-[20px] md:text-[24px] tracking-tight font-medium">Providers for you</h2>
           <Link
-            href="/counsellors"
+            href="/matches"
             className="text-[12px] uppercase tracking-[0.14em] text-[var(--muted)] underline underline-offset-4 hover:text-[var(--foreground)] transition-colors shrink-0"
           >
             View all
@@ -117,7 +117,7 @@ export default function DashboardPage() {
         ) : matches && matches.length ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {matches.slice(0, 3).map((m, i) => (
-              <CounsellorCard
+              <ProviderCard
                 key={m.profile.uid}
                 profile={m.profile}
                 index={i}
@@ -129,7 +129,7 @@ export default function DashboardPage() {
           </div>
         ) : (
           <p className="text-[14px] text-[var(--muted)]">
-            Counsellors are being verified — who fits you will appear here.
+            Providers are being verified — who fits you will appear here.
           </p>
         )}
         {!intake ? (

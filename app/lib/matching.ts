@@ -1,18 +1,18 @@
 /**
  * What Talk learns about a person at intake, and how it turns that into
- * counsellor suggestions.
+ * provider suggestions.
  *
  * Pure on purpose — no Firebase, no React, only type imports — so the same
  * code runs in the browser, in the AI route on the server, and in a plain
  * `node` test (scripts/test-matching.mts).
  */
 
-import type { CounsellorProfile, Locale } from "./models";
+import type { Locale, ProviderProfile } from "./models";
 import type { Language } from "./ai/protocol";
 
 // ----------------------------------------------------------- vocabularies
 
-/** Areas of focus a counsellor offers and a person can be matched on. */
+/** Areas of focus a provider offers and a person can be matched on. */
 export const SPECIALIZATIONS = [
   "anxiety",
   "depression",
@@ -46,29 +46,44 @@ export const SPECIALIZATION_LABELS: Record<Specialization, string> = {
 };
 
 /**
- * The umbrella is "counsellors", but the people behind it are several
- * professions — the kind of help someone asks for decides which fit.
+ * What a provider offers, and what a person asks for — one vocabulary for
+ * both sides, so matching is a set intersection.
+ *
+ * This replaced a `profession` list on the provider matched to a separate
+ * `supportType` on the intake through a lookup table. People do not ask for a
+ * psychologist; they ask for help of a kind.
  */
-export const PROFESSIONS = [
-  "counsellor",
-  "therapist",
-  "psychologist",
-  "social-worker",
-  "coach",
-  "psychiatric-nurse",
+export const SERVICES = [
+  "therapy",
+  "psychotherapy",
+  "mental-health-counselling",
+  "psychosocial-support",
+  "social-work",
 ] as const;
 
-export type Profession = (typeof PROFESSIONS)[number];
+export type Service = (typeof SERVICES)[number];
 
-export const PROFESSION_LABELS: Record<Profession, string> = {
-  counsellor: "Counsellor",
-  therapist: "Therapist",
-  psychologist: "Psychologist",
-  "social-worker": "Social worker",
-  coach: "Coach",
-  "psychiatric-nurse": "Psychiatric nurse",
+export const SERVICE_LABELS: Record<Service, string> = {
+  therapy: "Therapy",
+  psychotherapy: "Psychotherapy",
+  "mental-health-counselling": "Mental health counselling",
+  "psychosocial-support": "Psychosocial support",
+  "social-work": "Social work",
 };
 
+/** Said aloud by Talk when she offers the choice. Plain, not clinical. */
+export const SERVICE_BLURBS: Record<Service, string> = {
+  therapy: "working through something difficult with a professional",
+  psychotherapy: "deeper, longer-term work on patterns and past experiences",
+  "mental-health-counselling": "talking things through with someone trained to listen",
+  "psychosocial-support": "support with life around you — family, community, coping day to day",
+  "social-work": "practical help with housing, money, work or family services",
+};
+
+/**
+ * Sessions are video for now (the team's decision), but the field stays so
+ * voice, chat and in-person can be switched on without a migration.
+ */
 export const SESSION_FORMATS = ["video", "voice", "chat", "in-person"] as const;
 export type SessionFormat = (typeof SESSION_FORMATS)[number];
 
@@ -79,24 +94,13 @@ export const FORMAT_LABELS: Record<SessionFormat, string> = {
   "in-person": "In person",
 };
 
-export type CounsellorGender = "woman" | "man";
+/** Everyone is offered video today; nothing else is bookable yet. */
+export const ACTIVE_FORMATS: SessionFormat[] = ["video"];
 
-export const SUPPORT_TYPES = ["therapy", "counselling", "coaching", "social-support", "unsure"] as const;
-export type SupportType = (typeof SUPPORT_TYPES)[number];
-
-export const SUPPORT_LABELS: Record<SupportType, string> = {
-  therapy: "Therapy",
-  counselling: "Counselling",
-  coaching: "Coaching",
-  "social-support": "Social support",
-  unsure: "Not sure yet",
-};
+export type ProviderGender = "woman" | "man";
 
 export const GENDER_PREFS = ["woman", "man", "any"] as const;
 export type GenderPref = (typeof GENDER_PREFS)[number];
-
-export const FORMAT_PREFS = [...SESSION_FORMATS, "any"] as const;
-export type FormatPref = (typeof FORMAT_PREFS)[number];
 
 const LANGUAGE_LOCALE: Partial<Record<Language, Locale>> = {
   english: "en",
@@ -116,14 +120,14 @@ export function localeOf(language: Language | null | undefined): Locale | null {
 export type Intake = {
   /** What they would like to be called. */
   preferredName: string | null;
-  /** The language they want support in — detected, not asked for. */
+  /** The language they want support in — chosen, not guessed. */
   language: Language | null;
   concerns: Specialization[];
   /** One English sentence, in their terms. Private to them. */
   concernSummary: string | null;
-  supportType: SupportType | null;
-  counsellorGender: GenderPref | null;
-  format: FormatPref | null;
+  /** The kinds of help they are looking for. */
+  servicesWanted: Service[];
+  providerGender: GenderPref | null;
   completedAt: number | null;
 };
 
@@ -132,22 +136,27 @@ export const EMPTY_INTAKE: Intake = {
   language: null,
   concerns: [],
   concernSummary: null,
-  supportType: null,
-  counsellorGender: null,
-  format: null,
+  servicesWanted: [],
+  providerGender: null,
   completedAt: null,
 };
 
 /**
  * What Talk must learn before suggesting anyone, in the order she asks.
  * Name and language are gathered along the way rather than as questions:
- * the greeting asks the name, and the language is heard.
+ * the greeting asks the name, and the language is chosen up front.
  */
-export const REQUIRED_FIELDS = ["concerns", "supportType", "counsellorGender", "format"] as const;
+export const REQUIRED_FIELDS = ["concerns", "servicesWanted", "providerGender"] as const;
 export type RequiredField = (typeof REQUIRED_FIELDS)[number];
 
+function isEmptyField(intake: Intake, field: RequiredField): boolean {
+  if (field === "concerns") return intake.concerns.length === 0;
+  if (field === "servicesWanted") return intake.servicesWanted.length === 0;
+  return intake[field] == null;
+}
+
 export function missingFields(intake: Intake): RequiredField[] {
-  return REQUIRED_FIELDS.filter((f) => (f === "concerns" ? intake.concerns.length === 0 : intake[f] == null));
+  return REQUIRED_FIELDS.filter((f) => isEmptyField(intake, f));
 }
 
 export function intakeProgress(intake: Intake): number {
@@ -156,6 +165,11 @@ export function intakeProgress(intake: Intake): number {
 
 function oneOf<T extends string>(v: unknown, allowed: readonly T[]): T | null {
   return typeof v === "string" && (allowed as readonly string[]).includes(v) ? (v as T) : null;
+}
+
+function manyOf<T extends string>(v: unknown, allowed: readonly T[]): T[] {
+  if (!Array.isArray(v)) return [];
+  return [...new Set(v.map((x) => oneOf(x, allowed)).filter((x): x is T => x !== null))];
 }
 
 function text(v: unknown, max = 300): string | null {
@@ -168,17 +182,13 @@ function text(v: unknown, max = 300): string | null {
  */
 export function cleanIntake(raw: unknown, languages: readonly Language[]): Intake {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  const concerns = Array.isArray(r.concerns)
-    ? [...new Set(r.concerns.map((c) => oneOf(c, SPECIALIZATIONS)).filter((c): c is Specialization => c !== null))]
-    : [];
   return {
     preferredName: text(r.preferredName, 60),
     language: oneOf(r.language, languages),
-    concerns,
+    concerns: manyOf(r.concerns, SPECIALIZATIONS),
     concernSummary: text(r.concernSummary),
-    supportType: oneOf(r.supportType, SUPPORT_TYPES),
-    counsellorGender: oneOf(r.counsellorGender, GENDER_PREFS),
-    format: oneOf(r.format, FORMAT_PREFS),
+    servicesWanted: manyOf(r.servicesWanted, SERVICES),
+    providerGender: oneOf(r.providerGender, GENDER_PREFS),
     completedAt: typeof r.completedAt === "number" ? r.completedAt : null,
   };
 }
@@ -189,9 +199,11 @@ export function mergeIntake(prev: Intake, patch: Partial<Intake>): Intake {
   for (const key of Object.keys(patch) as (keyof Intake)[]) {
     const value = patch[key];
     if (value == null) continue;
-    if (key === "concerns") {
-      const add = value as Specialization[];
-      if (add.length) next.concerns = [...new Set([...prev.concerns, ...add])];
+    if (key === "concerns" || key === "servicesWanted") {
+      const add = value as string[];
+      if (add.length) {
+        (next as Record<string, unknown>)[key] = [...new Set([...(prev[key] as string[]), ...add])];
+      }
       continue;
     }
     (next as Record<string, unknown>)[key] = value;
@@ -201,23 +213,15 @@ export function mergeIntake(prev: Intake, patch: Partial<Intake>): Intake {
 
 // ---------------------------------------------------------------- matching
 
-/** Which professions suit which kind of help. First is the closest fit. */
-const FIT: Record<Exclude<SupportType, "unsure">, Profession[]> = {
-  therapy: ["therapist", "psychologist", "counsellor", "psychiatric-nurse"],
-  counselling: ["counsellor", "therapist", "social-worker", "psychologist"],
-  coaching: ["coach", "counsellor"],
-  "social-support": ["social-worker", "counsellor"],
-};
-
 export type Match = {
-  profile: CounsellorProfile;
+  profile: ProviderProfile;
   score: number;
   /** Why this person was suggested, in a few words each. Most important first. */
   reasons: string[];
 };
 
 /**
- * Rank counsellors for one person.
+ * Rank providers for one person.
  *
  * Nobody is filtered out — a directory of tens cannot afford to show someone
  * nothing — but a mismatch on something they asked for sinks a profile well
@@ -225,7 +229,7 @@ export type Match = {
  * asked for Wolof and is matched with someone who cannot speak it has not
  * been helped at all.
  */
-export function rankCounsellors(profiles: CounsellorProfile[], intake: Intake | null): Match[] {
+export function rankProviders(profiles: ProviderProfile[], intake: Intake | null): Match[] {
   const want = intake ?? EMPTY_INTAKE;
   const locale = localeOf(want.language);
 
@@ -245,33 +249,26 @@ export function rankCounsellors(profiles: CounsellorProfile[], intake: Intake | 
         score += 4;
       }
 
-      const shared = want.concerns.filter((c) => profile.specializations.includes(c));
-      score += Math.min(shared.length, 3) * 14;
-      for (const c of shared.slice(0, 2)) reasons.push(SPECIALIZATION_LABELS[c]);
+      const sharedConcerns = want.concerns.filter((c) => profile.specializations.includes(c));
+      score += Math.min(sharedConcerns.length, 3) * 14;
+      for (const c of sharedConcerns.slice(0, 2)) reasons.push(SPECIALIZATION_LABELS[c]);
 
-      if (want.supportType && want.supportType !== "unsure" && profile.profession) {
-        const fit = FIT[want.supportType].indexOf(profile.profession);
-        if (fit >= 0) {
-          score += 12 - fit * 3;
-          if (fit === 0) reasons.push(PROFESSION_LABELS[profile.profession]);
+      const sharedServices = want.servicesWanted.filter((s) => profile.services.includes(s));
+      if (want.servicesWanted.length) {
+        if (sharedServices.length) {
+          score += 12;
+          reasons.push(SERVICE_LABELS[sharedServices[0]]);
+        } else {
+          score -= 10;
         }
       }
 
-      if (want.counsellorGender && want.counsellorGender !== "any" && profile.gender) {
-        if (profile.gender === want.counsellorGender) {
+      if (want.providerGender && want.providerGender !== "any" && profile.gender) {
+        if (profile.gender === want.providerGender) {
           score += 14;
           reasons.push(profile.gender === "woman" ? "Woman" : "Man");
         } else {
           score -= 20;
-        }
-      }
-
-      if (want.format && want.format !== "any") {
-        if (profile.formats.includes(want.format)) {
-          score += 10;
-          reasons.push(FORMAT_LABELS[want.format]);
-        } else {
-          score -= 8;
         }
       }
 
@@ -288,10 +285,9 @@ export function intakeChips(intake: Intake | null): string[] {
   const locale = localeOf(intake.language);
   if (locale) chips.push(LOCALE_NAME[locale]);
   for (const c of intake.concerns.slice(0, 3)) chips.push(SPECIALIZATION_LABELS[c]);
-  if (intake.supportType && intake.supportType !== "unsure") chips.push(SUPPORT_LABELS[intake.supportType]);
-  if (intake.counsellorGender && intake.counsellorGender !== "any") {
-    chips.push(intake.counsellorGender === "woman" ? "A woman" : "A man");
+  for (const s of intake.servicesWanted.slice(0, 2)) chips.push(SERVICE_LABELS[s]);
+  if (intake.providerGender && intake.providerGender !== "any") {
+    chips.push(intake.providerGender === "woman" ? "A woman" : "A man");
   }
-  if (intake.format && intake.format !== "any") chips.push(FORMAT_LABELS[intake.format]);
   return chips;
 }

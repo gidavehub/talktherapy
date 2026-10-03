@@ -28,7 +28,7 @@ export function formatDalasi(
   })}`;
 }
 
-/** "D700 – D3,000" for the human-counsellor range on marketing pages. */
+/** "D700 – D3,000" for the human-provider range on marketing pages. */
 export function formatDalasiRange(minMinor: number, maxMinor: number): string {
   return `${formatDalasi(minMinor)} – ${formatDalasi(maxMinor)}`;
 }
@@ -45,7 +45,7 @@ export function toMajor(minor: number): number {
 /**
  * Platform's share of a consultation fee.
  *
- * Kept as a single named constant so the counsellor-facing earnings screen and
+ * Kept as a single named constant so the provider-facing earnings screen and
  * the payment split can never disagree about the number.
  */
 export const PLATFORM_FEE_RATE = 0.15;
@@ -54,6 +54,6 @@ export function platformFeeMinor(amountMinor: number): number {
   return Math.round(amountMinor * PLATFORM_FEE_RATE);
 }
 
-export function counsellorPayoutMinor(amountMinor: number): number {
+export function providerPayoutMinor(amountMinor: number): number {
   return amountMinor - platformFeeMinor(amountMinor);
 }

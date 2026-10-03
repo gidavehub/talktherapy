@@ -12,7 +12,7 @@ import {
 export const metadata: Metadata = {
   title: "How Talk works",
   description:
-    "From a difficult day to a booked session with a qualified counsellor — how Talk combines an AI companion, human professionals, and wellbeing resources.",
+    "From a difficult day to a booked session with a qualified provider — how Talk combines an AI companion, human professionals, and wellbeing resources.",
 };
 
 const STEPS = [
@@ -26,10 +26,10 @@ const STEPS = [
   },
   {
     title: "Get pointed towards the right support",
-    body: "Every companion conversation ends the same way: by helping you decide what would actually help next. Often that is booking time with a qualified human counsellor.",
+    body: "Every companion conversation ends the same way: by helping you decide what would actually help next. Often that is booking time with a qualified human provider.",
   },
   {
-    title: "Choose a counsellor and book",
+    title: "Choose a provider and book",
     body: "Browse verified professionals by specialisation, language and availability. See their qualifications and rates before you commit to anything.",
   },
   {
@@ -49,8 +49,8 @@ const PILLARS = [
     icon: <IconOrb />,
   },
   {
-    title: "Human counsellors",
-    body: "Qualified counsellors and psychosocial support professionals, credential-verified before they appear in the directory.",
+    title: "Human providers",
+    body: "Qualified providers and psychosocial support professionals, credential-verified before they appear in the directory.",
     icon: <IconPeople />,
   },
   {
@@ -72,15 +72,15 @@ const FAQS = [
   },
   {
     q: "Who can see what I share?",
-    a: "Your journal entries and mood check-ins are private to you. Counsellors do not have access to them unless you deliberately share something in a session. Conversations are encrypted in transit and at rest, and are never sold or used for advertising.",
+    a: "Your journal entries and mood check-ins are private to you. Providers do not have access to them unless you deliberately share something in a session. Conversations are encrypted in transit and at rest, and are never sold or used for advertising.",
   },
   {
-    q: "How do I know a counsellor is qualified?",
-    a: "Every counsellor submits their credentials before their profile can appear publicly. An administrator reviews the documents and only then is the profile visible in the directory. You can see qualifications, specialisations and years of experience on each profile.",
+    q: "How do I know a provider is qualified?",
+    a: "Every provider submits their credentials before their profile can appear publicly. An administrator reviews the documents and only then is the profile visible in the directory. You can see qualifications, specialisations and years of experience on each profile.",
   },
   {
     q: "What does it cost?",
-    a: "The resource centre is free. An initial AI consultation is D250 for roughly 5–7 minutes; a longer AI session is D500 for around 20 minutes. Human counselling sessions range from D700 to D3,000 depending on the professional. Pricing is set deliberately so that seeing a human is the more cost-effective path.",
+    a: "The resource centre is free. A first conversation with Talk is D200 for up to 8 minutes; a longer AI session is D500 for around 20 minutes. Human counselling sessions range from D700 to D3,000 depending on the professional. Pricing is set deliberately so that seeing a human is the more cost-effective path.",
   },
   {
     q: "What if I am in crisis?",
@@ -128,7 +128,7 @@ export default function HowItWorksPage() {
       <CTABlock
         lines={["You do not need", "the right words."]}
         body="Create an account and start whenever you are ready. Nothing is shared without your say-so."
-        secondary={{ label: "Browse counsellors", href: "/therapists" }}
+        secondary={{ label: "Browse providers", href: "/providers" }}
       />
     </>
   );

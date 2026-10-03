@@ -5,7 +5,7 @@ import { useState } from "react";
 import { motion } from "motion/react";
 import { SPRING_SOFT } from "@/components/motion/primitives";
 import { useAuth } from "@/components/AuthProvider";
-import CounsellorCard from "@/components/counsellors/CounsellorCard";
+import ProviderCard from "@/components/providers/ProviderCard";
 import Button from "@/components/ui/Button";
 import { EmptyState, Pill, Spinner } from "@/components/ui/Feedback";
 import { IconPeople } from "@/components/ui/icons";
@@ -13,13 +13,13 @@ import { intakeChips } from "@/lib/matching";
 import { useMatches } from "@/lib/useMatches";
 
 /**
- * Counsellors for you.
+ * Providers for you.
  *
  * Where onboarding ends: Talk has learned what someone needs, and this is who
  * fits — ranked, each card saying why. Also where "View all" on the dashboard
  * leads. Everyone available is listed; the ones that fit come first.
  */
-export default function CounsellorsForYouPage() {
+export default function ProvidersForYouPage() {
   const { profile } = useAuth();
   const intake = profile?.intake ?? null;
   const { matches, error, loading } = useMatches(intake);
@@ -83,20 +83,20 @@ export default function CounsellorsForYouPage() {
       ) : error ? (
         <EmptyState
           icon={<IconPeople />}
-          title="We could not load counsellors"
+          title="We could not load providers"
           description="Please try again in a moment."
           action={<Button href="/support" variant="secondary">Contact support</Button>}
         />
       ) : !matches || matches.length === 0 ? (
         <EmptyState
           icon={<IconPeople />}
-          title="Counsellors are being verified"
-          description="Every counsellor is credential-checked before they appear here. We will show you who fits as soon as they are ready."
+          title="Providers are being verified"
+          description="Every provider is credential-checked before they appear here. We will show you who fits as soon as they are ready."
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {matches.map((m, i) => (
-            <CounsellorCard
+            <ProviderCard
               key={m.profile.uid}
               profile={m.profile}
               index={i}

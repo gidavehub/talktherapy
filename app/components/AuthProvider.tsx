@@ -97,9 +97,9 @@ export function useRole() {
     role,
     ready,
     isPatient: role === "patient",
-    isCounsellor: role === "counsellor",
-    /** A counsellor who has cleared credential review. */
-    isVerifiedCounsellor: role === "counsellor" && Boolean(profile?.verified),
+    isProvider: role === "provider",
+    /** A provider who has cleared credential review. */
+    isVerifiedProvider: role === "provider" && Boolean(profile?.verified),
     isAdmin: role === "admin",
     isOrgAdmin: role === "org_admin",
   };

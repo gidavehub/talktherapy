@@ -16,7 +16,7 @@ const CAN_DO = [
   "Stress-management, breathing and grounding exercises",
   "General psychoeducation about wellbeing",
   "Helping you identify what kind of support might help",
-  "Guiding you toward booking a human counsellor",
+  "Guiding you toward booking a human provider",
 ];
 
 const WILL_NOT_DO = [

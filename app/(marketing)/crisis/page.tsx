@@ -129,7 +129,7 @@ export default function CrisisPage() {
             deserve support.
           </p>
           <p>
-            You can book a session with a qualified counsellor through Talk, or
+            You can book a session with a qualified provider through Talk, or
             speak to someone you trust — a family member, a friend, a teacher, a
             colleague, or a religious leader. Telling one person is often the
             hardest and most useful step.
@@ -138,10 +138,10 @@ export default function CrisisPage() {
 
         <div className="mt-8 flex flex-col sm:flex-row gap-3">
           <Link
-            href="/therapists"
+            href="/providers"
             className="inline-flex h-12 items-center justify-center rounded-full bg-[var(--dark)] text-white px-7 text-[12px] uppercase tracking-[0.14em] font-medium hover:bg-[var(--dark-soft)] transition-colors"
           >
-            Find a counsellor
+            Find a provider
           </Link>
           <Link
             href="/resources"

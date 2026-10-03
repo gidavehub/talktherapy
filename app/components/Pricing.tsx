@@ -22,7 +22,7 @@ const tiers: Tier[] = [
     blurb: "A taste of what matching feels like. No card, no pressure.",
     features: [
       "AI-guided 15-minute intake",
-      "One free intro call with a matched therapist",
+      "One free intro call with a matched provider",
       "Daily mood check-ins",
     ],
     cta: "Start Free",
@@ -34,8 +34,8 @@ const tiers: Tier[] = [
     blurb: "For people who want regular sessions without the friction.",
     features: [
       "Everything in Intro",
-      "Two therapist sessions / month",
-      "Unlimited text-chat with your therapist",
+      "Two provider sessions / month",
+      "Unlimited text-chat with your provider",
       "Guided meditations & journaling",
     ],
     cta: "Choose Plus",
@@ -48,7 +48,7 @@ const tiers: Tier[] = [
     blurb: "Deep, ongoing support — with priority access on hard days.",
     features: [
       "Everything in Plus",
-      "Weekly therapist sessions",
+      "Weekly provider sessions",
       "Same-day session rebooking",
       "Crisis-line priority routing",
     ],

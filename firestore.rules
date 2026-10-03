@@ -42,11 +42,11 @@ service cloud.firestore {
       return hasRole('admin');
     }
 
-    // A counsellor who has actually cleared credential review. Anything that
-    // exposes a counsellor to patients must check this, not just the role.
-    function isVerifiedCounsellor() {
+    // A provider who has actually cleared credential review. Anything that
+    // exposes a provider to patients must check this, not just the role.
+    function isVerifiedProvider() {
       return isSignedIn()
-        && userDoc().role == 'counsellor'
+        && userDoc().role == 'provider'
         && userDoc().verified == true;
     }
 
@@ -59,18 +59,18 @@ service cloud.firestore {
     // ------------------------------------------------------------------ users
 
     match /users/{uid} {
-      // A user reads their own doc. Admins read anyone. Counsellors do NOT get
+      // A user reads their own doc. Admins read anyone. Providers do NOT get
       // blanket read over patients — they see only the patients who booked
       // them, and that link is resolved through /bookings, not here.
       allow get: if isSelf(uid) || isAdmin();
       allow list: if isAdmin();
 
-      // On create you may only make yourself, only as patient or counsellor,
+      // On create you may only make yourself, only as patient or provider,
       // and `verified` is forced: patients are trivially verified (the flag is
-      // meaningless for them), counsellors must start unverified and be
+      // meaningless for them), providers must start unverified and be
       // approved by an admin.
       allow create: if isSelf(uid)
-        && request.resource.data.role in ['patient', 'counsellor']
+        && request.resource.data.role in ['patient', 'provider']
         && request.resource.data.verified == (request.resource.data.role == 'patient');
 
       // Self-updates may not touch role or verified. Admins may change both.
@@ -83,7 +83,7 @@ service cloud.firestore {
       // ------------------------------------------------ private wellbeing data
       //
       // Mood, journal and consent history. Owner only — no admin read, no
-      // counsellor read, ever. If a counsellor needs context, the patient
+      // provider read, ever. If a provider needs context, the patient
       // shares it deliberately through a session note, not by us opening a
       // back door here.
 
@@ -104,18 +104,18 @@ service cloud.firestore {
       }
     }
 
-    // ----------------------------------------------------- counsellor profiles
+    // ------------------------------------------------------- provider profiles
 
-    match /counsellorProfiles/{uid} {
-      // The public directory only ever shows verified counsellors. Unverified
+    match /providerProfiles/{uid} {
+      // The public directory only ever shows verified providers. Unverified
       // and suspended profiles are visible to their owner and to admins.
       allow get, list: if resource.data.status == 'verified'
         || isSelf(uid)
         || isAdmin();
 
-      // A counsellor writes their own profile but can never self-approve.
+      // A provider writes their own profile but can never self-approve.
       allow create: if isSelf(uid)
-        && hasRole('counsellor')
+        && hasRole('provider')
         && request.resource.data.status in ['draft', 'pending'];
 
       allow update: if (isSelf(uid) && request.resource.data.status == resource.data.status)
@@ -140,9 +140,9 @@ service cloud.firestore {
     // Credential review queue.
     match /verificationRequests/{requestId} {
       allow get, list: if isAdmin()
-        || (isSignedIn() && resource.data.counsellorId == request.auth.uid);
+        || (isSignedIn() && resource.data.providerId == request.auth.uid);
       allow create: if isSignedIn()
-        && request.resource.data.counsellorId == request.auth.uid
+        && request.resource.data.providerId == request.auth.uid
         && request.resource.data.status == 'pending';
       // Only an admin decides. The applicant cannot move their own request.
       allow update, delete: if isAdmin();
@@ -150,21 +150,21 @@ service cloud.firestore {
 
     // -------------------------------------------------------- availability
 
-    match /availability/{counsellorId} {
+    match /availability/{providerId} {
       allow read: if isSignedIn();
-      allow write: if isSelf(counsellorId) || isAdmin();
+      allow write: if isSelf(providerId) || isAdmin();
 
       match /slots/{slotId} {
         // Patients must see open slots to book them.
         allow read: if isSignedIn();
-        allow write: if isSelf(counsellorId) || isAdmin();
+        allow write: if isSelf(providerId) || isAdmin();
       }
     }
 
     // ------------------------------------------------------------- bookings
 
     match /bookings/{bookingId} {
-      // `participants` is a denormalised [patientId, counsellorId]. It lets one
+      // `participants` is a denormalised [patientId, providerId]. It lets one
       // composite index serve "my bookings" for both roles, and makes this rule
       // a membership test with zero extra document reads.
       function isParticipant() {
@@ -179,7 +179,7 @@ service cloud.firestore {
         && request.resource.data.patientId == request.auth.uid
         && request.resource.data.participants.hasAll([
              request.resource.data.patientId,
-             request.resource.data.counsellorId
+             request.resource.data.providerId
            ])
         && request.resource.data.status == 'pending'
         && request.resource.data.paymentStatus == 'unpaid';
@@ -225,11 +225,11 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
-      // Clinical notes. Written by the counsellor, never visible to the
-      // patient through this path, never visible to other counsellors.
+      // Clinical notes. Written by the provider, never visible to the
+      // patient through this path, never visible to other providers.
       match /notes/{noteId} {
         allow read, write: if isSignedIn()
-          && get(/databases/$(database)/documents/sessions/$(sessionId)).data.counsellorId == request.auth.uid;
+          && get(/databases/$(database)/documents/sessions/$(sessionId)).data.providerId == request.auth.uid;
       }
     }
 
@@ -278,7 +278,7 @@ service cloud.firestore {
     match /transactions/{transactionId} {
       allow get, list: if isSignedIn() && (
         resource.data.userId == request.auth.uid ||
-        resource.data.counsellorId == request.auth.uid
+        resource.data.providerId == request.auth.uid
       ) || isAdmin();
       allow write: if false;
     }

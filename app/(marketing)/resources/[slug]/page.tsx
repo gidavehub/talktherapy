@@ -88,8 +88,8 @@ export default async function ResourcePage(props: PageProps<"/resources/[slug]">
           <Alert tone="info">
             This is general information, not medical advice. If something here
             resonates and you would like to talk it through, you can{" "}
-            <Link href="/therapists" className="underline underline-offset-4">
-              book a session with a verified counsellor
+            <Link href="/providers" className="underline underline-offset-4">
+              book a session with a verified provider
             </Link>
             .
           </Alert>
@@ -108,8 +108,8 @@ export default async function ResourcePage(props: PageProps<"/resources/[slug]">
           <Button href="/resources" variant="secondary">
             More resources
           </Button>
-          <Button href="/therapists" variant="ghost" withArrow={false}>
-            Find a counsellor
+          <Button href="/providers" variant="ghost" withArrow={false}>
+            Find a provider
           </Button>
         </div>
       </div>

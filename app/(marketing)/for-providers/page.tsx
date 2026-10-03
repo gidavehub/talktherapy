@@ -8,9 +8,9 @@ import { HUMAN_RATE_MIN_MINOR, HUMAN_RATE_MAX_MINOR } from "@/lib/models";
 import { PLATFORM_FEE_RATE } from "@/lib/money";
 
 export const metadata: Metadata = {
-  title: "For counsellors",
+  title: "For providers",
   description:
-    "Join Talk as a verified counsellor or psychosocial support professional. Set your own rate, manage your availability, and reach people who would not otherwise walk through a door.",
+    "Join Talk as a verified provider or psychosocial support professional. Set your own rate, manage your availability, and reach people who would not otherwise walk through a door.",
 };
 
 const BENEFITS = [
@@ -66,7 +66,7 @@ const STEPS = [
 const FAQS = [
   {
     q: "What qualifications do I need?",
-    a: "We work with qualified counsellors, psychologists, psychosocial support practitioners, social workers and other appropriately qualified professionals. You will need to evidence your qualification and identity. If you are unsure whether your background qualifies, apply and ask — we would rather have the conversation.",
+    a: "We work with qualified providers, psychologists, psychosocial support practitioners, social workers and other appropriately qualified professionals. You will need to evidence your qualification and identity. If you are unsure whether your background qualifies, apply and ask — we would rather have the conversation.",
   },
   {
     q: "How much does Talk take?",
@@ -90,17 +90,17 @@ const FAQS = [
   },
 ];
 
-export default function ForCounsellorsPage() {
+export default function ForProvidersPage() {
   return (
     <>
       <PageIntro
-        eyebrow="For counsellors"
+        eyebrow="For providers"
         lines={["Your practice,", "further reach."]}
-        lede="Talk connects qualified counsellors and psychosocial support professionals with people across The Gambia who need support and cannot easily get to it."
+        lede="Talk connects qualified providers and psychosocial support professionals with people across The Gambia who need support and cannot easily get to it."
         stamp="PRACTISE"
       >
         <div className="flex flex-col sm:flex-row gap-3">
-          <Button href="/sign-up?role=counsellor" size="lg">
+          <Button href="/sign-up?role=provider" size="lg">
             Apply to join
           </Button>
           <Button href="#how" variant="secondary" withArrow={false}>
@@ -141,7 +141,7 @@ export default function ForCounsellorsPage() {
         eyebrow="Apply"
         lines={["Bring your practice", "to more people."]}
         body="Applications are reviewed by a person, not a form filter."
-        primary={{ label: "Start your application", href: "/sign-up?role=counsellor" }}
+        primary={{ label: "Start your application", href: "/sign-up?role=provider" }}
         secondary={{ label: "Ask a question", href: "/support" }}
       />
     </>

@@ -60,7 +60,7 @@ export function RequireAuth({
 export function RequireRole({
   children,
   allow,
-  /** Counsellor routes that must not be reachable until credentials clear. */
+  /** Provider routes that must not be reachable until credentials clear. */
   requireVerified = false,
   fallback = "/dashboard",
 }: {
@@ -91,9 +91,9 @@ export function RequireRole({
     if (!profile) return;
 
     if (!permitted) {
-      // A counsellor with the right role but pending credentials gets the
+      // A provider with the right role but pending credentials gets the
       // status page, not a generic bounce, so they know why.
-      if (requireVerified && role === "counsellor" && !profile.verified) {
+      if (requireVerified && role === "provider" && !profile.verified) {
         router.replace("/pro/verification");
         return;
       }

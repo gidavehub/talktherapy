@@ -53,7 +53,7 @@ export default function JournalPage() {
             Private by design.
           </h1>
           <p className="mt-3 text-[14px] text-[var(--muted)] max-w-[520px] leading-relaxed">
-            Only you can read these. Not counsellors, not administrators — the
+            Only you can read these. Not providers, not administrators — the
             access rules make it impossible rather than merely disallowed.
           </p>
         </div>

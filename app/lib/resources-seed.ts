@@ -142,7 +142,7 @@ Accept help in specific forms. "Let me know if you need anything" is hard to ans
 
 ## When to reach out
 
-Grief is not an illness and does not need to be treated. But if months on you cannot function, if you feel unable to go on, or if you are avoiding everything that reminds you of the person to the point that your life has narrowed, speaking to a counsellor can help.
+Grief is not an illness and does not need to be treated. But if months on you cannot function, if you feel unable to go on, or if you are avoiding everything that reminds you of the person to the point that your life has narrowed, speaking to a provider can help.
 
 If you are having thoughts of ending your life, please treat that as urgent. Call 117 for police or 116 for an ambulance, or tell someone near you right now.`,
   },
@@ -187,11 +187,11 @@ Try to notice when that has happened. The chapter in front of you is a chapter. 
 
 If expectations at home are adding to the pressure, a direct conversation often helps more than people expect. You do not have to announce a crisis. Something as simple as saying you are finding this term hard and would appreciate patience can change the atmosphere considerably.
 
-If that conversation feels impossible, a counsellor can help you work out how to have it.
+If that conversation feels impossible, a provider can help you work out how to have it.
 
 ## When to get support
 
-If you have stopped attending, if anxiety is stopping you from sitting assessments, or if you are unable to enjoy anything outside study, speak to someone. Your institution may have a counsellor, and you can book a session here. This is common, and it responds well to support.`,
+If you have stopped attending, if anxiety is stopping you from sitting assessments, or if you are unable to enjoy anything outside study, speak to someone. Your institution may have a provider, and you can book a session here. This is common, and it responds well to support.`,
   },
   {
     id: "seed-breathing",
@@ -257,11 +257,11 @@ So here it is, plainly.
 
 ## You do not need to prepare
 
-You do not need your thoughts organised, a clear account of the problem, or the right vocabulary. "I do not really know where to start" is a completely normal opening sentence, and a good counsellor will take it from there.
+You do not need your thoughts organised, a clear account of the problem, or the right vocabulary. "I do not really know where to start" is a completely normal opening sentence, and a good provider will take it from there.
 
 ## It is mostly a conversation
 
-A first session is largely about the counsellor understanding what has brought you there and what you are hoping for. They will ask questions. You are allowed to not answer any of them.
+A first session is largely about the provider understanding what has brought you there and what you are hoping for. They will ask questions. You are allowed to not answer any of them.
 
 There is no couch, no analysis of your childhood unless it is relevant to you, and no verdict at the end.
 
@@ -275,7 +275,7 @@ Either is normal, and neither means much.
 
 ## It is confidential
 
-What you say stays between you and your counsellor. The exception, which any professional will explain, is if there is a serious risk to your life or someone else's — in which case they have an obligation to act.
+What you say stays between you and your provider. The exception, which any professional will explain, is if there is a serious risk to your life or someone else's — in which case they have an obligation to act.
 
 ## You can change your mind
 

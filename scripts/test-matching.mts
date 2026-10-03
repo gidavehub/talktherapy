@@ -1,44 +1,42 @@
 /**
- * Unit test for counsellor matching (app/lib/matching.ts).
+ * Unit test for provider matching (app/lib/matching.ts).
  *
  *   node scripts/test-matching.mts
  *
  * Runs the real ranking code — Node strips the types — against profiles
- * shaped like the sample counsellors, for people with different needs.
+ * shaped like the sample providers, for people with different needs.
  */
 
-import { EMPTY_INTAKE, cleanIntake, mergeIntake, missingFields, rankCounsellors } from "../app/lib/matching.ts";
-import type { Intake } from "../app/lib/matching.ts";
-import type { CounsellorProfile } from "../app/lib/models.ts";
+import { EMPTY_INTAKE, cleanIntake, mergeIntake, missingFields, rankProviders } from "../app/lib/matching.ts";
+import type { Intake, Service } from "../app/lib/matching.ts";
+import type { ProviderProfile } from "../app/lib/models.ts";
 
 const P = (
   uid: string,
-  profession: CounsellorProfile["profession"],
-  gender: CounsellorProfile["gender"],
-  languages: CounsellorProfile["languages"],
+  services: Service[],
+  gender: ProviderProfile["gender"],
+  languages: ProviderProfile["languages"],
   specializations: string[],
-  formats: CounsellorProfile["formats"],
   ratingAvg = 4.5,
   yearsExperience = 5,
-): CounsellorProfile => ({
+): ProviderProfile => ({
   uid, displayName: uid, headline: "", bio: "", specializations, languages, qualifications: [], yearsExperience,
   sessionRateMinor: 100000, status: "verified", photoPath: null, ratingAvg, ratingCount: 0, timezone: "Africa/Banjul",
-  profession, gender, formats, location: null, sample: true, createdAt: 0, updatedAt: 0,
+  services, gender, formats: ["video"], location: null, sample: true, createdAt: 0, updatedAt: 0,
 });
 
 const PROFILES = [
-  P("awa", "counsellor", "woman", ["wo", "en"], ["grief", "family", "depression"], ["video", "voice"], 4.8, 9),
-  P("lamin", "psychologist", "man", ["en", "wo", "mnk"], ["anxiety", "trauma", "workplace"], ["video", "in-person"], 4.7, 12),
-  P("fatoumata", "social-worker", "woman", ["ff", "wo", "en"], ["family", "youth", "substance"], ["in-person", "voice"], 4.6, 7),
-  P("ebrima", "coach", "man", ["en"], ["workplace", "self-esteem", "academic"], ["video", "chat"], 4.5, 5),
-  P("isatou", "therapist", "woman", ["en", "mnk"], ["trauma", "anxiety", "relationships"], ["video"], 4.9, 10),
-  P("modou", "counsellor", "man", ["wo", "en"], ["grief", "depression", "sleep"], ["voice", "chat"], 4.4, 6),
-  P("mariama", "psychiatric-nurse", "woman", ["mnk", "ff", "en"], ["depression", "anxiety", "sleep"], ["in-person", "voice"], 4.7, 14),
-  P("ndey", "therapist", "woman", ["wo", "en"], ["grief", "trauma", "sleep"], ["video", "in-person"], 4.8, 8),
+  P("awa", ["mental-health-counselling", "psychosocial-support"], "woman", ["wo", "en"], ["grief", "family", "depression"], 4.8, 9),
+  P("lamin", ["therapy", "psychotherapy"], "man", ["en", "wo", "mnk"], ["anxiety", "trauma", "workplace"], 4.7, 12),
+  P("fatoumata", ["social-work", "psychosocial-support"], "woman", ["ff", "wo", "en"], ["family", "youth", "substance"], 4.6, 7),
+  P("ebrima", ["psychosocial-support"], "man", ["en"], ["workplace", "self-esteem", "academic"], 4.5, 5),
+  P("isatou", ["therapy", "psychotherapy"], "woman", ["en", "mnk"], ["trauma", "anxiety", "relationships"], 4.9, 10),
+  P("modou", ["mental-health-counselling"], "man", ["wo", "en"], ["grief", "depression", "sleep"], 4.4, 6),
+  P("mariama", ["mental-health-counselling", "therapy"], "woman", ["mnk", "ff", "en"], ["depression", "anxiety", "sleep"], 4.7, 14),
+  P("ndey", ["therapy", "psychotherapy"], "woman", ["wo", "en"], ["grief", "trauma", "sleep"], 4.8, 8),
 ];
 
 const intake = (p: Partial<Intake>): Intake => ({ ...EMPTY_INTAKE, ...p });
-const byId = new Map(PROFILES.map((p) => [p.uid, p]));
 
 let failures = 0;
 function check(ok: boolean, what: string) {
@@ -46,52 +44,66 @@ function check(ok: boolean, what: string) {
   if (!ok) failures += 1;
 }
 
-console.log("Fatou — Wolof, grief + sleep, counselling, a woman, video");
+console.log("Fatou — Wolof, grief + sleep, mental health counselling, a woman");
 {
-  const m = rankCounsellors(PROFILES, intake({ language: "wolof", concerns: ["grief", "sleep"], supportType: "counselling", counsellorGender: "woman", format: "video" }));
+  const m = rankProviders(PROFILES, intake({ language: "wolof", concerns: ["grief", "sleep"], servicesWanted: ["mental-health-counselling"], providerGender: "woman" }));
   console.log(`  order: ${m.map((x) => x.profile.uid).join(", ")}`);
   const top = m[0].profile;
-  check(top.languages.includes("wo") && top.gender === "woman" && top.formats.includes("video") && top.specializations.includes("grief"), `top (${top.uid}) speaks Wolof, is a woman, does video, works with grief`);
+  check(top.languages.includes("wo") && top.gender === "woman" && top.services.includes("mental-health-counselling"),
+    `top (${top.uid}) speaks Wolof, is a woman, offers mental health counselling`);
   check(m.slice(0, 2).every((x) => x.profile.gender === "woman"), "no man in the top two");
   check(m[0].reasons.includes("Speaks Wolof") && m[0].reasons.includes("Woman"), `reasons say why: ${m[0].reasons.join(" · ")}`);
-  check(m.findIndex((x) => x.profile.uid === "ebrima") > 4, "an English-only male coach is near the bottom");
+  check(m.findIndex((x) => x.profile.uid === "ebrima") > 4, "an English-only man offering a different service is near the bottom");
 }
 
-console.log("\nMandinka speaker — anxiety, therapy, a man, in person");
+console.log("\nMandinka speaker — anxiety, therapy, a man");
 {
-  const m = rankCounsellors(PROFILES, intake({ language: "mandinka", concerns: ["anxiety"], supportType: "therapy", counsellorGender: "man", format: "in-person" }));
+  const m = rankProviders(PROFILES, intake({ language: "mandinka", concerns: ["anxiety"], servicesWanted: ["therapy"], providerGender: "man" }));
   check(m[0].profile.uid === "lamin", `top is lamin (got ${m[0].profile.uid}: ${m[0].reasons.join(" · ")})`);
 }
 
-console.log("\nPulaar speaker — family, social support, any gender, any format");
+console.log("\nPulaar speaker — family, social work, any gender");
 {
-  const m = rankCounsellors(PROFILES, intake({ language: "pulaar", concerns: ["family"], supportType: "social-support", counsellorGender: "any", format: "any" }));
+  const m = rankProviders(PROFILES, intake({ language: "pulaar", concerns: ["family"], servicesWanted: ["social-work"], providerGender: "any" }));
   check(m[0].profile.uid === "fatoumata", `top is fatoumata (got ${m[0].profile.uid})`);
 }
 
-console.log("\nEnglish — work stress, coaching, chat");
+console.log("\nEnglish — work stress, psychosocial support");
 {
-  const m = rankCounsellors(PROFILES, intake({ language: "english", concerns: ["workplace"], supportType: "coaching", counsellorGender: "any", format: "chat" }));
-  check(m[0].profile.uid === "ebrima", `top is ebrima (got ${m[0].profile.uid})`);
+  const m = rankProviders(PROFILES, intake({ language: "english", concerns: ["workplace"], servicesWanted: ["psychosocial-support"], providerGender: "any" }));
+  check(m[0].profile.uid === "ebrima", `top is ebrima (got ${m[0].profile.uid}: ${m[0].reasons.join(" · ")})`);
+}
+
+console.log("\nTwo services wanted — either one counts");
+{
+  const m = rankProviders(PROFILES, intake({ language: "english", concerns: ["trauma"], servicesWanted: ["therapy", "psychotherapy"], providerGender: "woman" }));
+  check(["isatou", "ndey"].includes(m[0].profile.uid), `top offers therapy and is a woman (got ${m[0].profile.uid})`);
 }
 
 console.log("\nNo intake at all");
 {
-  const m = rankCounsellors(PROFILES, null);
+  const m = rankProviders(PROFILES, null);
   check(m.length === PROFILES.length, "nobody is filtered out");
   check(m.every((x) => x.reasons.length === 0), "no invented reasons");
 }
 
 console.log("\nIntake plumbing");
 {
-  const dirty = cleanIntake({ language: "klingon", concerns: ["grief", "bogus", "grief"], supportType: "therapy", format: 7 }, ["english", "wolof", "mandinka", "pulaar", "other"]);
-  check(dirty.language === null && dirty.format === null, "invalid values are dropped");
-  check(dirty.concerns.length === 1 && dirty.concerns[0] === "grief", "concerns are validated and de-duplicated");
-  const merged = mergeIntake(intake({ preferredName: "Fatou", concerns: ["grief"] }), { preferredName: null, concerns: ["sleep"], format: "video" });
+  const dirty = cleanIntake(
+    { language: "klingon", concerns: ["grief", "bogus", "grief"], servicesWanted: ["therapy", "coaching"], providerGender: 7 },
+    ["english", "wolof", "mandinka", "pulaar", "other"],
+  );
+  check(dirty.language === null && dirty.providerGender === null, "invalid values are dropped");
+  check(dirty.concerns.join() === "grief", "concerns are validated and de-duplicated");
+  check(dirty.servicesWanted.join() === "therapy", "a service that no longer exists is dropped");
+  const merged = mergeIntake(
+    intake({ preferredName: "Fatou", concerns: ["grief"], servicesWanted: ["therapy"] }),
+    { preferredName: null, concerns: ["sleep"], servicesWanted: ["psychotherapy"] },
+  );
   check(merged.preferredName === "Fatou", "a turn that says nothing never erases an answer");
   check(merged.concerns.join() === "grief,sleep", "concerns accumulate");
-  check(missingFields(merged).join() === "supportType,counsellorGender", `missing: ${missingFields(merged).join(", ")}`);
-  void byId;
+  check(merged.servicesWanted.join() === "therapy,psychotherapy", "services accumulate");
+  check(missingFields(merged).join() === "providerGender", `missing: ${missingFields(merged).join(", ") || "(none)"}`);
 }
 
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");

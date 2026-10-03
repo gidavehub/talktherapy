@@ -10,7 +10,7 @@ import { formatDalasi, formatDalasiRange } from "@/lib/money";
 export const metadata: Metadata = {
   title: "Plans & pricing",
   description:
-    "Free wellbeing resources, AI consultations from D250, and human counselling sessions from D700. Pricing in Gambian Dalasi.",
+    "Free wellbeing resources, AI consultations from D200, and human sessions from D700. Pricing in Gambian Dalasi.",
 };
 
 const TIERS = [
@@ -34,15 +34,15 @@ const TIERS = [
     price: formatDalasiRange(HUMAN_RATE_MIN_MINOR, HUMAN_RATE_MAX_MINOR),
     cadence: "per session",
     blurb:
-      "A confidential consultation with a credential-verified counsellor or psychosocial support professional.",
+      "A confidential consultation with a credential-verified provider or psychosocial support professional.",
     features: [
       "45–60 minute private video session",
-      "Choose your counsellor by specialisation and language",
+      "Choose your provider by specialisation and language",
       "Every professional credential-verified",
       "Book follow-ups with the same person",
       "Rate set by the individual professional",
     ],
-    cta: { label: "Browse counsellors", href: "/therapists" },
+    cta: { label: "Browse providers", href: "/providers" },
     featured: true,
   },
   {
@@ -65,7 +65,7 @@ const TIERS = [
 const FAQS = [
   {
     q: "Why is the AI more expensive per minute than a human?",
-    a: "Deliberately. The companion is designed as a bridge, not a destination — a way to start when talking to a person feels like too much. Pricing it this way keeps a human counsellor the more sensible choice for anyone who needs real support, which is the outcome we want.",
+    a: "Deliberately. The companion is designed as a bridge, not a destination — a way to start when talking to a person feels like too much. Pricing it this way keeps a human provider the more sensible choice for anyone who needs real support, which is the outcome we want.",
   },
   {
     q: "How do I pay?",
@@ -77,10 +77,10 @@ const FAQS = [
   },
   {
     q: "Can I get a refund?",
-    a: "If a counsellor does not attend a booked session, you are refunded in full. If you need to cancel, do so at least 24 hours ahead and you will not be charged. Cancellations inside 24 hours are at the counsellor's discretion.",
+    a: "If a provider does not attend a booked session, you are refunded in full. If you need to cancel, do so at least 24 hours ahead and you will not be charged. Cancellations inside 24 hours are at the provider's discretion.",
   },
   {
-    q: "Do counsellors set their own rates?",
+    q: "Do providers set their own rates?",
     a: "Yes, within the D700–D3,000 range, based on their qualifications, specialisation and experience. The rate is shown on every profile before you book. Talk takes a service fee from each completed session.",
   },
 ];

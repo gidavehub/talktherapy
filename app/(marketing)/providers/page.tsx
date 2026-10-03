@@ -1,26 +1,26 @@
 import type { Metadata } from "next";
 import PageIntro from "@/components/marketing/PageIntro";
 import { Section, CTABlock } from "@/components/marketing/Sections";
-import CounsellorDirectory from "@/components/marketing/CounsellorDirectory";
+import ProviderDirectory from "@/components/marketing/ProviderDirectory";
 
 export const metadata: Metadata = {
-  title: "Find a counsellor",
+  title: "Find a provider",
   description:
-    "Browse credential-verified counsellors and psychosocial support professionals in The Gambia. Filter by specialisation, language and rate.",
+    "Browse credential-verified providers and psychosocial support professionals in The Gambia. Filter by specialisation, language and rate.",
 };
 
-export default function TherapistsPage() {
+export default function ProvidersPage() {
   return (
     <>
       <PageIntro
-        eyebrow="Counsellors"
+        eyebrow="Providers"
         lines={["Find someone", "who fits."]}
         lede="Every professional here has had their identity and qualifications checked before their profile went live. Filter by what matters to you — what you want to talk about, and the language you want to talk about it in."
         stamp="SUPPORT"
       />
 
       <Section tone="surface">
-        <CounsellorDirectory />
+        <ProviderDirectory />
       </Section>
 
       <CTABlock

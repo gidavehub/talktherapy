@@ -8,30 +8,30 @@ import { Avatar, Badge, EmptyState, Spinner, CheckItem } from "../ui/Feedback";
 import Button from "../ui/Button";
 import { IconPeople } from "../ui/icons";
 import { formatDalasi } from "../../lib/money";
-import { LOCALE_LABELS, type CounsellorProfile } from "../../lib/models";
+import { LOCALE_LABELS, type ProviderProfile } from "../../lib/models";
 import {
   SPECIALIZATION_LABELS,
-  getCounsellor,
+  getProvider,
   type Specialization,
-} from "../../lib/counsellors";
-import { FORMAT_LABELS, PROFESSION_LABELS } from "../../lib/matching";
+} from "../../lib/providers";
+import { FORMAT_LABELS, SERVICE_LABELS } from "../../lib/matching";
 
 /**
- * Public counsellor profile.
+ * Public provider profile.
  *
- * Client-fetched because counsellor documents are read through the Firebase
+ * Client-fetched because provider documents are read through the Firebase
  * Web SDK, which only runs in the browser. A not-found and an
  * access-refused both land in the same "unavailable" state — deliberately,
- * since confirming that an unverified counsellor exists would leak something
+ * since confirming that an unverified provider exists would leak something
  * the rules are meant to hide.
  */
-export default function CounsellorProfileView({ counsellorId }: { counsellorId: string }) {
-  const [profile, setProfile] = useState<CounsellorProfile | null>(null);
+export default function ProviderProfileView({ providerId }: { providerId: string }) {
+  const [profile, setProfile] = useState<ProviderProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    getCounsellor(counsellorId)
+    getProvider(providerId)
       .then((next) => {
         if (cancelled) return;
         setProfile(next);
@@ -45,7 +45,7 @@ export default function CounsellorProfileView({ counsellorId }: { counsellorId: 
     return () => {
       cancelled = true;
     };
-  }, [counsellorId]);
+  }, [providerId]);
 
   if (loading) {
     return (
@@ -61,8 +61,8 @@ export default function CounsellorProfileView({ counsellorId }: { counsellorId: 
       <EmptyState
         icon={<IconPeople />}
         title="This profile is not available"
-        description="The counsellor may no longer be listed, or the link may be incorrect. You can browse everyone currently available in the directory."
-        action={<Button href="/therapists">Back to directory</Button>}
+        description="The provider may no longer be listed, or the link may be incorrect. You can browse everyone currently available in the directory."
+        action={<Button href="/providers">Back to directory</Button>}
       />
     );
   }
@@ -84,9 +84,9 @@ export default function CounsellorProfileView({ counsellorId }: { counsellorId: 
             <p className="mt-2 text-[14px] md:text-[15px] text-[var(--muted)] leading-relaxed">
               {profile.headline}
             </p>
-            {profile.profession || profile.location ? (
+            {profile.services.length || profile.location ? (
               <p className="mt-1 text-[13px] text-[var(--foreground)]">
-                {[profile.profession ? PROFESSION_LABELS[profile.profession] : null, profile.location]
+                {[profile.services.map((s) => SERVICE_LABELS[s]).join(", ") || null, profile.location]
                   .filter(Boolean)
                   .join(" · ")}
               </p>
@@ -94,7 +94,7 @@ export default function CounsellorProfileView({ counsellorId }: { counsellorId: 
             <div className="mt-4 flex flex-wrap gap-2">
               {/* A sample is never presented as a verified professional. */}
               {profile.sample ? (
-                <Badge tone="warning">Sample profile — not a real counsellor</Badge>
+                <Badge tone="warning">Sample profile — not a real provider</Badge>
               ) : (
                 <Badge tone="positive">Credentials verified</Badge>
               )}

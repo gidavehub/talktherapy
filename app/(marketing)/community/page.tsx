@@ -86,7 +86,7 @@ export default function CommunityPage() {
               also free once you have an account.
             </p>
             <p>
-              If you want to talk to someone, the counsellor directory is
+              If you want to talk to someone, the provider directory is
               browsable without signing up, so you can see who is available and
               what they charge before committing to anything.
             </p>
@@ -102,7 +102,7 @@ export default function CommunityPage() {
       <CTABlock
         eyebrow="Today"
         lines={["Start with what", "is already here."]}
-        body="Free resources, private wellbeing tools, and verified counsellors."
+        body="Free resources, private wellbeing tools, and verified providers."
         primary={{ label: "Browse resources", href: "/resources" }}
         secondary={{ label: "Tell me when it launches", href: "/support" }}
       />

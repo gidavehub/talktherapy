@@ -16,7 +16,7 @@ import { useAuth } from "./AuthProvider";
 
 const PRIMARY_LINKS = [
   { href: "/how-it-works", label: "How It Works" },
-  { href: "/therapists", label: "Counsellors" },
+  { href: "/providers", label: "Providers" },
   { href: "/resources", label: "Resources" },
   { href: "/plans", label: "Plans" },
 ];
@@ -25,7 +25,7 @@ const SECONDARY_LINKS = [
   { href: "/about", label: "About" },
   { href: "/technology", label: "Technology" },
   { href: "/safety", label: "Safety & Ethics" },
-  { href: "/for-counsellors", label: "For Counsellors" },
+  { href: "/for-providers", label: "For Providers" },
   { href: "/for-institutions", label: "For Institutions" },
   { href: "/support", label: "Support" },
 ];

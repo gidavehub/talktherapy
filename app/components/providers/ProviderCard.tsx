@@ -5,24 +5,24 @@ import { motion } from "motion/react";
 import { SPRING_SOFT } from "../motion/primitives";
 import { Avatar, Badge } from "../ui/Feedback";
 import { formatDalasi } from "../../lib/money";
-import { LOCALE_LABELS, type CounsellorProfile } from "../../lib/models";
-import { PROFESSION_LABELS, SPECIALIZATION_LABELS, type Specialization } from "../../lib/matching";
+import { LOCALE_LABELS, type ProviderProfile } from "../../lib/models";
+import { SERVICE_LABELS, SPECIALIZATION_LABELS, type Specialization } from "../../lib/matching";
 
 /**
- * One counsellor, as a card. Shared by the public directory, the "for you"
- * list and the dashboard, so a counsellor looks the same everywhere.
+ * One provider, as a card. Shared by the public directory, the "for you"
+ * list and the dashboard, so a provider looks the same everywhere.
  *
  * With `reasons`, the card leads with why this person was suggested — "Speaks
  * Wolof · Grief & loss · Video" says more to someone choosing than a bio does.
  */
-export default function CounsellorCard({
+export default function ProviderCard({
   profile,
   index = 0,
   reasons,
   best = false,
   compact = false,
 }: {
-  profile: CounsellorProfile;
+  profile: ProviderProfile;
   index?: number;
   reasons?: string[];
   /** The top suggestion. */
@@ -30,7 +30,9 @@ export default function CounsellorCard({
   /** Dashboard size: drops the fee/language footer. */
   compact?: boolean;
 }) {
-  const kind = [profile.profession ? PROFESSION_LABELS[profile.profession] : null, profile.location]
+  // What they offer, then where they are — the two things someone scanning a
+  // list actually chooses on.
+  const kind = [profile.services.map((s) => SERVICE_LABELS[s]).join(", ") || null, profile.location]
     .filter(Boolean)
     .join(" · ");
 
@@ -43,7 +45,7 @@ export default function CounsellorCard({
       className="relative rounded-[28px] bg-white shadow-[0_18px_40px_-22px_rgba(0,0,0,0.25)] p-6 flex flex-col"
     >
       <Link
-        href={`/therapists/${profile.uid}`}
+        href={`/providers/${profile.uid}`}
         className="absolute inset-0 rounded-[28px]"
         aria-label={`${profile.displayName} — view profile`}
       />

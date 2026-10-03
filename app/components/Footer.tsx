@@ -6,7 +6,7 @@ import { useRef } from "react";
 import { SPRING_SOFT, SPRING_SNAP } from "./motion/primitives";
 
 const navLinks = [
-  { href: "/therapists", label: "Therapists" },
+  { href: "/providers", label: "Providers" },
   { href: "/technology", label: "Technology" },
   { href: "/how-it-works", label: "How It Works" },
   { href: "/plans", label: "Plans" },

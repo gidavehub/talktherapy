@@ -48,8 +48,8 @@ export default function ResourcesPage() {
       <CTABlock
         eyebrow="Beyond reading"
         lines={["Some things need", "a conversation."]}
-        body="When an article is not enough, you can book a session with a verified counsellor."
-        primary={{ label: "Find a counsellor", href: "/therapists" }}
+        body="When an article is not enough, you can book a session with a verified provider."
+        primary={{ label: "Find a provider", href: "/providers" }}
         secondary={{ label: "See pricing", href: "/plans" }}
       />
     </>

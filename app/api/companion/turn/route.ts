@@ -11,7 +11,7 @@ import { speakingResponse } from "../stream";
  *
  * In intake mode Talk is doing the onboarding: the request carries what she
  * has learned so far, and the response carries the merged result and whether
- * she now has everything she needs to suggest counsellors.
+ * she now has everything she needs to suggest providers.
  */
 
 export const maxDuration = 60;

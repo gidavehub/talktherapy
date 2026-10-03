@@ -77,7 +77,7 @@ export default function ProfileSettingsPage() {
             value={displayName}
             onChange={(e) => setNameDraft(e.target.value)}
             maxLength={80}
-            hint="Shown to a counsellor when you book a session."
+            hint="Shown to a provider when you book a session."
           />
 
           <Select
@@ -85,7 +85,7 @@ export default function ProfileSettingsPage() {
             value={locale}
             onChange={(e) => setLocaleDraft(e.target.value as Locale)}
             options={LOCALE_OPTIONS}
-            hint="Used to suggest counsellors who work in your language."
+            hint="Used to suggest providers who work in your language."
           />
         </div>
 
@@ -127,7 +127,7 @@ export default function ProfileSettingsPage() {
                 : "—"}
             </dd>
           </div>
-          {profile?.role === "counsellor" ? (
+          {profile?.role === "provider" ? (
             <div className="flex items-center justify-between gap-4">
               <dt className="text-[var(--muted)]">Verification</dt>
               <dd>

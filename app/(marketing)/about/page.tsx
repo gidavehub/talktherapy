@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 const OBJECTIVES = [
   "Improve access to mental wellbeing and psychosocial support.",
   "Provide a safe digital space for emotional reflection and early support.",
-  "Connect people with qualified counsellors and psychosocial professionals.",
+  "Connect people with qualified providers and psychosocial professionals.",
   "Reduce the barriers and stigma around seeking support.",
   "Make credible wellbeing information freely available.",
   "Use AI responsibly, to complement rather than replace human expertise.",

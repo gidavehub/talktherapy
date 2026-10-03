@@ -66,15 +66,16 @@ const SCRIPT = [
   },
   {
     say: "Dama bëgg kenn ku ma mëna waxtaan ak moom.",
-    expect: (i) => i.supportType && i.supportType !== "unsure",
-    what: "support type captured",
+    expect: (i) => i.servicesWanted?.length > 0,
+    what: "service captured",
     wolofReply: true,
   },
-  { say: "Jigéen moo gën ci man.", expect: (i) => i.counsellorGender === "woman", what: "prefers a woman", wolofReply: true },
   {
-    say: "Video moo baax.",
-    expect: (i, t) => i.format === "video" && t.intakeComplete === true,
-    what: "format video, and intake complete",
+    // The last thing she needs — sessions are video only, so there is no
+    // format question any more and the intake finishes here.
+    say: "Jigéen moo gën ci man.",
+    expect: (i, t) => i.providerGender === "woman" && t.intakeComplete === true,
+    what: "prefers a woman, and the intake completes",
     wolofReply: true,
   },
 ];

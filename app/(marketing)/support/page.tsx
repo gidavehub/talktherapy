@@ -10,7 +10,7 @@ import { Alert, Spinner } from "@/components/ui/Feedback";
 export const metadata: Metadata = {
   title: "Support",
   description:
-    "Get in touch with the Talk team — questions about your account, bookings, joining as a counsellor, or institutional packages.",
+    "Get in touch with the Talk team — questions about your account, bookings, joining as a provider, or institutional packages.",
 };
 
 const FAQS = [
@@ -19,8 +19,8 @@ const FAQS = [
     a: "We aim to reply within two working days. This inbox is not monitored around the clock, so please do not use it for anything urgent.",
   },
   {
-    q: "I want to report a counsellor or a session.",
-    a: "Choose 'Reporting a concern' above and tell us what happened. Reports are reviewed by an administrator, and a counsellor can be suspended from the directory while we investigate.",
+    q: "I want to report a provider or a session.",
+    a: "Choose 'Reporting a concern' above and tell us what happened. Reports are reviewed by an administrator, and a provider can be suspended from the directory while we investigate.",
   },
   {
     q: "I need to delete my account and my data.",
@@ -28,7 +28,7 @@ const FAQS = [
   },
   {
     q: "Can I get support in Wolof?",
-    a: "Yes. Write to us in Wolof and we will reply in Wolof. You can also filter the counsellor directory by language to find professionals who work in Wolof, Mandinka or Pulaar.",
+    a: "Yes. Write to us in Wolof and we will reply in Wolof. You can also filter the provider directory by language to find professionals who work in Wolof, Mandinka or Pulaar.",
   },
 ];
 
@@ -38,7 +38,7 @@ export default function SupportPage() {
       <PageIntro
         eyebrow="Support"
         lines={["Ask us anything."]}
-        lede="Questions about your account, a booking, joining as a counsellor, or bringing Talk to your organisation — this reaches a person."
+        lede="Questions about your account, a booking, joining as a provider, or bringing Talk to your organisation — this reaches a person."
         stamp="HELP"
       />
 
@@ -87,8 +87,8 @@ export default function SupportPage() {
                   </Link>
                 </li>
                 <li>
-                  <Link href="/for-counsellors" className="underline underline-offset-4 hover:text-[var(--accent)] transition-colors">
-                    Joining as a counsellor
+                  <Link href="/for-providers" className="underline underline-offset-4 hover:text-[var(--accent)] transition-colors">
+                    Joining as a provider
                   </Link>
                 </li>
                 <li>

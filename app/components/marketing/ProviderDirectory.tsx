@@ -1,25 +1,25 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import CounsellorCard from "../counsellors/CounsellorCard";
+import ProviderCard from "../providers/ProviderCard";
 import { EmptyState, Pill, Spinner } from "../ui/Feedback";
 import Button from "../ui/Button";
 import { IconPeople } from "../ui/icons";
-import { LOCALE_LABELS, type CounsellorProfile, type Locale } from "../../lib/models";
+import { LOCALE_LABELS, type ProviderProfile, type Locale } from "../../lib/models";
 import {
   EMPTY_FILTERS,
   SPECIALIZATIONS,
   SPECIALIZATION_LABELS,
-  filterCounsellors,
-  listVerifiedCounsellors,
+  filterProviders,
+  listVerifiedProviders,
   type DirectoryFilters,
   type Specialization,
-} from "../../lib/counsellors";
+} from "../../lib/providers";
 
 /**
- * Public counsellor directory.
+ * Public provider directory.
  *
- * Fetches once and filters in memory — see the note in `lib/counsellors.ts`.
+ * Fetches once and filters in memory — see the note in `lib/providers.ts`.
  * Browsable signed-out on purpose: making someone create an account before
  * they can see whether anyone here speaks Wolof is exactly the kind of friction
  * the platform exists to remove.
@@ -27,14 +27,14 @@ import {
 
 const LANGUAGES: Locale[] = ["en", "wo", "mnk", "ff"];
 
-export default function CounsellorDirectory() {
-  const [profiles, setProfiles] = useState<CounsellorProfile[] | null>(null);
+export default function ProviderDirectory() {
+  const [profiles, setProfiles] = useState<ProviderProfile[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<DirectoryFilters>(EMPTY_FILTERS);
 
   useEffect(() => {
     let cancelled = false;
-    listVerifiedCounsellors()
+    listVerifiedProviders()
       .then((next) => {
         if (!cancelled) setProfiles(next);
       })
@@ -49,7 +49,7 @@ export default function CounsellorDirectory() {
   }, []);
 
   const visible = useMemo(
-    () => (profiles ? filterCounsellors(profiles, filters) : []),
+    () => (profiles ? filterProviders(profiles, filters) : []),
     [profiles, filters],
   );
 
@@ -85,7 +85,7 @@ export default function CounsellorDirectory() {
           value={filters.search}
           onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
           placeholder="Search by name, specialisation or approach"
-          aria-label="Search counsellors"
+          aria-label="Search providers"
           className="w-full h-12 rounded-2xl bg-white border border-[var(--border)] px-5 text-[14px] outline-none focus:border-[var(--accent)] transition-colors"
         />
 
@@ -139,7 +139,7 @@ export default function CounsellorDirectory() {
         {profiles === null ? (
           <div className="flex items-center gap-3 text-[var(--muted)] py-16 justify-center">
             <Spinner />
-            <span className="text-[13px]">Loading counsellors…</span>
+            <span className="text-[13px]">Loading providers…</span>
           </div>
         ) : error ? (
           <EmptyState
@@ -151,7 +151,7 @@ export default function CounsellorDirectory() {
         ) : visible.length === 0 && hasFilters ? (
           <EmptyState
             icon={<IconPeople />}
-            title="No counsellors match those filters"
+            title="No providers match those filters"
             description="Try widening your search — removing a language or specialisation usually helps."
             action={
               <Button variant="secondary" onClick={() => setFilters(EMPTY_FILTERS)} withArrow={false}>
@@ -164,13 +164,13 @@ export default function CounsellorDirectory() {
           // which would be the one thing guaranteed to destroy trust here.
           <EmptyState
             icon={<IconPeople />}
-            title="Our counsellor network is being verified"
-            description="We are onboarding qualified counsellors and psychosocial support professionals now. Every one of them is credential-checked before they appear here — which takes a little longer, and is the point. In the meantime, the wellbeing resource centre is free and open."
+            title="Our provider network is being verified"
+            description="We are onboarding qualified providers and psychosocial support professionals now. Every one of them is credential-checked before they appear here — which takes a little longer, and is the point. In the meantime, the wellbeing resource centre is free and open."
             action={
               <div className="flex flex-col sm:flex-row gap-3">
                 <Button href="/resources">Browse resources</Button>
-                <Button href="/for-counsellors" variant="secondary" withArrow={false}>
-                  I am a counsellor
+                <Button href="/for-providers" variant="secondary" withArrow={false}>
+                  I am a provider
                 </Button>
               </div>
             }
@@ -178,11 +178,11 @@ export default function CounsellorDirectory() {
         ) : (
           <>
             <p className="text-[12px] uppercase tracking-[0.18em] text-[var(--muted)] mb-6">
-              {visible.length} {visible.length === 1 ? "counsellor" : "counsellors"}
+              {visible.length} {visible.length === 1 ? "provider" : "providers"}
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
               {visible.map((profile, i) => (
-                <CounsellorCard key={profile.uid} profile={profile} index={i} />
+                <ProviderCard key={profile.uid} profile={profile} index={i} />
               ))}
             </div>
           </>

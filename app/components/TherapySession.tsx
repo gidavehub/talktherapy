@@ -12,11 +12,11 @@ const features = [
   },
   {
     title: "Matched in minutes",
-    body: "Fifteen-minute intake. A short-list of therapists tuned to you.",
+    body: "An eight-minute conversation. A short-list of providers tuned to you.",
   },
   {
     title: "Always private",
-    body: "Anonymous sign-up. End-to-end encrypted chat with your therapist.",
+    body: "Private by default. Your journal and mood are yours alone — no provider sees them unless you share.",
   },
 ];
 

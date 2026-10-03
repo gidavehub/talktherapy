@@ -17,15 +17,15 @@ const SECTIONS = [
     heading: "What we collect, and why",
     body: [
       "We collect only what we need to run the service. That means your account details (name, email, and a profile photo if you add one), anything you choose to record in the platform (mood check-ins, journal entries, messages to the AI companion), booking and payment records, and basic technical information such as the device and browser you use.",
-      "We use this to provide the service, to connect you with counsellors, to process payments, and to keep the platform safe. We do not use it for anything else.",
-      "We do not sell your information. We do not share it with advertisers. Sensitive details you share with the AI companion or with a counsellor are never repurposed for marketing.",
+      "We use this to provide the service, to connect you with providers, to process payments, and to keep the platform safe. We do not use it for anything else.",
+      "We do not sell your information. We do not share it with advertisers. Sensitive details you share with the AI companion or with a provider are never repurposed for marketing.",
     ],
   },
   {
     heading: "Who can see what",
     body: [
-      "Your journal entries and mood check-ins are visible only to you. Counsellors cannot read them. Administrators cannot read them. They are stored under your account and the access rules enforce that at the database level, not merely in the interface.",
-      "A counsellor sees what you share during a session, plus any note you attach to a booking. Clinical notes a counsellor writes about a session are visible to that counsellor only.",
+      "Your journal entries and mood check-ins are visible only to you. Providers cannot read them. Administrators cannot read them. They are stored under your account and the access rules enforce that at the database level, not merely in the interface.",
+      "A provider sees what you share during a session, plus any note you attach to a booking. Clinical notes a provider writes about a session are visible to that provider only.",
       "Where your account is part of an institutional package, your organisation never sees who booked a session, when, or with whom. Reporting to organisations is aggregate and is suppressed entirely for small groups so that individuals cannot be identified.",
     ],
   },
