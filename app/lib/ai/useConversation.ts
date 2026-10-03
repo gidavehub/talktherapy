@@ -10,6 +10,7 @@ import { EMPTY_INTAKE, type Intake } from "../matching";
 import {
   FOLD_TURNS,
   MAX_HISTORY_TURNS,
+  type Choice,
   type ConversationMode,
   type HistoryTurn,
   type Language,
@@ -94,6 +95,10 @@ export function useConversation({
   // intake from the profile stands in — derived, not copied, so a profile
   // that loads after mount needs no effect to sync it.
   const [sessionIntake, setIntake] = useState<Intake | null>(null);
+  /** Options for the question Talk just asked, shown as buttons. */
+  const [choices, setChoices] = useState<Choice[]>([]);
+  const [awaitingLanguage, setAwaitingLanguage] = useState(false);
+  const awaitingLanguageRef = useRef(false);
   const intake = sessionIntake ?? initialIntake ?? EMPTY_INTAKE;
   const language = heardLanguage ?? intake.language;
 
@@ -107,6 +112,15 @@ export function useConversation({
   const foldingRef = useRef(false);
   const intakeRef = useRef<Intake>(initialIntake ?? EMPTY_INTAKE);
   const doneRef = useRef(false);
+  /** When this conversation began — the intake has eight minutes. */
+  const startedAtRef = useRef(0);
+  /**
+   * How fast this person speaks, averaged over their turns. Each utterance
+   * gives a duration and the transcript gives the words, so their pace is
+   * free; Talk is then spoken back at it.
+   */
+  const paceRef = useRef<number | null>(null);
+  const lastUtteranceSec = useRef(0);
   const rafRef = useRef(0);
   const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Latest callbacks and settings, read at call time so the session never
@@ -244,6 +258,19 @@ export function useConversation({
               setLanguage(lang);
             }
             if (ev.intakeComplete) doneRef.current = true;
+            setChoices(ev.choices ?? []);
+            setAwaitingLanguage(Boolean(ev.awaitingLanguage));
+            awaitingLanguageRef.current = Boolean(ev.awaitingLanguage);
+            if (ev.speechRate && player) player.setRate(ev.speechRate);
+
+            // Their pace: the words they just said against how long it took.
+            if (ev.transcript && lastUtteranceSec.current > 0.8) {
+              const words = ev.transcript.trim().split(/[ ]+/).length;
+              const wpm = (words / lastUtteranceSec.current) * 60;
+              if (wpm > 40 && wpm < 320) {
+                paceRef.current = paceRef.current ? paceRef.current * 0.6 + wpm * 0.4 : wpm;
+              }
+            }
 
             if (ev.transcript) {
               historyRef.current.push({ role: "user", text: ev.transcript, english: ev.english, language: lang });
@@ -313,6 +340,8 @@ export function useConversation({
       summary: summaryRef.current,
       mode: opts.current.mode,
       intake: opts.current.mode === "intake" ? intakeRef.current : undefined,
+      elapsedSec: startedAtRef.current ? Math.round((Date.now() - startedAtRef.current) / 1000) : 0,
+      paceWpm: paceRef.current ?? undefined,
     }),
     [],
   );
@@ -336,6 +365,7 @@ export function useConversation({
     if (activeRef.current) return;
     activeRef.current = true;
     doneRef.current = false;
+    startedAtRef.current = Date.now();
     // Resume from whatever is known: the saved intake, or this session's.
     intakeRef.current = opts.current.intake;
     setError(null);
@@ -363,7 +393,10 @@ export function useConversation({
           onSpeechStart: () => {
             if (phaseRef.current === "listening") go("hearing");
           },
-          onUtterance: (audio) => void speakRequest("/api/companion/turn", turnBody({ audio })),
+          onUtterance: (audio, seconds) => {
+            lastUtteranceSec.current = seconds;
+            void speakRequest("/api/companion/turn", turnBody({ audio }));
+          },
         });
       } catch (e) {
         console.error("[useConversation] capture", e);
@@ -403,6 +436,40 @@ export function useConversation({
       void speakRequest("/api/companion/turn", turnBody({ text: clean }));
     },
     [speakRequest, turnBody],
+  );
+
+  /**
+   * A tapped answer. Everything is also answerable out loud — this is for a
+   * noisy room, a quiet one, and for anyone who finds a button easier than a
+   * sentence.
+   *
+   * The language is the exception: it is not sent to the model to interpret.
+   * Tapping it settles the language outright and Talk opens again in it,
+   * which is what stops a misheard first sentence deciding the conversation.
+   */
+  const choose = useCallback(
+    (choice: Choice) => {
+      if (!activeRef.current) return;
+      setChoices([]);
+      if (awaitingLanguageRef.current) {
+        const language = choice.id as Language;
+        const next = { ...intakeRef.current, language };
+        intakeRef.current = next;
+        setIntake(next);
+        setLanguage(language);
+        setAwaitingLanguage(false);
+        awaitingLanguageRef.current = false;
+        opts.current.onIntake?.(next);
+        void speakRequest("/api/companion/greet", {
+          mode: "intake",
+          intake: next,
+          displayName: opts.current.displayName,
+        });
+        return;
+      }
+      sendText(choice.label);
+    },
+    [sendText, speakRequest],
   );
 
   /**
@@ -454,6 +521,9 @@ export function useConversation({
     mic,
     active: phase !== "idle",
     textOnly,
+    choices,
+    awaitingLanguage,
+    choose,
     start,
     stop,
     interrupt,

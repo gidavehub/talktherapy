@@ -1,8 +1,14 @@
 import "server-only";
 import { generate, models, streamGenerate, textOf, type Content } from "./vertex";
 import {
+  INTAKE_BUDGET_SEC,
   LANGUAGES,
+  LANGUAGE_CHOICES,
+  PACE_DEFAULT_WPM,
+  PACE_MAX_WPM,
+  PACE_MIN_WPM,
   RISK_LEVELS,
+  type Choice,
   type ConversationMode,
   type HeardLanguage,
   type HistoryTurn,
@@ -198,11 +204,11 @@ function historyContents(history: HistoryTurn[]): Content[] {
   return out;
 }
 
-function systemFor(summary: string, mode: ConversationMode, intake: Intake) {
+function systemFor(summary: string, mode: ConversationMode, intake: Intake, remainingSec?: number) {
   const memory = summary.trim()
     ? `\n\nEARLIER IN THIS CONVERSATION (your own summary — the recent turns follow as messages):\n${summary.trim()}`
     : "";
-  return SYSTEM + (mode === "intake" ? intakeSection(intake) : "") + memory;
+  return SYSTEM + (mode === "intake" ? intakeSection(intake, remainingSec) : "") + memory;
 }
 
 // ------------------------------------------------------------------- intake
@@ -236,8 +242,18 @@ function describeKnown(intake: Intake): string {
   return known.length ? known.join("; ") : "nothing yet";
 }
 
-function intakeSection(intake: Intake): string {
+function intakeSection(intake: Intake, remainingSec = INTAKE_BUDGET_SEC): string {
   const missing = missingFields(intake);
+  // The whole intake has to produce providers inside eight minutes. Telling
+  // her the time left is what keeps a warm conversation from becoming a long
+  // one; the server stops asking entirely when it runs out.
+  const minutes = Math.max(0, Math.round(remainingSec / 60));
+  const clock =
+    remainingSec <= 0
+      ? "\nTIME IS UP. Ask nothing more: thank them, and say you will show them some providers now."
+      : remainingSec <= 120
+        ? `\nABOUT ${minutes} MINUTE(S) LEFT. Keep it brief and move to the next thing still to learn; do not open new topics.`
+        : "";
   const todo = missing.length
     ? missing.map((f, i) => `${i + 1}. ${FIELD_GUIDE[f]}`).join("\n")
     : "(nothing — close the conversation now)";
@@ -258,6 +274,7 @@ This person has just joined. Before they meet a provider you are getting to know
 Their language: ${language}
 If they ask to change language, or clearly speak a different one of the four, offer the change in one short sentence and set intake.language to the new one when they agree. Never switch on your own, and never answer in a language they did not choose.
 
+${clock}
 Already known: ${describeKnown(intake)}
 Still to learn, in this order — ask only about the FIRST one:
 ${todo}
@@ -336,7 +353,51 @@ export type TurnInput = {
   mode: ConversationMode;
   /** Intake mode: what is already known. */
   intake: Intake;
+  /** Seconds since the conversation began. */
+  elapsedSec?: number;
+  /** The person's own speaking pace, words per minute. */
+  paceWpm?: number;
 };
+
+/**
+ * How fast Talk speaks back.
+ *
+ * Measured from the person: a slow speaker gets a slow reply. Two levers,
+ * because neither alone is enough — a style word the TTS model can act on,
+ * and a playback trim small enough that the pitch shift is inaudible.
+ */
+export function paceStyle(wpm: number | undefined): string {
+  if (!wpm) return "at a natural, unhurried pace";
+  if (wpm < 115) return "slowly and gently, leaving space between sentences";
+  if (wpm > 170) return "at an easy but brisker pace";
+  return "at a natural, unhurried pace";
+}
+
+export function speechRate(wpm: number | undefined): number {
+  if (!wpm) return 1;
+  const bounded = Math.min(PACE_MAX_WPM, Math.max(PACE_MIN_WPM, wpm));
+  // Never more than ~12% either way: beyond that the voice sounds wrong.
+  return Math.min(1.12, Math.max(0.9, bounded / PACE_DEFAULT_WPM));
+}
+
+/** Only the options for the question actually being asked survive. */
+function cleanChoices(raw: unknown, intake: Intake): Choice[] {
+  if (!Array.isArray(raw)) return [];
+  const next = missingFields(intake)[0];
+  const allowed: readonly string[] =
+    next === "servicesWanted" ? SERVICES : next === "providerGender" ? GENDER_PREFS : [];
+  if (!allowed.length) return [];
+  const out: Choice[] = [];
+  for (const c of raw) {
+    if (!c || typeof c !== "object") continue;
+    const { id, label } = c as Record<string, unknown>;
+    if (typeof id !== "string" || typeof label !== "string") continue;
+    if (!allowed.includes(id) || !label.trim()) continue;
+    if (out.some((o) => o.id === id)) continue;
+    out.push({ id, label: label.trim().slice(0, 60) });
+  }
+  return out.slice(0, 6);
+}
 
 export async function runTurn(input: TurnInput, signal?: AbortSignal): Promise<TurnResult> {
   const intakeMode = input.mode === "intake";
@@ -347,7 +408,18 @@ export async function runTurn(input: TurnInput, signal?: AbortSignal): Promise<T
   const res = await generate(
     models.text,
     {
-      systemInstruction: { parts: [{ text: systemFor(input.summary, input.mode, input.intake) }] },
+      systemInstruction: {
+        parts: [
+          {
+            text: systemFor(
+              input.summary,
+              input.mode,
+              input.intake,
+              input.elapsedSec == null ? undefined : INTAKE_BUDGET_SEC - input.elapsedSec,
+            ),
+          },
+        ],
+      },
       contents: [...historyContents(input.history), { role: "user", parts: [message] }],
       generationConfig: {
         // Low enough that the transcript stays verbatim, high enough that
@@ -415,9 +487,18 @@ export async function runTurn(input: TurnInput, signal?: AbortSignal): Promise<T
   // Completion is decided from the merged facts, not the model's flag: a
   // model that says "done" with a gap would strand someone unmatched, and one
   // that forgets to say "done" would keep asking after it has everything.
-  const intakeComplete = missingFields(intake).length === 0;
+  // Out of time counts as finished: better a shortlist built on what she has
+  // than a conversation that never reaches anyone.
+  const outOfTime = (input.elapsedSec ?? 0) >= INTAKE_BUDGET_SEC;
+  const intakeComplete = missingFields(intake).length === 0 || outOfTime;
   if (intakeComplete && !intake.completedAt) intake.completedAt = Date.now();
-  return { ...result, intake, intakeComplete };
+  return {
+    ...result,
+    intake,
+    intakeComplete,
+    choices: intakeComplete ? [] : cleanChoices(parsed.choices, intake),
+    speechRate: speechRate(input.paceWpm),
+  };
 }
 
 // ----------------------------------------------------------------- greeting
@@ -438,10 +519,41 @@ function firstName(displayName: string | null | undefined): string | null {
 // Short on purpose: the first draft ran 23 seconds, which is a speech, not a
 // welcome. Who she is, what happens next, that any language works — then the
 // first question.
-const OPENING = (name: string | null) =>
-  "Salaam aleekum. I'm Talk, an AI companion — let's find you the right provider. " +
-  "Speak English, Wolof, Mandinka or Pulaar. " +
-  (name ? `Shall I call you ${name}?` : "What should I call you?");
+// Spoken before anything else, with the four names as buttons beside it. The
+// language names are proper nouns, so they are recognisable to someone who
+// does not speak the sentence around them.
+const LANGUAGE_PROMPT =
+  "Salaam aleekum, and welcome to Talk. Which language would you like to speak — English, Wolof, Mandinka, or Pulaar?";
+
+/** One short line, written by the model in a given language. */
+async function sayInLanguage(
+  language: Language,
+  instruction: string,
+  signal?: AbortSignal,
+): Promise<{ reply: string; replyEnglish: string }> {
+  const res = await generate(
+    models.text,
+    {
+      systemInstruction: { parts: [{ text: SYSTEM }] },
+      contents: [{ role: "user", parts: [{ text: `[Write this in ${language}, and only this: ${instruction}]` }] }],
+      generationConfig: {
+        temperature: 0.6,
+        maxOutputTokens: 2048,
+        responseMimeType: "application/json",
+        responseSchema: GREETING_SCHEMA,
+        thinkingConfig: { thinkingLevel: "low" },
+      },
+      safetySettings: SAFETY_SETTINGS,
+    },
+    signal,
+  );
+  let parsed: Record<string, unknown> = {};
+  try {
+    parsed = JSON.parse(textOf(res));
+  } catch {}
+  const reply = str(parsed.reply);
+  return { reply, replyEnglish: str(parsed.replyEnglish) || reply };
+}
 
 const GREETING_SCHEMA = {
   type: "OBJECT",
@@ -458,9 +570,35 @@ export async function runGreeting(
   const language: Language = intake.language ?? "english";
   const started = intake.preferredName || intake.concerns.length || intake.servicesWanted.length;
 
+  // Nothing is asked before the language is settled. Guessing it from the
+  // first utterance is what sent Fula and Mandinka speakers into a Wolof
+  // conversation they could not get out of.
+  if (input.mode === "intake" && !intake.language) {
+    return {
+      transcript: "",
+      language: "english",
+      english: "",
+      risk: "none",
+      reply: LANGUAGE_PROMPT,
+      replyEnglish: LANGUAGE_PROMPT,
+      greeting: true,
+      awaitingLanguage: true,
+      choices: LANGUAGE_CHOICES,
+      intake,
+    };
+  }
+
   if (input.mode === "intake" && !started) {
-    const reply = OPENING(firstName(input.displayName));
-    return { transcript: "", language: "english", english: "", risk: "none", reply, replyEnglish: reply, greeting: true, intake };
+    // The language is settled, so the opening is spoken in it — the first
+    // thing they hear is their own language, not English.
+    const opening = await sayInLanguage(
+      language,
+      `Greet them warmly, say you are Talk, an AI companion who will help find them the right provider, and ask ${
+        name ? `whether you may call them ${name}` : "what they would like to be called"
+      }. Two short sentences at most.`,
+      signal,
+    );
+    return { transcript: "", language, english: "", risk: "none", ...opening, greeting: true, intake };
   }
 
   const ask =
@@ -503,10 +641,20 @@ export async function runGreeting(
 
 // -------------------------------------------------------------------- voice
 
-function voiceName() {
-  // Chosen from the audition in scripts/probe-models.mjs; the user has the
-  // final say, so it is configuration rather than code.
-  return process.env.TALK_VOICE || "Vindemiatrix";
+const VOICE_ENV: Record<Language, string> = {
+  english: "TALK_VOICE_EN",
+  wolof: "TALK_VOICE_WO",
+  mandinka: "TALK_VOICE_MNK",
+  pulaar: "TALK_VOICE_FF",
+  other: "TALK_VOICE",
+};
+
+function voiceName(language: Language) {
+  // One voice served all four languages at first. A per-language override
+  // exists because the same prebuilt voice does not pronounce Pulaar and
+  // English equally well; unset, they all fall back to the audition winner
+  // from scripts/probe-models.mjs.
+  return process.env[VOICE_ENV[language]] || process.env.TALK_VOICE || "Vindemiatrix";
 }
 
 /**
@@ -518,12 +666,13 @@ export async function* speak(
   text: string,
   language: Language,
   signal?: AbortSignal,
+  paceWpm?: number,
 ): AsyncGenerator<{ pcm: Buffer; sampleRate: number }> {
   const body = {
-    contents: [{ role: "user", parts: [{ text: `${voiceStyle(language)}:\n\n${text}` }] }],
+    contents: [{ role: "user", parts: [{ text: `${voiceStyle(language)}, ${paceStyle(paceWpm)}:\n\n${text}` }] }],
     generationConfig: {
       responseModalities: ["AUDIO"],
-      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName() } } },
+      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName(language) } } },
     },
   };
 

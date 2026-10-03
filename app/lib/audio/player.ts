@@ -27,6 +27,12 @@ export class StreamPlayer {
   private ended = false;
   private started = false;
   private onDone: (() => void) | null = null;
+  /**
+   * Playback speed, so Talk answers at the pace the person speaks. Kept small
+   * (the server clamps to 0.9–1.12) because a bigger shift moves her pitch
+   * and she stops sounding like herself.
+   */
+  private rate = 1;
 
   constructor(private readonly ctx: AudioContext) {
     this.out = ctx.createGain();
@@ -45,6 +51,11 @@ export class StreamPlayer {
 
   get playing() {
     return this.started && (this.sources.size > 0 || !this.ended);
+  }
+
+  /** Set the speed for the next utterance. */
+  setRate(rate: number) {
+    this.rate = Math.min(1.25, Math.max(0.75, rate || 1));
   }
 
   /** Begin a new utterance. `onDone` fires once it has finished playing. */
@@ -74,6 +85,7 @@ export class StreamPlayer {
 
     const src = this.ctx.createBufferSource();
     src.buffer = buffer;
+    src.playbackRate.value = this.rate;
     src.connect(this.out);
 
     const now = this.ctx.currentTime;
@@ -81,7 +93,9 @@ export class StreamPlayer {
     // restart the schedule a little ahead of now rather than in the past.
     if (!this.started || this.nextTime < now) this.nextTime = now + LEAD;
     src.start(this.nextTime);
-    this.nextTime += buffer.duration;
+    // Playing faster means this chunk ends sooner — schedule the next one
+    // against the real duration, or the gapless join drifts.
+    this.nextTime += buffer.duration / this.rate;
     this.started = true;
 
     this.sources.add(src);

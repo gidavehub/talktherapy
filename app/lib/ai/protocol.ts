@@ -64,9 +64,39 @@ export type TurnRequest = {
   mode?: ConversationMode;
   /** Intake mode: everything learned so far (see lib/matching Intake). */
   intake?: unknown;
+  /** Seconds since the conversation began, for the 8-minute intake budget. */
+  elapsedSec?: number;
+  /** How fast this person speaks, in words per minute. */
+  paceWpm?: number;
 };
 
 export const MAX_TEXT_CHARS = 2000;
+
+/**
+ * One answer to a question with a fixed set of answers, written in the
+ * person's own language. Shown as a button and spoken aloud, so someone who
+ * cannot read well — or cannot hear the question — can still answer.
+ */
+export type Choice = { id: string; label: string };
+
+/** The four languages, offered before anything else is asked. */
+export const LANGUAGE_CHOICES: Choice[] = [
+  { id: "english", label: "English" },
+  { id: "wolof", label: "Wolof" },
+  { id: "mandinka", label: "Mandinka" },
+  { id: "pulaar", label: "Pulaar (Fula)" },
+];
+
+/**
+ * Talk matches the person's speaking pace. Measured from their own speech;
+ * these bounds stop a very slow or very fast speaker dragging her with them.
+ */
+export const PACE_DEFAULT_WPM = 150;
+export const PACE_MIN_WPM = 80;
+export const PACE_MAX_WPM = 200;
+
+/** The whole intake has to reach providers inside this. */
+export const INTAKE_BUDGET_SEC = 8 * 60;
 
 export type GreetRequest = {
   mode: ConversationMode;
@@ -96,6 +126,12 @@ export type TurnResult = {
   intake?: Intake;
   /** Intake mode: everything needed has been learned; the page moves on. */
   intakeComplete?: boolean;
+  /** Answers to the question just asked, as buttons. */
+  choices?: Choice[];
+  /** True while Talk is waiting for the language to be chosen. */
+  awaitingLanguage?: boolean;
+  /** Playback rate for her voice, so she speaks at the person's pace. */
+  speechRate?: number;
 };
 
 /**

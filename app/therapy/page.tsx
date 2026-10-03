@@ -261,6 +261,37 @@ export default function TherapyPage() {
           ) : null}
         </div>
 
+        {/* Answers as buttons, in the person's own language. Everything here
+            can also be said out loud — this is for a noisy room, a shared
+            one, and for anyone who finds reading a sentence harder than
+            recognising a word. The language question arrives this way too. */}
+        <AnimatePresence>
+          {talk.choices.length ? (
+            <motion.div
+              key={talk.choices.map((c) => c.id).join("|")}
+              initial={{ y: 10, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={SPRING_SOFT}
+              className="relative z-10 mt-2 flex flex-wrap items-center justify-center gap-2 max-w-[560px]"
+            >
+              {talk.choices.map((choice) => (
+                <motion.button
+                  key={choice.id}
+                  type="button"
+                  onClick={() => talk.choose(choice)}
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.97 }}
+                  transition={SPRING_SNAP}
+                  className="min-h-12 rounded-full border border-white/25 bg-white/5 px-6 py-3 text-[15px] text-white hover:bg-white/15 transition-colors"
+                >
+                  {choice.label}
+                </motion.button>
+              ))}
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+
         {talk.error ? (
           <div className="relative z-10 mt-4 max-w-[440px] text-center text-[13px] text-[var(--accent-soft)]">
             {talk.error.message}

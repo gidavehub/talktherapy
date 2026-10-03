@@ -21,6 +21,8 @@ export function speakingResponse(
   signal: AbortSignal,
   label: string,
   produce: () => Promise<TurnResult>,
+  /** The person's own speaking pace, so Talk answers at their speed. */
+  paceWpm?: number,
 ): Response {
   const encoder = new TextEncoder();
 
@@ -61,7 +63,7 @@ export function speakingResponse(
               pending = even < all.length ? [all.subarray(even)] : [];
               pendingBytes = all.length - even;
             };
-            for await (const chunk of speak(turn.reply, turn.language, signal)) {
+            for await (const chunk of speak(turn.reply, turn.language, signal, paceWpm)) {
               rate = chunk.sampleRate;
               pending.push(chunk.pcm);
               pendingBytes += chunk.pcm.length;

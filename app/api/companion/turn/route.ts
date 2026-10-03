@@ -40,6 +40,9 @@ export async function POST(req: Request) {
   if (!audio && !text) return json(400, { error: "Say or type something first." });
 
   const mode = body.mode === "intake" ? "intake" : "companion";
+  const num = (v: unknown, max: number) =>
+    typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.min(v, max) : undefined;
+  const paceWpm = num(body.paceWpm, 400);
   const input = {
     audio: audio || undefined,
     text: audio ? undefined : text,
@@ -47,7 +50,9 @@ export async function POST(req: Request) {
     summary: cleanSummary(body.summary),
     mode,
     intake: cleanIntake(body.intake, LANGUAGES),
+    elapsedSec: num(body.elapsedSec, 4 * 60 * 60),
+    paceWpm,
   } as const;
 
-  return speakingResponse(req.signal, "companion/turn", () => runTurn(input, req.signal));
+  return speakingResponse(req.signal, "companion/turn", () => runTurn(input, req.signal), paceWpm);
 }
