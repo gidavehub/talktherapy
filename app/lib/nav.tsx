@@ -8,6 +8,8 @@ import {
   IconResources,
   IconMic,
   IconChat,
+  IconCalendar,
+  IconClock,
 } from "../components/ui/icons";
 
 /**
@@ -32,8 +34,11 @@ export const PATIENT_NAV: NavItem[] = [
   // take a slot rather than extend the row.
   { href: "/chats", label: "Messages", icon: <IconChat />, primary: true },
   { href: "/therapy", label: "Talk", icon: <IconMic />, primary: true },
-  { href: "/settings/profile", label: "Settings", icon: <IconSettings />, primary: true },
+  // Took the fifth slot from Settings. A session you have booked is something
+  // you will check; settings is something you change once.
+  { href: "/sessions", label: "Sessions", icon: <IconCalendar />, primary: true },
   // Useful, but not what the MVP is for — reachable from the menu.
+  { href: "/settings/profile", label: "Settings", icon: <IconSettings /> },
   { href: "/mood", label: "Mood", icon: <IconMood /> },
   { href: "/journal", label: "Journal", icon: <IconJournal /> },
   { href: "/resources", label: "Resources", icon: <IconResources /> },
@@ -53,6 +58,8 @@ export const PATIENT_NAV: NavItem[] = [
  */
 export const PROVIDER_NAV: NavItem[] = [
   { href: "/chats", label: "Messages", icon: <IconChat />, primary: true },
+  { href: "/sessions", label: "Sessions", icon: <IconCalendar />, primary: true },
+  { href: "/pro/availability", label: "Hours", icon: <IconClock />, primary: true },
   { href: "/pro/profile", label: "Profile", icon: <IconPeople />, primary: true },
   { href: "/settings", label: "Settings", icon: <IconSettings />, primary: true },
 ];

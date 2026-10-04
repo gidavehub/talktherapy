@@ -73,6 +73,29 @@ const listing = {
   ratingCount: 0,
 };
 
+/** An hour a provider is offering. */
+const slot = {
+  providerId: PROVIDER,
+  startsAt: 1_790_000_000_000,
+  endsAt: 1_790_002_700_000,
+  status: "open",
+  bookingId: null,
+};
+
+/** A session, as the server writes it. */
+const booking = {
+  patientId: PATIENT,
+  providerId: PROVIDER,
+  participants: [PATIENT, PROVIDER],
+  slotId: "s1",
+  startsAt: slot.startsAt,
+  endsAt: slot.endsAt,
+  status: "pending",
+  paymentStatus: "unpaid",
+  amountMinor: 80000,
+  currency: "GMD",
+};
+
 /** A payment as the server records it before the shopper is redirected. */
 const payment = {
   paymentIntentId: "pi_1",
@@ -180,6 +203,33 @@ const CASES = [
     `${DOCS}/providerProfiles/${PROVIDER}`, listing],
   ["a provider reads their own listing before it is checked", "ALLOW", PROVIDER, "get",
     `${DOCS}/providerProfiles/${PROVIDER}`, listing],
+
+  // --- sessions ----------------------------------------------------------
+  // A booking and the slot it takes have to change together, and a patient
+  // cannot write a provider's slots — so bookings are made by the server and
+  // the client path is shut. These prove it is actually shut.
+  ["reading your own session", "ALLOW", PATIENT, "get", `${DOCS}/bookings/bk_1`, booking],
+  ["the provider reads the same session", "ALLOW", PROVIDER, "get", `${DOCS}/bookings/bk_1`, booking],
+  ["a stranger reads it", "DENY", STRANGER, "get", `${DOCS}/bookings/bk_1`, booking],
+  ["booking straight from the browser", "DENY", PATIENT, "create", `${DOCS}/bookings/bk_2`, null, booking],
+  ["marking your own session paid", "DENY", PATIENT, "update", `${DOCS}/bookings/bk_1`, booking,
+    { ...booking, paymentStatus: "paid" }],
+  ["cancelling from the browser", "DENY", PATIENT, "update", `${DOCS}/bookings/bk_1`, booking,
+    { ...booking, status: "cancelled" }],
+
+  // A provider owns their calendar; nobody else may touch it. A patient
+  // taking a slot goes through the server, which is why this stays shut even
+  // though booking needs the slot to change.
+  ["a provider offers an hour", "ALLOW", PROVIDER, "create",
+    `${DOCS}/availability/${PROVIDER}/slots/s1`, null, slot],
+  ["a provider withdraws an hour", "ALLOW", PROVIDER, "delete",
+    `${DOCS}/availability/${PROVIDER}/slots/s1`, slot],
+  ["a patient marks a slot taken", "DENY", PATIENT, "update",
+    `${DOCS}/availability/${PROVIDER}/slots/s1`, slot, { ...slot, status: "booked" }],
+  ["a patient blocks out somebody's calendar", "DENY", PATIENT, "create",
+    `${DOCS}/availability/${PROVIDER}/slots/s2`, null, slot],
+  ["a patient can see the free hours", "ALLOW", PATIENT, "get",
+    `${DOCS}/availability/${PROVIDER}/slots/s1`, slot],
 ];
 
 /**

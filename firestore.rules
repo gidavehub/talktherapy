@@ -173,23 +173,21 @@ service cloud.firestore {
 
       allow get, list: if isParticipant() || isAdmin();
 
-      // The patient creates the booking, and cannot mark it paid themselves —
-      // only the payment webhook (server-side, Admin SDK) may do that.
-      allow create: if isSignedIn()
-        && request.resource.data.patientId == request.auth.uid
-        && request.resource.data.participants.hasAll([
-             request.resource.data.patientId,
-             request.resource.data.providerId
-           ])
-        && request.resource.data.status == 'pending'
-        && request.resource.data.paymentStatus == 'unpaid';
-
-      // Either side may cancel or reschedule; neither may touch payment state,
-      // and neither may add a third party to the booking.
-      allow update: if (isParticipant()
-          && request.resource.data.paymentStatus == resource.data.paymentStatus
-          && request.resource.data.participants == resource.data.participants)
-        || isAdmin();
+      // NO CLIENT WRITES. Booking and cancelling both go through
+      // app/lib/server/bookings.ts, which runs with the Admin SDK and so is
+      // not subject to this rule.
+      //
+      // This used to allow a patient to create their own booking, and that
+      // could not be made safe. A booking and the slot it takes have to change
+      // together, and a patient cannot write a provider's slots — so a
+      // client-side booking left the slot looking free, and the second patient
+      // to choose that time found out when nobody joined the call. The server
+      // does both in one transaction, reading the slot's state inside it.
+      //
+      // The fee is the other half: it is read from the provider's profile
+      // there, never sent by the client, so nobody books a D3,000 session for
+      // a dalasi.
+      allow create, update: if isAdmin();
 
       allow delete: if isAdmin();
     }

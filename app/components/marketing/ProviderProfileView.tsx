@@ -7,7 +7,7 @@ import { motion } from "motion/react";
 import { SPRING_SNAP, SPRING_SOFT } from "../motion/primitives";
 import { Avatar, Badge, EmptyState, Spinner, CheckItem } from "../ui/Feedback";
 import Button from "../ui/Button";
-import { IconChat, IconPeople } from "../ui/icons";
+import { IconCalendar, IconChat, IconPeople } from "../ui/icons";
 import { useAuth } from "../AuthProvider";
 import { openChat } from "../../lib/chat";
 import { formatDalasi } from "../../lib/money";
@@ -224,12 +224,10 @@ export default function ProviderProfileView({ providerId }: { providerId: string
           </div>
         </dl>
 
-        {/* Booking and live sessions are the next build; until then this is
-            honest rather than a link to a page that does not exist.
-
-            Messaging, however, works now — so it is the live button and
-            booking is the dimmed one beside it. Someone who has just read a
-            profile and wants to reach this person can, today. */}
+        {/* Message first, book second. Somebody deciding whether to trust a
+            stranger with the worst week of their life usually wants to say
+            hello before they commit to an hour — and a provider who answers
+            warmly is the thing that makes the booking happen. */}
         <div className="mt-8 space-y-2.5">
           {canMessage ? (
             <motion.button
@@ -255,13 +253,15 @@ export default function ProviderProfileView({ providerId }: { providerId: string
             </motion.button>
           ) : null}
 
-          <button
-            type="button"
-            disabled
-            className="w-full h-12 rounded-full bg-[var(--accent)]/40 text-white text-[12px] uppercase tracking-[0.14em] font-medium cursor-not-allowed"
-          >
-            Booking opens soon
-          </button>
+          {canMessage ? (
+            <Link
+              href={`/book/${providerId}`}
+              className="w-full h-12 rounded-full border border-[var(--border)] text-[12px] uppercase tracking-[0.14em] font-medium flex items-center justify-center gap-2.5 hover:bg-black/[.03] transition-colors"
+            >
+              <IconCalendar size={15} />
+              Book a session
+            </Link>
+          ) : null}
 
           {messageError ? (
             <p className="text-[12px] text-[var(--accent)] leading-snug">{messageError}</p>
@@ -277,7 +277,8 @@ export default function ProviderProfileView({ providerId }: { providerId: string
               >
                 Sign in
               </Link>{" "}
-              to message {profile.displayName.split(" ")[0] || "this provider"}.
+              to message {profile.displayName.split(" ")[0] || "this provider"} or
+              book a session.
             </p>
           ) : null}
         </div>
