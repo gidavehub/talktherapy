@@ -1,17 +1,20 @@
 /**
  * Booking a session, over HTTP, against the real database.
  *
- *   node scripts/smoke-bookings.mjs [baseUrl]
+ *   cd functions && npm run build && cd .. && node scripts/smoke-bookings.mjs
  *
  * What is actually under test is the transaction in
  * app/lib/server/bookings.ts — specifically that TWO PEOPLE CANNOT TAKE THE
  * SAME HOUR. That is not provable by reading the code, and it is the failure
  * that matters: the second patient would find out when nobody joined.
  *
- * Needs `next dev` running with TALK_DEV_ALLOW_ANON_AI=1 (it is in
- * .env.local), which makes an unauthenticated request arrive as the uid
- * `dev-anonymous`. That bypass is development-only — NODE_ENV is "production"
- * in every build — so this cannot be pointed at a deployment.
+ * Calls the booking transaction DIRECTLY, in process, rather than over HTTP.
+ * The callables that wrap it (bookSession / cancelSession) only verify a
+ * caller and pass the arguments through, and reaching them needs a signed-in
+ * account. The transaction is where the thinking is, and this way it can be
+ * tested honestly without one.
+ *
+ * Run `npm run build` in functions/ first — this imports the compiled output.
  *
  * Writes to the live database and cleans up after itself: the slots it
  * creates are prefixed `smoke-`, and every booking it makes is deleted at the
@@ -21,13 +24,15 @@
 import { cert, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 
-const BASE = process.argv[2] || "http://localhost:3000";
 const KEY = process.env.TALK_ADMIN_CREDENTIALS || "./secrets/talk-admin-sa.json";
 const PROJECT = process.env.GOOGLE_CLOUD_PROJECT || "talk-therapy-509209";
 
+/** The real transaction, as deployed. */
+const { bookSlot, cancelBooking } = await import("../functions/lib/functions/src/bookings.js");
+
 /** A seeded sample provider: verified, so the transaction will accept them. */
 const PROVIDER = "sample-awa-jallow";
-const PATIENT = "dev-anonymous";
+const PATIENT = "smoke-bookings-uid";
 
 const db = getFirestore(
   initializeApp({ credential: cert(KEY), projectId: PROJECT }, "smoke-bookings"),
@@ -41,13 +46,22 @@ const check = (ok, what) => {
 
 const slots = () => db.collection("availability").doc(PROVIDER).collection("slots");
 
-async function post(path, body) {
-  const res = await fetch(`${BASE}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  return { status: res.status, json: await res.json().catch(() => ({})) };
+/**
+ * The same shape the old HTTP test used, so the assertions below read the
+ * same: an outcome and a reason. The callables map these onto HttpsError
+ * codes — `aborted` for a taken time, `not-found` for somebody else's.
+ */
+async function book(providerId, slotId, note = "") {
+  const result = await bookSlot({ patientId: PATIENT, providerId, slotId, note });
+  return { status: result.ok ? 200 : 409, json: result.ok ? result : { error: result.reason } };
+}
+
+async function cancel(bookingId, uid = PATIENT) {
+  const result = await cancelBooking(uid, bookingId);
+  return {
+    status: result.ok ? 200 : result.reason === "No such session." ? 404 : 409,
+    json: result.ok ? {} : { error: result.reason },
+  };
 }
 
 async function main() {
@@ -65,11 +79,7 @@ async function main() {
   const created = [];
 
   console.log("Taking a free hour");
-  const first = await post("/api/bookings/create", {
-    providerId: PROVIDER,
-    slotId,
-    note: "Smoke test booking.",
-  });
+  const first = await book(PROVIDER, slotId, "Smoke test booking.");
   check(first.status === 200, `answered 200 (got ${first.status}: ${first.json.error ?? "ok"})`);
   if (first.json.bookingId) created.push(first.json.bookingId);
 
@@ -95,7 +105,7 @@ async function main() {
   check(afterFirst.bookingId === first.json.bookingId, "and points at the booking that took it");
 
   console.log("\nThe same hour again — the one that matters");
-  const second = await post("/api/bookings/create", { providerId: PROVIDER, slotId, note: "" });
+  const second = await book(PROVIDER, slotId);
   check(second.status === 409, `refused with 409 (got ${second.status})`);
   check(
     typeof second.json.error === "string" && second.json.error.includes("taken"),
@@ -105,7 +115,7 @@ async function main() {
   check(!second.json.bookingId, "no second booking was created");
 
   console.log("\nAn hour that does not exist");
-  const ghost = await post("/api/bookings/create", { providerId: PROVIDER, slotId: "nope", note: "" });
+  const ghost = await book(PROVIDER, "nope");
   check(ghost.status === 409, `refused with 409 (got ${ghost.status})`);
 
   console.log("\nAn hour in the past");
@@ -117,7 +127,7 @@ async function main() {
     status: "open",
     bookingId: null,
   });
-  const past = await post("/api/bookings/create", { providerId: PROVIDER, slotId: pastId, note: "" });
+  const past = await book(PROVIDER, pastId);
   check(past.status === 409, `refused with 409 (got ${past.status})`);
   check(
     typeof past.json.error === "string" && past.json.error.includes("passed"),
@@ -125,7 +135,7 @@ async function main() {
   );
 
   console.log("\nCancelling");
-  const cancelled = await post("/api/bookings/cancel", { bookingId: first.json.bookingId });
+  const cancelled = await cancel(first.json.bookingId);
   check(cancelled.status === 200, `answered 200 (got ${cancelled.status})`);
 
   const afterCancel = (await slots().doc(slotId).get()).data() ?? {};
@@ -151,7 +161,7 @@ async function main() {
     updatedAt: Date.now(),
   });
   created.push(theirs.id);
-  const notYours = await post("/api/bookings/cancel", { bookingId: theirs.id });
+  const notYours = await cancel(theirs.id);
   check(notYours.status === 404, `refused with 404, the same answer as "no such session" (got ${notYours.status})`);
   const stillThere = (await theirs.get()).data() ?? {};
   check(stillThere.status === "pending", "and left it alone");

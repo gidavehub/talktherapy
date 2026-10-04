@@ -17,12 +17,22 @@
  * Admin SDK, so these writes bypass firestore.rules entirely. That is why the
  * rules refuse client creates outright: there is exactly one way a booking can
  * come into existence, and it is this file.
+ *
+ * It lives in Cloud Functions rather than the web app because it writes with
+ * admin rights. A web host holds the public Firebase config and nothing more.
  */
 
-import "server-only";
-import { adminDb } from "./admin";
-import { COLLECTIONS } from "@/lib/models";
-import type { BookingStatus } from "@/lib/models";
+import { db } from "./payments";
+
+/** Mirrors COLLECTIONS in the app's models.ts. */
+const COLLECTIONS = {
+  availability: "availability",
+  slots: "slots",
+  bookings: "bookings",
+  providerProfiles: "providerProfiles",
+} as const;
+
+type BookingStatus = "pending" | "confirmed" | "completed" | "cancelled" | "no_show";
 
 export type BookOutcome =
   | { ok: true; bookingId: string; startsAt: number; endsAt: number }
@@ -34,7 +44,7 @@ const GONE = "That time is no longer being offered.";
 const PAST = "That time has already passed.";
 
 function slotRef(providerId: string, slotId: string) {
-  return adminDb()
+  return db()
     .collection(COLLECTIONS.availability)
     .doc(providerId)
     .collection(COLLECTIONS.slots)
@@ -47,12 +57,12 @@ export async function bookSlot(input: {
   slotId: string;
   note: string;
 }): Promise<BookOutcome> {
-  const db = adminDb();
+  const store = db();
   const slot = slotRef(input.providerId, input.slotId);
-  const provider = db.collection(COLLECTIONS.providerProfiles).doc(input.providerId);
-  const booking = db.collection(COLLECTIONS.bookings).doc();
+  const provider = store.collection(COLLECTIONS.providerProfiles).doc(input.providerId);
+  const booking = store.collection(COLLECTIONS.bookings).doc();
 
-  return db.runTransaction(async (tx) => {
+  return store.runTransaction(async (tx) => {
     const [slotSnap, providerSnap] = await Promise.all([tx.get(slot), tx.get(provider)]);
 
     if (!slotSnap.exists) return { ok: false as const, reason: GONE };
@@ -118,10 +128,10 @@ export type CancelOutcome = { ok: true } | { ok: false; reason: string };
  * handing a stranger's slot back to the pool would be worse than losing one.
  */
 export async function cancelBooking(uid: string, bookingId: string): Promise<CancelOutcome> {
-  const db = adminDb();
-  const booking = db.collection(COLLECTIONS.bookings).doc(bookingId);
+  const store = db();
+  const booking = store.collection(COLLECTIONS.bookings).doc(bookingId);
 
-  return db.runTransaction(async (tx) => {
+  return store.runTransaction(async (tx) => {
     const snap = await tx.get(booking);
     if (!snap.exists) return { ok: false as const, reason: "No such session." };
 

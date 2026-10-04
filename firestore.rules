@@ -417,7 +417,7 @@ service cloud.firestore {
     // paid for has been granted.
     //
     // Written ONLY by the server, with the Admin SDK, from
-    // app/lib/payments/store.ts. Admin writes bypass these rules entirely, so
+    // functions/src/payments.ts. Admin writes bypass these rules entirely, so
     // the rules here exist to lock out everyone else.
     match /payments/{paymentIntentId} {
       // `get` only, never `list`. The owner needs to poll their own payment
@@ -437,7 +437,7 @@ service cloud.firestore {
       // by an admin either. A client that could write here could mark its own
       // payment `fulfilled` and take a D200 consultation for nothing. The only
       // thing that may move payment state is the signed Modem Pay webhook
-      // (app/api/payments/modem/webhook), which runs server-side with the
+      // (the modemWebhook Cloud Function), which runs server-side with the
       // Admin SDK and so is not subject to this rule.
       allow write: if false;
     }

@@ -18,6 +18,7 @@ import { getAuth, type Auth } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
 import { getDatabase, type Database } from "firebase/database";
 import { getStorage, type FirebaseStorage } from "firebase/storage";
+import { getFunctions, type Functions } from "firebase/functions";
 
 const config = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -57,6 +58,20 @@ export function realtimeDb(): Database {
 
 export function firebaseStorage(): FirebaseStorage {
   return getStorage(getFirebaseApp());
+}
+
+/**
+ * Callable Cloud Functions, in the region they are deployed to.
+ *
+ * The region is not optional: a callable looks for the function in
+ * us-central1 unless told otherwise, and would quietly 404 against functions
+ * that live in us-east4 — which is where this account's functions are.
+ *
+ * Anything holding a merchant key or writing with admin rights runs there,
+ * never in the web app. This is how the browser reaches it.
+ */
+export function firebaseFunctions(): Functions {
+  return getFunctions(getFirebaseApp(), "us-east4");
 }
 
 export function firebaseConfigured(): boolean {

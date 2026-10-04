@@ -1,10 +1,14 @@
 /**
  * The payment webhook, over HTTP, against the real database.
  *
- *   node scripts/smoke-payments-webhook.mjs [baseUrl]
+ *   node scripts/smoke-payments-webhook.mjs [webhookUrl]
  *
- * Signs with MODEM_PAY_SECRET_KEY from the environment, or from .env.local —
- * whatever the running server verifies with.
+ * Defaults to the DEPLOYED Cloud Function. The webhook lives in Firebase
+ * Functions, not in the Next app: that is where the merchant key is (Secret
+ * Manager), and it is publicly reachable without deploying a website.
+ *
+ * Signs with MODEM_PAY_SECRET_KEY from the environment or .env.local, which
+ * must be the same value the function reads from Secret Manager.
  *
  * scripts/test-modempay-webhook.mjs proves the signature, idempotency and
  * amount logic as pure functions. This proves the parts that only exist when
@@ -27,7 +31,8 @@ import { readFileSync } from "node:fs";
 import { cert, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 
-const BASE = process.argv[2] || "http://localhost:3017";
+const WEBHOOK =
+  process.argv[2] || "https://us-east4-talk-therapy-509209.cloudfunctions.net/modemWebhook";
 
 /**
  * The same secret the running server verifies with.
@@ -52,7 +57,6 @@ function signingSecret() {
 
 const SECRET = signingSecret();
 const KEY = process.env.TALK_ADMIN_CREDENTIALS || "./secrets/talk-admin-sa.json";
-const URL_PATH = "/api/payments/modem/webhook";
 
 if (!SECRET) {
   console.error(
@@ -93,7 +97,7 @@ const body = (extra) =>
   });
 
 async function deliver(raw, signature) {
-  const res = await fetch(`${BASE}${URL_PATH}`, {
+  const res = await fetch(WEBHOOK, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -130,6 +134,7 @@ async function main() {
   });
 
   console.log(`A signed delivery for ${INTENT}`);
+  console.log(`  → ${WEBHOOK}`);
   const raw = body();
   const first = await deliver(raw);
   check(first.status === 200, `answered 200 (got ${first.status})`);
@@ -188,14 +193,83 @@ async function main() {
   check(orphanDoc.status === "succeeded", `recorded as paid (got ${orphanDoc.status})`);
   check(orphanDoc.amountMinor === AMOUNT_MINOR, `at the amount from the metadata (got ${orphanDoc.amountMinor})`);
 
+  // ---- a session fee, which must confirm the booking ----------------------
+  console.log("\nA session fee");
+  const sessionIntent = `pi_smoke_${randomUUID().slice(0, 8)}`;
+  const bookingRef = db.collection("bookings").doc();
+  const startsAt = Date.now() + 6 * 24 * 60 * 60_000;
+
+  await bookingRef.set({
+    patientId: UID,
+    providerId: "smoke-provider",
+    participants: [UID, "smoke-provider"],
+    slotId: "irrelevant",
+    startsAt,
+    endsAt: startsAt + 45 * 60_000,
+    status: "pending",
+    paymentStatus: "unpaid",
+    amountMinor: AMOUNT_MINOR,
+    currency: "GMD",
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  });
+
+  await db.collection("payments").doc(sessionIntent).set({
+    paymentIntentId: sessionIntent,
+    provider: "modempay",
+    uid: UID,
+    purpose: "session_fee",
+    amountMinor: AMOUNT_MINOR,
+    currency: "GMD",
+    status: "pending",
+    fulfilled: false,
+    needsReview: false,
+    bookingId: bookingRef.id,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  });
+
+  const sessionRaw = JSON.stringify({
+    event: "charge.succeeded",
+    event_id: `evt_smoke_${randomUUID().slice(0, 8)}`,
+    data: {
+      payment_intent_id: sessionIntent,
+      status: "paid",
+      amount: AMOUNT_MAJOR,
+      metadata: {
+        uid: UID,
+        purpose: "session_fee",
+        amount_minor: String(AMOUNT_MINOR),
+        booking_id: bookingRef.id,
+      },
+    },
+  });
+
+  const paidSession = await deliver(sessionRaw);
+  check(paidSession.status === 200, `answered 200 (got ${paidSession.status})`);
+  check(paidSession.json.acted === true, `acted on it: ${paidSession.json.reason}`);
+
+  const session = (await bookingRef.get()).data() ?? {};
+  check(session.paymentStatus === "paid", `the session reads paid (got ${session.paymentStatus})`);
+  check(
+    session.status === "confirmed",
+    `and confirmed — paying is what makes it an appointment (got ${session.status})`,
+  );
+  check(session.transactionId === sessionIntent, "and points at the payment that settled it");
+
   // ---- clean up -----------------------------------------------------------
-  const events = await db.collection("paymentEvents").where("paymentIntentId", "in", [INTENT, orphan]).get();
+  const events = await db
+    .collection("paymentEvents")
+    .where("paymentIntentId", "in", [INTENT, orphan, sessionIntent])
+    .get();
   await Promise.all([
     db.collection("payments").doc(INTENT).delete(),
     db.collection("payments").doc(orphan).delete(),
+    db.collection("payments").doc(sessionIntent).delete(),
+    bookingRef.delete(),
     ...events.docs.map((d) => d.ref.delete()),
   ]);
-  console.log(`\nCleaned up: 2 payments, ${events.size} event records`);
+  console.log(`\nCleaned up: 3 payments, 1 booking, ${events.size} event records`);
 
   console.log(failures ? `\n${failures} CHECK(S) FAILED` : "\nALL CHECKS PASSED");
   process.exitCode = failures ? 1 : 0;

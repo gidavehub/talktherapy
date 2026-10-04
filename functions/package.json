@@ -1,0 +1,20 @@
+{
+  "name": "talk-functions",
+  "private": true,
+  "engines": {
+    "node": "20"
+  },
+  "main": "lib/functions/src/index.js",
+  "scripts": {
+    "build": "tsc",
+    "deploy": "npm run build && firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0",
+    "firebase-functions": "^6.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

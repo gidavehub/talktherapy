@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "es2022",
+    "lib": ["es2022"],
+    "moduleResolution": "node",
+    "outDir": "lib",
+    // One level up, so the shared protocol module below can be compiled in
+    // alongside src/. That is why `main` is lib/functions/src/index.js.
+    "rootDir": "..",
+    "strict": true,
+    "noImplicitReturns": true,
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  // The wire format, signature verification and fulfilment decisions are SHARED
+  // with the Next app rather than copied. That file imports nothing but
+  // node:crypto, which is what makes this possible — and it carries a hundred
+  // assertions in scripts/test-modempay-webhook.mjs that would be worthless
+  // against a second copy.
+  "include": ["src/**/*.ts", "../app/lib/payments/modempay-protocol.ts"]
+}

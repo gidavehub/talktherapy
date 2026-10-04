@@ -38,7 +38,7 @@ export const COLLECTIONS = {
   /**
    * `paymentEvents/{eventKey}` — the webhook idempotency ledger. One document
    * per delivery acted on; its only job is to exist. See
-   * app/lib/payments/store.ts for why it is written in the same transaction as
+   * functions/src/payments.ts for why it is written in the same transaction as
    * the fulfilment it guards.
    */
   paymentEvents: "paymentEvents",
@@ -458,7 +458,7 @@ export type Transaction = {
  * `payments/{paymentIntentId}` — one document per payment intent.
  *
  * WRITTEN ONLY BY THE SERVER, with the Admin SDK, from
- * app/lib/payments/store.ts. firestore.rules lets the owner read their own and
+ * functions/src/payments.ts. firestore.rules lets the owner read their own and
  * lets no client write any of it, because this document is what decides
  * whether someone received the thing they paid for.
  *

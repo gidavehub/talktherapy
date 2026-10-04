@@ -24,7 +24,8 @@ import {
   where,
   type DocumentData,
 } from "firebase/firestore";
-import { firebaseAuth, firebaseConfigured, firestore } from "./firebase";
+import { httpsCallable } from "firebase/functions";
+import { firebaseConfigured, firebaseFunctions, firestore } from "./firebase";
 import { COLLECTIONS, type AvailabilitySlot, type Booking } from "./models";
 
 /** How long one session lasts. One length for now; providers vary later. */
@@ -225,50 +226,87 @@ export async function removeSlot(providerId: string, slotId: string): Promise<vo
 
 // ------------------------------------------------------------------- booking
 
-async function authHeader(): Promise<Record<string, string>> {
-  const token = await firebaseAuth().currentUser?.getIdToken().catch(() => null);
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-async function post(path: string, body: unknown): Promise<{ ok: boolean; error?: string }> {
-  const res = await fetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...(await authHeader()) },
-    body: JSON.stringify(body),
-  });
-  const json = (await res.json().catch(() => ({}))) as { error?: string };
-  return res.ok ? { ok: true } : { ok: false, error: json.error ?? "Something went wrong." };
+/**
+ * Booking and cancelling are CALLABLE CLOUD FUNCTIONS.
+ *
+ * Both write with admin rights — a booking and the slot it takes have to
+ * change together, and a patient cannot write a provider's slots — so they
+ * run beside the project's own service account rather than in the web app,
+ * which holds the public Firebase config and nothing more.
+ *
+ * Being callable also means Firebase verifies the caller's ID token before
+ * the function runs, and an HttpsError comes back as a message worth showing:
+ * "Somebody else has just taken that time" rather than a status code.
+ */
+async function call(name: string, payload: unknown): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await httpsCallable(firebaseFunctions(), name)(payload);
+    return { ok: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    return { ok: false, error: message || "Something went wrong." };
+  }
 }
 
 export function bookSlot(providerId: string, slotId: string, note: string) {
-  return post("/api/bookings/create", { providerId, slotId, note });
+  return call("bookSession", { providerId, slotId, note });
 }
 
 export function cancelBooking(bookingId: string) {
-  return post("/api/bookings/cancel", { bookingId });
+  return call("cancelSession", { bookingId });
 }
 
 /**
  * Start paying for a session.
  *
+ * A CALLABLE CLOUD FUNCTION, not an API route in this app. The merchant key
+ * lives in Secret Manager beside the function; a web host holds the public
+ * Firebase config and nothing more. Being callable also means Firebase
+ * verifies the caller's ID token before the function runs, and the browser
+ * needs no CORS of its own.
+ *
  * Returns the hosted checkout link to send the browser to. The price is NOT
- * sent — the server reads it from the booking, which got it from the
+ * sent — the function reads it from the booking, which got it from the
  * provider's profile when the booking was made.
  */
 export async function startSessionPayment(
   bookingId: string,
 ): Promise<{ ok: true; paymentLink: string } | { ok: false; error: string }> {
-  const res = await fetch("/api/payments/modem/create", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...(await authHeader()) },
-    body: JSON.stringify({ purpose: "session_fee", bookingId }),
-  });
-
-  const json = (await res.json().catch(() => ({}))) as { paymentLink?: string; error?: string };
-  if (!res.ok || !json.paymentLink) {
-    return { ok: false, error: json.error ?? "Could not start the payment." };
+  try {
+    const call = httpsCallable<{ bookingId: string }, { paymentLink: string }>(
+      firebaseFunctions(),
+      "startSessionPayment",
+    );
+    const { data } = await call({ bookingId });
+    if (!data?.paymentLink) return { ok: false, error: "Could not start the payment." };
+    return { ok: true, paymentLink: data.paymentLink };
+  } catch (error) {
+    // A callable turns the function's HttpsError into a message worth showing
+    // — "That session is already paid for" rather than a status code.
+    const message = error instanceof Error ? error.message : "";
+    return { ok: false, error: message || "Could not start the payment." };
   }
-  return { ok: true, paymentLink: json.paymentLink };
+}
+
+/**
+ * Ask what happened to a payment, and reconcile it if the webhook was lost.
+ *
+ * Called by the page the shopper lands back on. Safe to call repeatedly: the
+ * function refuses to credit a payment that is already fulfilled.
+ */
+export async function checkPayment(
+  paymentIntentId: string,
+): Promise<{ fulfilled: boolean; needsReview: boolean } | null> {
+  try {
+    const call = httpsCallable<{ paymentIntentId: string }, { fulfilled: boolean; needsReview: boolean }>(
+      firebaseFunctions(),
+      "checkPayment",
+    );
+    const { data } = await call({ paymentIntentId });
+    return { fulfilled: Boolean(data?.fulfilled), needsReview: Boolean(data?.needsReview) };
+  } catch {
+    return null;
+  }
 }
 
 // ------------------------------------------------------------------ labels

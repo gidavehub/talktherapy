@@ -251,7 +251,7 @@ console.log("\nIdempotency keys");
 console.log("\nA replayed event is acted on exactly once");
 {
   /**
-   * Stand-in for app/lib/payments/store.ts's Firestore transaction, with the
+   * Stand-in for functions/src/payments.ts's Firestore transaction, with the
    * property that matters: the event record and the fulfilment land together
    * or not at all. Recording first and crediting after is the bug this guards
    * against — it cost real money in another of the owner's projects, because
@@ -484,7 +484,7 @@ console.log("\nThe create-payment body is wrapped");
     metadata: { uid: "user_fatou", purpose: "ai_initial", amount_minor: "20000" },
     returnUrl: "https://talk.example/therapy?paid=1",
     cancelUrl: "https://talk.example/plans?cancelled=1",
-    callbackUrl: "https://talk.example/api/payments/modem/webhook",
+    callbackUrl: "https://us-east4-talk-therapy-509209.cloudfunctions.net/modemWebhook",
   });
 
   check(Object.keys(body).join() === "data", "the body has exactly one top-level key, `data`");
