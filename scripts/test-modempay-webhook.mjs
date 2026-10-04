@@ -514,11 +514,29 @@ console.log("\nThe create-payment reply is read from the right fields");
 
   let threw = false;
   try {
-    readCheckoutResponse({ status: true, data: { id: "obj_only" } });
+    readCheckoutResponse({ status: true, message: "created" });
   } catch {
     threw = true;
   }
-  check(threw, "a reply missing those fields fails loudly rather than returning a broken link");
+  check(threw, "a reply with neither a reference nor a link fails loudly rather than returning a broken one");
+
+  // The same tolerance connekteasy arrived at in production against this
+  // gateway. Preference order matters more than the fallbacks: reading `id`
+  // first would hand back an object id that the webhook never matches.
+  const flat = readCheckoutResponse({
+    payment_intent_id: "pi_flat",
+    payment_link: "https://checkout.modempay.com/pi_flat",
+  });
+  check(flat.paymentIntentId === "pi_flat", "reads a reply with the fields at the top level");
+
+  const byId = readCheckoutResponse({ data: { id: "pi_by_id", link: "https://checkout/x" } });
+  check(byId.paymentIntentId === "pi_by_id", "falls back to data.id when there is no payment_intent_id");
+  check(byId.paymentLink === "https://checkout/x", "and to data.link for the link");
+
+  const byReference = readCheckoutResponse({
+    data: { reference: "pi_ref", payment_link: "https://checkout/y" },
+  });
+  check(byReference.paymentIntentId === "pi_ref", "falls back to data.reference last of all");
 }
 
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");

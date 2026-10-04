@@ -133,14 +133,39 @@ export type CheckoutResult = {
  * so it is ignored on purpose.
  */
 export function readCheckoutResponse(body: unknown): CheckoutResult {
-  const data = asRecord(asRecord(body)?.data);
-  const paymentIntentId = asString(data?.payment_intent_id);
-  const paymentLink = asString(data?.payment_link);
+  const outer = asRecord(body);
+  // `{ status, message, data: { … } }` is the documented shape, but the
+  // fields have been seen at the top level too.
+  const inner = asRecord(outer?.data) ?? outer;
+
+  // The order is the one connekteasy arrived at in production against this
+  // gateway, and it is kept exactly: payment_intent_id first because that is
+  // what the API really returns, `id` only as a fallback because the SDK's
+  // own types wrongly promise it, then the same two at the top level, then
+  // `reference`. Reading `id` FIRST would hand back an object id that nothing
+  // afterwards matches — the webhook would arrive about a payment we have no
+  // record of.
+  const paymentIntentId =
+    asString(inner?.payment_intent_id) ??
+    asString(inner?.id) ??
+    asString(outer?.payment_intent_id) ??
+    asString(outer?.id) ??
+    asString(inner?.reference) ??
+    asString(outer?.reference);
+
+  const paymentLink =
+    asString(inner?.payment_link) ??
+    asString(inner?.link) ??
+    asString(outer?.payment_link) ??
+    asString(outer?.link);
+
   if (!paymentIntentId || !paymentLink) {
+    // The keys, not the body: a payment response can carry customer details.
     throw new Error(
-      "Modem Pay did not return data.payment_intent_id and data.payment_link",
+      `Modem Pay returned no payment reference or link. Keys: ${Object.keys(inner ?? {}).join(", ")}`,
     );
   }
+
   return { paymentIntentId, paymentLink };
 }
 
@@ -367,7 +392,11 @@ export function normaliseWebhookEvent(body: unknown): NormalisedEvent {
     asString(payload.intent_id) ??
     // Only as a last resort: on some envelopes the payload IS the intent, and
     // then its `id` is the intent id. Never preferred over an explicit field.
-    asString(payload.id);
+    // `reference` is what connekteasy's webhook falls back to, kept for the
+    // same reason — an event we cannot tie to a payment is money taken and
+    // nothing delivered.
+    asString(payload.id) ??
+    asString(payload.reference);
 
   return {
     eventId: extractEventId(envelope, paymentIntentId),
