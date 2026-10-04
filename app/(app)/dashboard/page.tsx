@@ -9,6 +9,7 @@ import Card, { StatTile, DarkPanel } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Feedback";
 import MoodTrendChart from "@/components/app/MoodTrendChart";
+import HomeActivity from "@/components/app/HomeActivity";
 import ProviderCard from "@/components/providers/ProviderCard";
 import { Spinner } from "@/components/ui/Feedback";
 import { useMatches } from "@/lib/useMatches";
@@ -31,11 +32,18 @@ import type { JournalEntry, MoodEntry } from "@/lib/models";
 /**
  * Patient home.
  *
- * Providers first. The point of Talk is getting someone to the right person,
- * so the first thing on the page is who fits them — picked from what they told
- * Talk at onboarding — with "View all" one tap away. The check-in and journal
- * follow for anyone who wants them. Crisis help is reachable from here without
- * scrolling past anything.
+ * Providers first, then whatever is actually waiting on them.
+ *
+ * The point of Talk is getting someone to the right person, so the first thing
+ * on the page is who fits them — picked from what they told Talk at onboarding
+ * — with "View all" one tap away. Straight after it comes the conversation
+ * with something unread in it and the session that is coming up, because those
+ * are what a returning person opened the app to check, and HomeActivity shows
+ * nothing at all until one of them exists.
+ *
+ * The check-in and journal follow, for anyone who wants them. They stay in the
+ * product and in the menu; they are simply not what anyone came for. Crisis
+ * help is reachable from here without scrolling past anything.
  */
 
 function greeting(): string {
@@ -141,6 +149,10 @@ export default function DashboardPage() {
           </Link>
         ) : null}
       </section>
+
+      {/* Anything waiting: an unread conversation, the next session. Renders
+          nothing at all for somebody who has neither yet. */}
+      <HomeActivity />
 
       {/* Check-in prompt */}
       {!checkedIn ? (
