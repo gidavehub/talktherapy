@@ -26,7 +26,7 @@ import { getProvider } from "../../lib/providers";
  * state (which is both a cascading render and a second source of truth).
  */
 
-type Peer = { name: string | null; photoURL: string | null };
+type Peer = { name: string | null; photoPath: string | null };
 
 const cache = new Map<string, Peer>();
 const inFlight = new Set<string>();
@@ -71,13 +71,14 @@ export function useChatPeer(uid: string | null, fallbackName: string) {
       .then((profile) => {
         cache.set(uid, {
           name: profile?.displayName || null,
-          photoURL: profile?.photoPath ?? null,
+          // A Storage object path, not a URL — ProviderAvatar resolves it.
+          photoPath: profile?.photoPath ?? null,
         });
       })
       .catch(() => {
         // Cached even on failure, so an unresolvable uid is not retried on
         // every render of the list.
-        cache.set(uid, { name: null, photoURL: null });
+        cache.set(uid, { name: null, photoPath: null });
       })
       .finally(() => {
         inFlight.delete(uid);
@@ -87,7 +88,7 @@ export function useChatPeer(uid: string | null, fallbackName: string) {
 
   return {
     name: peer?.name ?? fallbackName,
-    photoURL: peer?.photoURL ?? null,
+    photoPath: peer?.photoPath ?? null,
     resolved: peer !== null,
   };
 }

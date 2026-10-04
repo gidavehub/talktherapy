@@ -22,7 +22,9 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import { firebaseConfigured, firestore } from "./firebase";
+import { ref as storageRef, uploadBytes } from "firebase/storage";
+import { firebaseConfigured, firebaseStorage, firestore } from "./firebase";
+import { fileToCompressedDataUrl } from "./base64";
 import {
   COLLECTIONS,
   type ProviderProfile,
@@ -200,6 +202,34 @@ export async function getOwnProviderProfile(uid: string): Promise<ProviderProfil
   return snap.exists() ? toProfile(snap.id, snap.data()) : null;
 }
 
+/**
+ * Upload a provider's photo and return the Storage path to record on their
+ * profile.
+ *
+ * Compressed to 512px JPEG before it leaves the browser, with the helper the
+ * avatar flow already uses. A provider photographing themselves on a phone
+ * produces a 4MB file; on a Gambian mobile connection that is a slow upload
+ * for them and a slow page for everybody who ever sees them in a list.
+ *
+ * Goes under `avatars/{uid}`, which storage.rules already makes publicly
+ * readable "because they appear in the provider directory, which is browsable
+ * before sign-in" — exactly this case. A fixed filename, so re-uploading
+ * replaces the old photo rather than leaving a litter of orphans nothing
+ * points at.
+ */
+export async function uploadProviderPhoto(uid: string, file: File): Promise<string> {
+  const dataUrl = await fileToCompressedDataUrl(file, {
+    maxDimension: 512,
+    quality: 0.82,
+    mime: "image/jpeg",
+  });
+  const blob = await (await fetch(dataUrl)).blob();
+
+  const path = `avatars/${uid}/provider.jpg`;
+  await uploadBytes(storageRef(firebaseStorage(), path), blob, { contentType: "image/jpeg" });
+  return path;
+}
+
 /** The fields a provider fills in. Everything else is set by us or by review. */
 export type ProviderDraft = {
   displayName: string;
@@ -214,6 +244,8 @@ export type ProviderDraft = {
   gender: "woman" | "man" | null;
   /** A town from TOWNS_BY_AREA, lower-case, so matching can place it. */
   location: string | null;
+  /** Storage path from uploadProviderPhoto, when they have set one. */
+  photoPath?: string | null;
 };
 
 /**
@@ -245,6 +277,9 @@ export async function saveProviderProfile(uid: string, draft: ProviderDraft): Pr
     sessionRateMinor: draft.sessionRateMinor,
     gender: draft.gender,
     location: draft.location,
+    // Only written when the form has one, so saving the rest of the profile
+    // never clears a photo that is already there.
+    ...(draft.photoPath !== undefined ? { photoPath: draft.photoPath } : {}),
     formats: ["video"] as SessionFormat[],
     updatedAt: serverTimestamp(),
   };
@@ -260,7 +295,7 @@ export async function saveProviderProfile(uid: string, draft: ProviderDraft): Pr
     // Straight to pending: there is no save-as-draft in the UI, so a profile
     // that exists is one its owner wants reviewed.
     status: "pending",
-    photoPath: null,
+    photoPath: draft.photoPath ?? null,
     ratingAvg: 0,
     ratingCount: 0,
     timezone: "Africa/Banjul",

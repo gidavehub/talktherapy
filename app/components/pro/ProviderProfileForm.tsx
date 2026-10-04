@@ -19,7 +19,8 @@ import {
   type Specialization,
 } from "@/lib/matching";
 import { LOCALE_LABELS, type Locale, type ProviderProfile } from "@/lib/models";
-import { getOwnProviderProfile, saveProviderProfile } from "@/lib/providers";
+import { getOwnProviderProfile, saveProviderProfile, uploadProviderPhoto } from "@/lib/providers";
+import ProviderAvatar from "@/components/providers/ProviderAvatar";
 import { toMajor, toMinor } from "@/lib/money";
 
 /**
@@ -155,6 +156,8 @@ export default function ProviderProfileForm() {
   const [rate, setRate] = useState("");
   const [gender, setGender] = useState("");
   const [town, setTown] = useState("");
+  const [photoPath, setPhotoPath] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const uid = user?.uid ?? null;
 
@@ -178,6 +181,7 @@ export default function ProviderProfileForm() {
           setRate(String(toMajor(found.sessionRateMinor) || ""));
           setGender(found.gender ?? "");
           setTown(found.location ?? "");
+          setPhotoPath(found.photoPath);
         } else {
           // Their own name is the one thing we already know.
           setDisplayName(account?.displayName ?? "");
@@ -229,6 +233,7 @@ export default function ProviderProfileForm() {
         sessionRateMinor: toMinor(rateMajor),
         gender: gender === "woman" || gender === "man" ? gender : null,
         location: town || null,
+        photoPath,
       });
 
       const saved = await getOwnProviderProfile(uid);
@@ -241,8 +246,32 @@ export default function ProviderProfileForm() {
     }
   }, [
     uid, displayName, headline, bio, services, languages, focus,
-    qualifications, years, rate, gender, town, existing, toast,
+    qualifications, years, rate, gender, town, photoPath, existing, toast,
   ]);
+
+  /**
+   * Their photo.
+   *
+   * Uploaded immediately rather than held until Save, so they see the result
+   * straight away and a failed upload is reported on its own instead of taking
+   * the whole form down with it. It is still only recorded on the profile when
+   * they save.
+   */
+  const choosePhoto = useCallback(
+    async (file: File | undefined) => {
+      if (!file || !uid) return;
+      setUploading(true);
+      setError(null);
+      try {
+        setPhotoPath(await uploadProviderPhoto(uid, file));
+      } catch {
+        setError("That photo did not upload. Check your connection and try again.");
+      } finally {
+        setUploading(false);
+      }
+    },
+    [uid],
+  );
 
   // The gate lets any signed-in person reach this URL; only a provider has a
   // listing. Said plainly rather than redirected, so a patient who followed a
@@ -271,6 +300,32 @@ export default function ProviderProfileForm() {
 
       <Card radius="md" padding="p-6 md:p-8" reveal={false}>
         <div className="space-y-5">
+          {/*
+            A face is the first thing anyone decides on, and until now every
+            provider in the product was a pair of initials.
+          */}
+          <div className="flex items-center gap-4">
+            <ProviderAvatar photoPath={photoPath} name={displayName} size={72} />
+            <div className="min-w-0">
+              <label className="inline-flex items-center rounded-full bg-[var(--background)] px-4 py-2 text-[12.5px] cursor-pointer hover:bg-black/[.06] transition-colors">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    void choosePhoto(e.target.files?.[0]);
+                    e.target.value = "";
+                  }}
+                />
+                {uploading ? "Uploading…" : photoPath ? "Change photo" : "Add a photo"}
+              </label>
+              <p className="mt-1.5 text-[12px] text-[var(--muted)] leading-relaxed">
+                Somebody deciding whether to tell you the worst week of their
+                life would like to see your face first.
+              </p>
+            </div>
+          </div>
+
           <Input
             label="Your name"
             hint="As you want it to appear to someone looking for help."

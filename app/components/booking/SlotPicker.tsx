@@ -4,12 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { SPRING_SNAP, SPRING_SOFT } from "../motion/primitives";
-import { Alert, Avatar, EmptyState, Spinner } from "../ui/Feedback";
+import { Alert, EmptyState, Spinner } from "../ui/Feedback";
 import { IconCalendar, IconSpeaker } from "../ui/icons";
 import Button from "../ui/Button";
 import { useAuth } from "../AuthProvider";
 import { useReadAloud } from "../../lib/useReadAloud";
 import { getProvider } from "../../lib/providers";
+import ProviderAvatar from "../providers/ProviderAvatar";
 import { formatDalasi } from "../../lib/money";
 import {
   SESSION_MINUTES,
@@ -96,7 +97,7 @@ export default function SlotPicker({ providerId }: { providerId: string }) {
     <div className="max-w-[620px] space-y-5">
       {provider ? (
         <div className="flex items-center gap-3.5 rounded-[22px] bg-white px-4 py-3.5">
-          <Avatar name={provider.displayName} size={46} />
+          <ProviderAvatar photoPath={provider.photoPath} name={provider.displayName} size={46} />
           <div className="min-w-0">
             <p className="truncate text-[15px] font-medium leading-tight">
               {provider.displayName}

@@ -4,13 +4,14 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import { useAuth } from "../AuthProvider";
-import { Avatar, EmptyState, Spinner } from "../ui/Feedback";
+import { EmptyState, Spinner } from "../ui/Feedback";
 import { IconChat } from "../ui/icons";
 import Composer from "./Composer";
 import DateSeparator, { startsNewDay } from "./DateSeparator";
 import MessageBubble from "./MessageBubble";
 import TypingIndicator from "./TypingIndicator";
 import { useChatPeer } from "./useChatPeer";
+import ProviderAvatar from "../providers/ProviderAvatar";
 import type { VoiceRecording } from "./useVoiceRecorder";
 import { useReadAloud } from "../../lib/useReadAloud";
 import {
@@ -186,7 +187,7 @@ export default function ChatThread({ chatId }: { chatId: string }) {
           </svg>
         </Link>
 
-        <Avatar name={peer.name} size={38} />
+        <ProviderAvatar photoPath={peer.photoPath} name={peer.name} size={38} />
 
         <div className="min-w-0 flex-1">
           <p className="truncate text-[14px] font-medium leading-tight">

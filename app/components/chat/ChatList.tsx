@@ -5,10 +5,11 @@ import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { SPRING_SOFT, SPRING_SNAP } from "../motion/primitives";
 import { useAuth } from "../AuthProvider";
-import { Avatar, EmptyState, Spinner } from "../ui/Feedback";
+import { EmptyState, Spinner } from "../ui/Feedback";
 import { IconChat, IconSpeaker } from "../ui/icons";
 import Button from "../ui/Button";
 import { useChatPeer } from "./useChatPeer";
+import ProviderAvatar from "../providers/ProviderAvatar";
 import { useReadAloud } from "../../lib/useReadAloud";
 import { nameOf, otherParticipant, unreadFor, watchChats } from "../../lib/chat";
 import type { Chat } from "../../lib/models";
@@ -86,7 +87,7 @@ function ChatRow({
         href={`/chats/${chat.id}`}
         className="group flex min-w-0 flex-1 items-center gap-3.5 rounded-[22px] bg-white px-4 py-3.5 transition-colors hover:bg-black/[.02]"
       >
-        <Avatar name={name} size={46} />
+        <ProviderAvatar photoPath={peer.photoPath} name={name} size={46} />
 
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-3">

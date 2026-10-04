@@ -4,11 +4,12 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { SPRING_SNAP } from "../motion/primitives";
-import { Alert, Avatar, Spinner } from "../ui/Feedback";
+import { Alert, Spinner } from "../ui/Feedback";
 import { IconMic, IconPhone, IconVideo } from "../ui/icons";
 import Button from "../ui/Button";
 import { useAuth } from "../AuthProvider";
 import { useChatPeer } from "../chat/useChatPeer";
+import ProviderAvatar from "../providers/ProviderAvatar";
 import { useNow } from "../../lib/useNow";
 import { watchBooking, spokenSlot } from "../../lib/booking";
 import { hasRelay, joinCall, joinWindow, type CallController, type CallState } from "../../lib/call";
@@ -161,7 +162,7 @@ export default function CallRoom({ bookingId }: { bookingId: string }) {
           />
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center">
-            <Avatar name={peer.name} size={74} />
+            <ProviderAvatar photoPath={peer.photoPath} name={peer.name} size={74} />
             <div>
               <p className="text-[16px] text-white">{peer.name}</p>
               <p className="mt-1 text-[12px] uppercase tracking-[0.18em] text-white/55">

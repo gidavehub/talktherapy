@@ -4,11 +4,12 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { SPRING_SOFT } from "../motion/primitives";
-import { Alert, Avatar, EmptyState, Spinner } from "../ui/Feedback";
+import { Alert, EmptyState, Spinner } from "../ui/Feedback";
 import { IconCalendar, IconChat, IconSpeaker, IconVideo } from "../ui/icons";
 import Button from "../ui/Button";
 import { useAuth } from "../AuthProvider";
 import { useChatPeer } from "../chat/useChatPeer";
+import ProviderAvatar from "../providers/ProviderAvatar";
 import { useReadAloud } from "../../lib/useReadAloud";
 import { directChatId } from "../../lib/chat";
 import { formatDalasi } from "../../lib/money";
@@ -70,7 +71,7 @@ function SessionRow({
       className={`rounded-[22px] bg-white px-4 py-3.5 ${cancelled || past ? "opacity-60" : ""}`}
     >
       <div className="flex items-center gap-3.5">
-        <Avatar name={peer.name} size={44} />
+        <ProviderAvatar photoPath={peer.photoPath} name={peer.name} size={44} />
 
         <div className="min-w-0 flex-1">
           <p className="truncate text-[14.5px] font-medium leading-tight">{peer.name}</p>

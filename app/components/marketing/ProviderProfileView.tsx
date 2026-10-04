@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { SPRING_SNAP, SPRING_SOFT } from "../motion/primitives";
-import { Avatar, Badge, EmptyState, Spinner, CheckItem } from "../ui/Feedback";
+import { Badge, EmptyState, Spinner, CheckItem } from "../ui/Feedback";
 import Button from "../ui/Button";
 import { IconCalendar, IconChat, IconPeople } from "../ui/icons";
 import { useAuth } from "../AuthProvider";
+import ProviderAvatar from "../providers/ProviderAvatar";
 import { openChat } from "../../lib/chat";
 import { formatDalasi } from "../../lib/money";
 import { LOCALE_LABELS, type ProviderProfile } from "../../lib/models";
@@ -120,7 +121,7 @@ export default function ProviderProfileView({ providerId }: { providerId: string
           transition={SPRING_SOFT}
           className="flex items-start gap-5"
         >
-          <Avatar name={profile.displayName} size={80} />
+          <ProviderAvatar photoPath={profile.photoPath} name={profile.displayName} size={80} />
           <div className="min-w-0 pt-1">
             <h1 className="text-[28px] md:text-[36px] leading-tight tracking-tight font-medium">
               {profile.displayName}

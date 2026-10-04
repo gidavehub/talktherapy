@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { motion } from "motion/react";
 import { SPRING_SOFT } from "../motion/primitives";
-import { Avatar, Badge } from "../ui/Feedback";
+import { Badge } from "../ui/Feedback";
+import ProviderAvatar from "./ProviderAvatar";
 import { formatDalasi } from "../../lib/money";
 import { LOCALE_LABELS, type ProviderProfile } from "../../lib/models";
 import { SERVICE_LABELS, SPECIALIZATION_LABELS, type Specialization } from "../../lib/matching";
@@ -40,7 +41,6 @@ export default function ProviderCard({
   onRead,
   speaking = false,
   onOpen,
-  photoUrl = null,
 }: {
   profile: ProviderProfile;
   index?: number;
@@ -62,8 +62,6 @@ export default function ProviderCard({
    * open a conversation as, and falls back to the profile.
    */
   onOpen?: (profile: ProviderProfile) => void;
-  /** Resolved download URL for `photoPath`, when there is one. */
-  photoUrl?: string | null;
 }) {
   // What they offer, then where they are — the two things someone scanning a
   // list actually chooses on.
@@ -95,7 +93,7 @@ export default function ProviderCard({
       )}
 
       <div className="flex items-start gap-4">
-        <Avatar src={photoUrl} name={profile.displayName} size={compact ? 48 : 56} />
+        <ProviderAvatar photoPath={profile.photoPath} name={profile.displayName} size={compact ? 48 : 56} />
         <div className="min-w-0 flex-1">
           <h3 className="text-[16px] font-medium leading-tight truncate">{profile.displayName}</h3>
           {kind ? <p className="mt-1 text-[12px] text-[var(--muted)] truncate">{kind}</p> : null}
