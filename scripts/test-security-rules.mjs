@@ -230,6 +230,28 @@ const CASES = [
     `${DOCS}/availability/${PROVIDER}/slots/s2`, null, slot],
   ["a patient can see the free hours", "ALLOW", PATIENT, "get",
     `${DOCS}/availability/${PROVIDER}/slots/s1`, slot],
+
+  // --- the call room -----------------------------------------------------
+  // The room id IS the booking id, so the participant list is checked against
+  // the booking rather than taken from whoever got there first. Without that,
+  // a stranger could create the room for somebody else's session listing only
+  // themselves — they would hear nothing, but the two people with the
+  // appointment would both be locked out of their own call.
+  ["opening the room for your own session", "ALLOW", PATIENT, "create",
+    `${DOCS}/calls/bk_1`, null, { participants: [PATIENT, PROVIDER] }],
+  ["the provider opens the same room", "ALLOW", PROVIDER, "create",
+    `${DOCS}/calls/bk_1`, null, { participants: [PATIENT, PROVIDER] }],
+  ["squatting on somebody else's call room", "DENY", STRANGER, "create",
+    `${DOCS}/calls/bk_1`, null, { participants: [STRANGER] }],
+  ["adding yourself to somebody else's call room", "DENY", STRANGER, "create",
+    `${DOCS}/calls/bk_1`, null, { participants: [PATIENT, PROVIDER, STRANGER] }],
+  ["reading a call room you are in", "ALLOW", PROVIDER, "get",
+    `${DOCS}/calls/bk_1`, { participants: [PATIENT, PROVIDER] }],
+  ["reading a call room you are not in", "DENY", STRANGER, "get",
+    `${DOCS}/calls/bk_1`, { participants: [PATIENT, PROVIDER] }],
+  ["rewriting who is in a live call", "DENY", PATIENT, "update",
+    `${DOCS}/calls/bk_1`, { participants: [PATIENT, PROVIDER] },
+    { participants: [PATIENT, PROVIDER, STRANGER] }],
 ];
 
 /**
@@ -273,6 +295,19 @@ const testCase = ([, expectation, uid, method, path, existing, incoming]) => ({
     ? { functionMocks: [parentChatMock] }
     : {}),
   ...(path.includes("/providerProfiles/") ? { functionMocks: userDocMocks } : {}),
+  // Creating a call room reads the booking it belongs to, which is the whole
+  // point of that rule — so the evaluator has to be told what it says.
+  ...(method === "create" && path.includes("/calls/")
+    ? {
+        functionMocks: [
+          {
+            function: "get",
+            args: [{ exactValue: `${DOCS}/bookings/bk_1` }],
+            result: { value: { data: booking } },
+          },
+        ],
+      }
+    : {}),
 });
 
 /**

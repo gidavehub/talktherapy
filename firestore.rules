@@ -359,10 +359,24 @@ service cloud.firestore {
       }
 
       allow read: if isCallParticipant();
-      // The room is created by whoever arrives first, who must be a listed
-      // participant, and the participant list can never be rewritten.
+
+      // The room is created by whoever arrives first, and its id IS the
+      // booking's — so the participant list has to be the booking's too,
+      // checked against the booking itself rather than taken on trust.
+      //
+      // Without that last clause anybody signed in could create the room for
+      // a session between two other people, listing only themselves. They
+      // could not hear anything: the room would hold no offer and they would
+      // never be sent one. But the two people who actually have the
+      // appointment would both fail to create it, both fail the update rule
+      // they are not participants of, and sit looking at a call that never
+      // connects, at the exact moment one of them most needs it to.
+      //
+      // One document read, once per call, at the only moment it is cheap.
       allow create: if isSignedIn()
-        && request.auth.uid in request.resource.data.participants;
+        && request.auth.uid in request.resource.data.participants
+        && request.resource.data.participants ==
+             get(/databases/$(database)/documents/bookings/$(sessionId)).data.participants;
       allow update: if isCallParticipant()
         && request.resource.data.participants == resource.data.participants;
       allow delete: if isCallParticipant();

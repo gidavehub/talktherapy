@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { SPRING_SOFT } from "../motion/primitives";
 import { Alert, Avatar, EmptyState, Spinner } from "../ui/Feedback";
-import { IconCalendar, IconChat, IconSpeaker } from "../ui/icons";
+import { IconCalendar, IconChat, IconSpeaker, IconVideo } from "../ui/icons";
 import Button from "../ui/Button";
 import { useAuth } from "../AuthProvider";
 import { useChatPeer } from "../chat/useChatPeer";
@@ -14,6 +14,7 @@ import { directChatId } from "../../lib/chat";
 import { formatDalasi } from "../../lib/money";
 import { cancelBooking, spokenSlot, watchMyBookings } from "../../lib/booking";
 import { useNow } from "../../lib/useNow";
+import { joinWindow } from "../../lib/call";
 import type { Booking } from "../../lib/models";
 
 /**
@@ -105,7 +106,20 @@ function SessionRow({
       ) : null}
 
       {!cancelled && !past ? (
-        <div className="mt-3 flex items-center gap-2">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {/* The way into the session itself, and only when it is nearly
+              time — a join button on a session three weeks away is a button
+              that does nothing, and the one thing somebody must not have to
+              hunt for is the call they are already late for. */}
+          {joinWindow(booking.startsAt, booking.endsAt, now) ? (
+            <Link
+              href={`/call/${booking.id}`}
+              className="inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2 text-[12.5px] text-white hover:bg-[var(--accent-soft)] transition-colors"
+            >
+              <IconVideo size={14} />
+              Join
+            </Link>
+          ) : null}
           {otherUid ? (
             <Link
               href={`/chats/${directChatId(selfUid, otherUid)}`}

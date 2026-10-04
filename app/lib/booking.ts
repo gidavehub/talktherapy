@@ -161,6 +161,30 @@ export function watchMyBookings(
   );
 }
 
+/**
+ * One session, live.
+ *
+ * The call screen needs the participants and the time, and needs to notice if
+ * the other side cancels while it is open. Rules refuse this to anyone who is
+ * not in it, so a pasted booking id yields nothing rather than somebody
+ * else's appointment.
+ */
+export function watchBooking(
+  bookingId: string,
+  cb: (booking: Booking | null) => void,
+): () => void {
+  if (!firebaseConfigured()) {
+    cb(null);
+    return () => {};
+  }
+
+  return onSnapshot(
+    doc(firestore(), COLLECTIONS.bookings, bookingId),
+    (snap) => cb(snap.exists() ? toBooking(snap.id, snap.data()) : null),
+    () => cb(null),
+  );
+}
+
 // ------------------------------------------------- a provider's own calendar
 
 /**
