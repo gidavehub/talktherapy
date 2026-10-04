@@ -7,6 +7,7 @@ import {
 } from "@/lib/payments/modempay-protocol";
 import { modemPayProvider, reportedAmountMinor, webhookSignatureCandidates } from "@/lib/payments/modempay";
 import { resolvePayer } from "@/lib/payments/resolve";
+import { creditSession, sessionToCredit } from "@/lib/payments/fulfil";
 import { recordAndApply } from "@/lib/payments/store";
 import type { VerifiedPayment } from "@/lib/payments/provider";
 import { json } from "../../respond";
@@ -112,6 +113,18 @@ export async function POST(req: Request) {
 
   const amountMinor = authoritative?.amountMinor ?? reportedAmountMinor(event.amountMajor);
 
+  // Checked BEFORE the transaction, because a credit runs after the
+  // transaction has written and Firestore refuses a read at that point. The
+  // provider's own copy of the metadata beats the delivery's.
+  const session = await sessionToCredit({
+    bookingId: authoritative?.bookingId ?? event.bookingId,
+    payerUid: payer?.uid ?? null,
+    amountMinor,
+  }).catch((error) => {
+    console.error("payments/webhook: could not check the session", error);
+    return null;
+  });
+
   try {
     const { outcome, decision } = await recordAndApply({
       eventKey: webhookEventKey(raw, event.eventId),
@@ -132,10 +145,11 @@ export async function POST(req: Request) {
           resolvedPurpose: payer?.purpose ?? null,
           resolvedEmail: payer?.email ?? null,
         }),
-      // `fulfilled: true` on the payment IS the entitlement today — the AI
-      // consultation checks for a fulfilled, unconsumed payment. When provider
-      // bookings land, activating the booking goes here, so that it shares the
-      // transaction with the event record and can never commit without it.
+      // Marking the session paid shares the transaction with the event
+      // record, so neither can commit without the other. For an AI tier there
+      // is nothing to activate yet: `fulfilled: true` on the payment is the
+      // entitlement, and the conversation will check for it.
+      credit: session ? creditSession(session.bookingId, event.paymentIntentId) : undefined,
     });
 
     console.log(

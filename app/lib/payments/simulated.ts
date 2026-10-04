@@ -23,7 +23,10 @@ import type { Checkout, CheckoutRequest, PaymentProvider, VerifiedPayment } from
  * In memory and per process, which is all a simulation needs — a restart
  * simply forgets, and nothing real was ever at stake.
  */
-const issued = new Map<string, { uid: string; purpose: string; amountMinor: number; email: string | null }>();
+const issued = new Map<
+  string,
+  { uid: string; purpose: string; amountMinor: number; email: string | null; bookingId: string | null }
+>();
 
 export function simulatedProvider(): PaymentProvider {
   return {
@@ -38,6 +41,7 @@ export function simulatedProvider(): PaymentProvider {
         purpose: input.purpose,
         amountMinor: input.amountMinor,
         email: input.customerEmail,
+        bookingId: input.bookingId ?? null,
       });
 
       // Straight back to the app, already carrying the intent id, so the
@@ -67,6 +71,7 @@ export function simulatedProvider(): PaymentProvider {
         expectedAmountMinor: record?.amountMinor ?? null,
         uid: record?.uid ?? null,
         purpose: record?.purpose ?? null,
+        bookingId: record?.bookingId ?? null,
         customerEmail: record?.email ?? null,
       };
     },

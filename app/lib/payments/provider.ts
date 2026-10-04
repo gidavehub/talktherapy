@@ -34,6 +34,8 @@ export type CheckoutRequest = {
   description: string;
   customerEmail: string | null;
   customerName: string | null;
+  /** Set for a session fee: the booking being paid for. */
+  bookingId?: string | null;
   /** Where the shopper lands after paying, and after cancelling. */
   returnUrl: string;
   cancelUrl: string;
@@ -71,6 +73,8 @@ export type VerifiedPayment = {
   expectedAmountMinor: number | null;
   uid: string | null;
   purpose: string | null;
+  /** The session this paid for, when it was a session fee. */
+  bookingId: string | null;
   customerEmail: string | null;
 };
 

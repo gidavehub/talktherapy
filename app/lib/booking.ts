@@ -248,6 +248,29 @@ export function cancelBooking(bookingId: string) {
   return post("/api/bookings/cancel", { bookingId });
 }
 
+/**
+ * Start paying for a session.
+ *
+ * Returns the hosted checkout link to send the browser to. The price is NOT
+ * sent — the server reads it from the booking, which got it from the
+ * provider's profile when the booking was made.
+ */
+export async function startSessionPayment(
+  bookingId: string,
+): Promise<{ ok: true; paymentLink: string } | { ok: false; error: string }> {
+  const res = await fetch("/api/payments/modem/create", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(await authHeader()) },
+    body: JSON.stringify({ purpose: "session_fee", bookingId }),
+  });
+
+  const json = (await res.json().catch(() => ({}))) as { paymentLink?: string; error?: string };
+  if (!res.ok || !json.paymentLink) {
+    return { ok: false, error: json.error ?? "Could not start the payment." };
+  }
+  return { ok: true, paymentLink: json.paymentLink };
+}
+
 // ------------------------------------------------------------------ labels
 
 const DAY = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long" });

@@ -12,7 +12,7 @@ import { useChatPeer } from "../chat/useChatPeer";
 import { useReadAloud } from "../../lib/useReadAloud";
 import { directChatId } from "../../lib/chat";
 import { formatDalasi } from "../../lib/money";
-import { cancelBooking, spokenSlot, watchMyBookings } from "../../lib/booking";
+import { cancelBooking, spokenSlot, startSessionPayment, watchMyBookings } from "../../lib/booking";
 import { useNow } from "../../lib/useNow";
 import { joinWindow } from "../../lib/call";
 import type { Booking } from "../../lib/models";
@@ -39,6 +39,8 @@ function SessionRow({
   now,
   onCancel,
   cancelling,
+  onPay,
+  paying,
   onRead,
   speaking,
 }: {
@@ -48,6 +50,8 @@ function SessionRow({
   now: number;
   onCancel: (id: string) => void;
   cancelling: boolean;
+  onPay: (id: string) => void;
+  paying: boolean;
   onRead: (id: string, text: string) => void;
   speaking: boolean;
 }) {
@@ -120,6 +124,21 @@ function SessionRow({
               Join
             </Link>
           ) : null}
+          {/* Unpaid, and only on the patient's side — the person who owes the
+              fee is the one who booked. A provider should never be shown a
+              button asking them to pay for their own session. */}
+          {booking.paymentStatus === "unpaid" &&
+          booking.amountMinor > 0 &&
+          booking.patientId === selfUid ? (
+            <button
+              type="button"
+              onClick={() => onPay(booking.id)}
+              disabled={paying}
+              className="rounded-full bg-[var(--dark)] px-4 py-2 text-[12.5px] text-white hover:bg-[var(--dark-soft)] transition-colors disabled:opacity-60"
+            >
+              {paying ? "Opening…" : `Pay ${formatDalasi(booking.amountMinor)}`}
+            </button>
+          ) : null}
           {otherUid ? (
             <Link
               href={`/chats/${directChatId(selfUid, otherUid)}`}
@@ -147,6 +166,7 @@ export default function SessionList() {
   const { user, profile, role } = useAuth();
   const [bookings, setBookings] = useState<Booking[] | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
+  const [paying, setPaying] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { read, speakingId } = useReadAloud(profile?.intake?.language ?? null);
   const now = useNow();
@@ -155,6 +175,20 @@ export default function SessionList() {
     if (!user) return;
     return watchMyBookings(user.uid, setBookings);
   }, [user]);
+
+  async function pay(id: string) {
+    setPaying(id);
+    setError(null);
+    const result = await startSessionPayment(id);
+    if (result.ok) {
+      // The gateway's own page. Leaving Talk is unavoidable for a hosted
+      // checkout; the return URL brings them back to this list.
+      window.location.href = result.paymentLink;
+      return;
+    }
+    setError(result.error);
+    setPaying(null);
+  }
 
   async function cancel(id: string) {
     setCancelling(id);
@@ -211,6 +245,8 @@ export default function SessionList() {
               now={now}
               onCancel={(id) => void cancel(id)}
               cancelling={cancelling === booking.id}
+              onPay={(id) => void pay(id)}
+              paying={paying === booking.id}
               onRead={read}
               speaking={speakingId === booking.id}
             />
@@ -237,6 +273,8 @@ export default function SessionList() {
               now={now}
               onCancel={(id) => void cancel(id)}
               cancelling={cancelling === booking.id}
+              onPay={(id) => void pay(id)}
+              paying={paying === booking.id}
               onRead={read}
               speaking={speakingId === booking.id}
             />

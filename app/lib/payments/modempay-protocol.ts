@@ -311,6 +311,14 @@ export type NormalisedEvent = {
   expectedAmountMinor: number | null;
   /** From `metadata.uid` — tier one of resolving who paid. */
   uid: string | null;
+  /**
+   * The session this paid for, from `metadata.booking_id`.
+   *
+   * Only a session fee carries one. It is what lets the webhook mark the
+   * booking paid in the SAME transaction that records the event — see
+   * `creditFor` in ./fulfil.ts.
+   */
+  bookingId: string | null;
   purpose: string | null;
   customerEmail: string | null;
 };
@@ -372,6 +380,7 @@ export function normaliseWebhookEvent(body: unknown): NormalisedEvent {
     // numbers, so this is parsed rather than read.
     expectedAmountMinor: asIntegerish(metadata.amount_minor),
     uid: asString(metadata.uid),
+    bookingId: asString(metadata.booking_id),
     purpose: asString(metadata.purpose),
     customerEmail: asString(payload.customer_email) ?? asString(payload.customerEmail),
   };

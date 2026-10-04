@@ -20,11 +20,36 @@ import { appBaseUrl, json } from "../../respond";
 
 export const dynamic = "force-dynamic";
 
-/** The only things buyable today. Session fees arrive with bookings. */
+/** The fixed-price items. A session fee is not one — it is per provider. */
 const PURCHASABLE: Record<string, { purpose: PaymentPurpose; tier: AiTierId }> = {
   ai_initial: { purpose: "ai_initial", tier: "initial" },
   ai_extended: { purpose: "ai_extended", tier: "extended" },
 };
+
+/**
+ * What a session costs, read from the booking.
+ *
+ * NEVER from the request. The price was fixed when the booking was made, from
+ * the provider's own profile, inside the transaction that made it — so this
+ * only has to read it back and check that the person paying is the person who
+ * booked.
+ */
+async function sessionFee(bookingId: string, uid: string) {
+  const snap = await adminDb().collection("bookings").doc(bookingId).get();
+  if (!snap.exists) return { error: "No such session." } as const;
+
+  const data = snap.data() ?? {};
+  // Same answer for "not yours" as for "not there", so this cannot be used to
+  // discover other people's sessions.
+  if (data.patientId !== uid) return { error: "No such session." } as const;
+  if (data.status === "cancelled") return { error: "That session was cancelled." } as const;
+  if (data.paymentStatus === "paid") return { error: "That session is already paid for." } as const;
+
+  const amountMinor = typeof data.amountMinor === "number" ? data.amountMinor : 0;
+  if (amountMinor <= 0) return { error: "That session has no fee set." } as const;
+
+  return { amountMinor } as const;
+}
 
 export async function POST(req: Request) {
   const user = await requireUser(req);
@@ -45,12 +70,33 @@ export async function POST(req: Request) {
   }
 
   const requested = typeof body.purpose === "string" ? body.purpose : "";
-  const item = PURCHASABLE[requested];
-  if (!item) {
-    return json(400, { error: "Unknown purpose." });
-  }
+  const bookingId = typeof body.bookingId === "string" ? body.bookingId.trim() : "";
 
-  const tier = AI_TIERS[item.tier];
+  // Two shapes of purchase: a fixed-price AI tier, or a session whose price
+  // lives on the booking.
+  let charge: { purpose: PaymentPurpose; amountMinor: number; title: string; description: string };
+
+  if (requested === "session_fee") {
+    if (!bookingId) return json(400, { error: "Missing session." });
+    const found = await sessionFee(bookingId, user.uid);
+    if ("error" in found) return json(404, { error: found.error });
+    charge = {
+      purpose: "session_fee",
+      amountMinor: found.amountMinor,
+      title: "Session with your provider",
+      description: "One session, by video, inside Talk.",
+    };
+  } else {
+    const item = PURCHASABLE[requested];
+    if (!item) return json(400, { error: "Unknown purpose." });
+    const tier = AI_TIERS[item.tier];
+    charge = {
+      purpose: item.purpose,
+      amountMinor: tier.amountMinor,
+      title: tier.label,
+      description: tier.blurb,
+    };
+  }
 
   // Email and name come from the user's own document, not the request — they
   // appear on the hosted checkout page and in the provider's records, and a
@@ -73,14 +119,18 @@ export async function POST(req: Request) {
   try {
     const checkout = await provider.createCheckout({
       uid: user.uid,
-      purpose: item.purpose,
-      amountMinor: tier.amountMinor,
-      title: tier.label,
-      description: tier.blurb,
+      purpose: charge.purpose,
+      amountMinor: charge.amountMinor,
+      title: charge.title,
+      description: charge.description,
       customerEmail,
       customerName,
-      returnUrl: `${base}/therapy?paid=1`,
-      cancelUrl: `${base}/plans?cancelled=1`,
+      // Travels in the payment's metadata, so the webhook can mark exactly
+      // this session paid in the transaction that records the event.
+      bookingId: charge.purpose === "session_fee" ? bookingId : null,
+      returnUrl:
+        charge.purpose === "session_fee" ? `${base}/sessions?paid=1` : `${base}/therapy?paid=1`,
+      cancelUrl: charge.purpose === "session_fee" ? `${base}/sessions` : `${base}/plans?cancelled=1`,
       // Per-intent callback. Deliveries to it are signed with the MERCHANT
       // SECRET KEY rather than the webhook signing secret — see
       // `webhookSignatureCandidates` in app/lib/payments/modempay.ts.
@@ -91,8 +141,8 @@ export async function POST(req: Request) {
       paymentIntentId: checkout.paymentIntentId,
       provider: configuredProviderName(),
       uid: user.uid,
-      purpose: item.purpose,
-      amountMinor: tier.amountMinor,
+      purpose: charge.purpose,
+      amountMinor: charge.amountMinor,
       customerEmail,
       paymentMethods: checkout.paymentMethods,
     });
@@ -101,7 +151,7 @@ export async function POST(req: Request) {
       paymentIntentId: checkout.paymentIntentId,
       paymentLink: checkout.paymentLink,
       paymentMethods: checkout.paymentMethods,
-      amountMinor: tier.amountMinor,
+      amountMinor: charge.amountMinor,
       currency: "GMD",
     });
   } catch (error) {

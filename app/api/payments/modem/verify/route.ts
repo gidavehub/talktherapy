@@ -2,6 +2,7 @@ import { decideFulfilment } from "@/lib/payments/modempay-protocol";
 import { paymentProvider } from "@/lib/payments/provider";
 import { readPayment, recordAndApply } from "@/lib/payments/store";
 import { resolvePayer } from "@/lib/payments/resolve";
+import { creditSession, sessionToCredit } from "@/lib/payments/fulfil";
 import { allow, requireUser } from "@/lib/server/requireUser";
 import { json } from "../../respond";
 
@@ -87,6 +88,14 @@ export async function GET(req: Request) {
     payloadPurpose: authoritative.purpose,
   }).catch(() => null);
 
+  // As in the webhook: checked before the transaction, because a credit may
+  // only write once one is under way.
+  const session = await sessionToCredit({
+    bookingId: authoritative.bookingId,
+    payerUid: payer?.uid ?? null,
+    amountMinor: authoritative.amountMinor,
+  }).catch(() => null);
+
   try {
     const { decision } = await recordAndApply({
       // One reconciliation per payment through this path, ever. A different key
@@ -109,6 +118,7 @@ export async function GET(req: Request) {
             paymentIntentId,
             amountMajor: null,
             expectedAmountMinor: authoritative.expectedAmountMinor,
+            bookingId: authoritative.bookingId,
             uid: authoritative.uid,
             purpose: authoritative.purpose,
             customerEmail: authoritative.customerEmail,
@@ -120,6 +130,7 @@ export async function GET(req: Request) {
           resolvedPurpose: payer?.purpose ?? null,
           resolvedEmail: payer?.email ?? null,
         }),
+      credit: session ? creditSession(session.bookingId, paymentIntentId) : undefined,
     });
 
     return json(200, {

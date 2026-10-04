@@ -125,6 +125,7 @@ export function modemPayProvider(): PaymentProvider {
           // The expected amount travels with the payment so a mismatch can be
           // spotted even if our own record is somehow missing.
           amount_minor: String(input.amountMinor),
+          ...(input.bookingId ? { booking_id: input.bookingId } : {}),
         },
         returnUrl: input.returnUrl,
         cancelUrl: input.cancelUrl,
@@ -162,6 +163,7 @@ export function modemPayProvider(): PaymentProvider {
         expectedAmountMinor: expectedMinorFromMetadata(read(metadata, "amount_minor")),
         uid: stringOrNull(read(metadata, "uid")),
         purpose: stringOrNull(read(metadata, "purpose")),
+        bookingId: stringOrNull(read(metadata, "booking_id")),
         customerEmail: stringOrNull(read(data, "customer_email") ?? read(data, "customerEmail")),
       };
     },
