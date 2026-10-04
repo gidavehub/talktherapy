@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "../components/AuthProvider";
 import { StreamPlayer } from "./audio/player";
 import type { Language } from "./ai/protocol";
+import { COMPANION } from "./ai/endpoints";
 
 /**
  * Read something on this screen aloud, in the person's own language.
@@ -11,7 +12,7 @@ import type { Language } from "./ai/protocol";
  * Talk is built for people who in many cases cannot read well, or cannot see.
  * Any surface — a provider's details, a message, a question — can hand its
  * text to this and have it spoken; the server renders it into their language
- * first (see app/api/companion/speak).
+ * first (see the companionSpeak Cloud Function).
  *
  * The AudioContext is created inside the click that asks for speech, which is
  * the only moment a browser will allow it to make sound.
@@ -66,7 +67,7 @@ export function useReadAloud(language: Language | null | undefined) {
 
       try {
         const token = user ? await user.getIdToken().catch(() => null) : null;
-        const res = await fetch("/api/companion/speak", {
+        const res = await fetch(COMPANION.speak, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
           body: JSON.stringify({ text, language: language ?? "english" }),

@@ -51,6 +51,14 @@ import {
   sessionToCredit,
 } from "./payments";
 
+export {
+  companionTurn,
+  companionGreet,
+  companionSpeak,
+  companionPresent,
+  companionSummarize,
+} from "./companion";
+
 const MODEM_PAY_SECRET_KEY = defineSecret("MODEM_PAY_SECRET_KEY");
 const MODEM_PAY_WEBHOOK_SECRET = defineSecret("MODEM_PAY_WEBHOOK_SECRET");
 

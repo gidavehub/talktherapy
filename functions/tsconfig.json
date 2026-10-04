@@ -20,5 +20,10 @@
   // node:crypto, which is what makes this possible — and it carries a hundred
   // assertions in scripts/test-modempay-webhook.mjs that would be worthless
   // against a second copy.
-  "include": ["src/**/*.ts", "../app/lib/payments/modempay-protocol.ts"]
+  "include": [
+    "src/**/*.ts",
+    "../app/lib/payments/modempay-protocol.ts",
+    "../app/lib/ai/protocol.ts",
+    "../app/lib/matching.ts"
+  ]
 }

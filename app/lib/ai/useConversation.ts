@@ -17,6 +17,7 @@ import {
   type Risk,
   type TurnEvent,
 } from "./protocol";
+import { COMPANION } from "./endpoints";
 
 /**
  * The voice conversation, end to end, on the client.
@@ -164,7 +165,7 @@ export function useConversation({
     foldingRef.current = true;
     const folded = historyRef.current.slice(0, FOLD_TURNS);
     try {
-      const res = await fetch("/api/companion/summarize", {
+      const res = await fetch(COMPANION.summarize, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(await authHeader()) },
         body: JSON.stringify({ summary: summaryRef.current, turns: folded }),
@@ -395,7 +396,7 @@ export function useConversation({
           },
           onUtterance: (audio, seconds) => {
             lastUtteranceSec.current = seconds;
-            void speakRequest("/api/companion/turn", turnBody({ audio }));
+            void speakRequest(COMPANION.turn, turnBody({ audio }));
           },
         });
       } catch (e) {
@@ -413,7 +414,7 @@ export function useConversation({
 
     // Onboarding opens with Talk's voice, not instructions on a screen.
     if (opts.current.mode === "intake") {
-      await speakRequest("/api/companion/greet", {
+      await speakRequest(COMPANION.greet, {
         mode: "intake",
         intake: intakeRef.current,
         displayName: opts.current.displayName,
@@ -433,7 +434,7 @@ export function useConversation({
         abortRef.current?.abort();
         playerRef.current?.stop();
       }
-      void speakRequest("/api/companion/turn", turnBody({ text: clean }));
+      void speakRequest(COMPANION.turn, turnBody({ text: clean }));
     },
     [speakRequest, turnBody],
   );
@@ -446,7 +447,7 @@ export function useConversation({
   const present = useCallback(
     (providers: unknown[], intake: Intake) => {
       doneRef.current = false;
-      void speakRequest("/api/companion/present", { providers, intake });
+      void speakRequest(COMPANION.present, { providers, intake });
     },
     [speakRequest],
   );
@@ -473,7 +474,7 @@ export function useConversation({
         setAwaitingLanguage(false);
         awaitingLanguageRef.current = false;
         opts.current.onIntake?.(next);
-        void speakRequest("/api/companion/greet", {
+        void speakRequest(COMPANION.greet, {
           mode: "intake",
           intake: next,
           displayName: opts.current.displayName,

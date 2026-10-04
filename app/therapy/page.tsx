@@ -21,6 +21,8 @@ import {
 import { LOCALE_LABELS } from "@/lib/models";
 import { formatDalasi } from "@/lib/money";
 import { useMatches } from "@/lib/useMatches";
+import { useOpenProvider } from "@/lib/useOpenProvider";
+import { useReadAloud } from "@/lib/useReadAloud";
 import ProviderCard from "@/components/providers/ProviderCard";
 
 /**
@@ -69,7 +71,11 @@ const DEV_ANON = process.env.NODE_ENV === "development";
 
 export default function TherapyPage() {
   const router = useRouter();
+  const { open: openProvider } = useOpenProvider();
   const { user, profile, ready } = useAuth();
+  // Talk narrates the shortlist once. The speaker on each card is how somebody
+  // hears it again without asking her to repeat the whole thing.
+  const { read: readAloud, speakingId: readingId } = useReadAloud(profile?.intake?.language ?? null);
 
   // Read once, lazily, from the URL: ?intake redoes the intake for someone
   // already set up; ?debug shows capture diagnostics.
@@ -184,8 +190,8 @@ export default function TherapyPage() {
         .split(/[ ]+/)
         .some((part) => part.length > 2 && said.includes(part)),
     );
-    if (hits.length === 1) router.push(`/providers/${hits[0].profile.uid}`);
-  }, [shortlist, talk.lines, router]);
+    if (hits.length === 1) void openProvider(hits[0].profile);
+  }, [shortlist, talk.lines, openProvider]);
 
   const denied = mic.status === "denied" || mic.status === "unsupported" || mic.status === "error";
   // Without a microphone the keyboard is the only way to answer, so it is open.
@@ -210,11 +216,13 @@ export default function TherapyPage() {
 
   /**
    * A tapped answer. Once Talk has introduced the shortlist, the options are
-   * the providers themselves, and tapping one opens their profile.
+   * the providers themselves, and tapping one opens the conversation with
+   * them — the same place saying their name goes.
    */
   function handleChoice(choice: { id: string; label: string }) {
-    if (shortlist?.some((m) => m.profile.uid === choice.id)) {
-      router.push(`/providers/${choice.id}`);
+    const picked = shortlist?.find((m) => m.profile.uid === choice.id);
+    if (picked) {
+      void openProvider(picked.profile);
       return;
     }
     talk.choose(choice);
@@ -382,6 +390,9 @@ export default function TherapyPage() {
                 key={m.profile.uid}
                 profile={m.profile}
                 index={i}
+                onOpen={(p) => void openProvider(p)}
+                onRead={(cardId, text) => void readAloud(cardId, text)}
+                speaking={readingId === m.profile.uid}
                 reasons={m.reasons}
                 best={i === 0}
                 compact

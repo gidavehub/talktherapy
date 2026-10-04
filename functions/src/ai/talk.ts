@@ -1,4 +1,3 @@
-import "server-only";
 import { generate, models, streamGenerate, textOf, type Content } from "./vertex";
 import {
   INTAKE_BUDGET_SEC,
@@ -15,7 +14,7 @@ import {
   type Language,
   type Risk,
   type TurnResult,
-} from "../protocol";
+} from "../../../app/lib/ai/protocol";
 import {
   AGE_RANGES,
   AREAS,
@@ -29,7 +28,7 @@ import {
   missingFields,
   type Intake,
   type RequiredField,
-} from "../../matching";
+} from "../../../app/lib/matching";
 
 /**
  * Talk's conversation pipeline — one voice turn.

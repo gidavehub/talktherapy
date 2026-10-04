@@ -12,6 +12,7 @@ import { IconPeople } from "@/components/ui/icons";
 import { intakeChips } from "@/lib/matching";
 import { useMatches } from "@/lib/useMatches";
 import { useReadAloud } from "@/lib/useReadAloud";
+import { useOpenProvider } from "@/lib/useOpenProvider";
 
 /**
  * Providers for you.
@@ -27,6 +28,7 @@ export default function ProvidersForYouPage() {
   // Every provider can read itself out, in whatever language they chose when
   // they talked to Talk.
   const { read, speakingId } = useReadAloud(intake?.language);
+  const { open: openProvider } = useOpenProvider();
   const [welcome] = useState(
     () => typeof window !== "undefined" && new URLSearchParams(window.location.search).has("welcome"),
   );
@@ -106,6 +108,7 @@ export default function ProvidersForYouPage() {
               index={i}
               reasons={intake ? m.reasons : undefined}
               best={Boolean(intake) && i === 0 && m.reasons.length > 0}
+              onOpen={(p) => void openProvider(p)}
               onRead={(id, text) => void read(id, text)}
               speaking={speakingId === m.profile.uid}
             />

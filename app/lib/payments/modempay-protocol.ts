@@ -4,7 +4,9 @@
  * Everything here is deterministic and offline: HMAC verification, event-shape
  * normalisation, the card-minimum rule, request/response shaping and the
  * fulfilment decision. The half that holds the secret key and talks to
- * api.modempay.com lives in ./modempay.ts.
+ * api.modempay.com is the modemPay() helper in functions/src/index.ts — in
+ * Cloud Functions, because that is where the merchant key lives (Secret
+ * Manager) and never on a web host.
  *
  * Why the split: this file is what `scripts/test-modempay-webhook.mjs` imports
  * and exercises. The webhook verifier is the one piece of a payment
@@ -17,7 +19,8 @@
  *
  * Money convention: every amount crossing this file is an integer in minor
  * units (bututs), as everywhere else in the app. Modem Pay's own API wants
- * MAJOR units; that conversion happens in ./modempay.ts and nowhere else.
+ * MAJOR units; that conversion happens in functions/src/index.ts (toMajor /
+ * toMinor) and nowhere else.
  */
 
 import { createHmac, createHash, randomBytes, timingSafeEqual } from "node:crypto";
@@ -321,7 +324,7 @@ export type NormalisedEvent = {
   statusText: string;
   outcome: WebhookOutcome;
   paymentIntentId: string | null;
-  /** As the wire gives it: MAJOR units. Converted in ./modempay.ts. */
+  /** As the wire gives it: MAJOR units. Converted in functions/src/index.ts. */
   amountMajor: number | null;
   /**
    * What we asked for, from `metadata.amount_minor` — already bututs, because
@@ -341,7 +344,7 @@ export type NormalisedEvent = {
    *
    * Only a session fee carries one. It is what lets the webhook mark the
    * booking paid in the SAME transaction that records the event — see
-   * `creditFor` in ./fulfil.ts.
+   * `creditSession` in functions/src/payments.ts.
    */
   bookingId: string | null;
   purpose: string | null;

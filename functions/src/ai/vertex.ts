@@ -1,4 +1,3 @@
-import "server-only";
 import { GoogleAuth } from "google-auth-library";
 
 /**
@@ -39,11 +38,18 @@ let authClient: ReturnType<GoogleAuth["getClient"]> | null = null;
 
 function client() {
   if (!authClient) {
-    // A key file locally; inline JSON where the host has no filesystem for
-    // secrets (Vercel, App Hosting). Never both, never neither.
-    const json = process.env.TALK_AI_CREDENTIALS_JSON;
+    // NO KEY FILE. Deployed, this function RUNS AS talk-ai (see the
+    // serviceAccount option in ../index.ts), so the ambient credentials are
+    // already that identity and a key never has to exist anywhere. The split
+    // the comment above describes is preserved by the runtime rather than by
+    // a file: this code can spend Vertex budget and cannot read a journal
+    // entry, because the identity it runs as holds nothing else.
+    //
+    // Locally, scripts fall back to the key file through
+    // GOOGLE_APPLICATION_CREDENTIALS or TALK_AI_CREDENTIALS.
+    const keyFile = process.env.TALK_AI_CREDENTIALS;
     const auth = new GoogleAuth({
-      ...(json ? { credentials: JSON.parse(json) } : { keyFile: required("TALK_AI_CREDENTIALS") }),
+      ...(keyFile ? { keyFile } : {}),
       scopes: "https://www.googleapis.com/auth/cloud-platform",
     });
     authClient = auth.getClient();

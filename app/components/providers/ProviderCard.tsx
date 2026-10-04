@@ -39,6 +39,8 @@ export default function ProviderCard({
   compact = false,
   onRead,
   speaking = false,
+  onOpen,
+  photoUrl = null,
 }: {
   profile: ProviderProfile;
   index?: number;
@@ -50,6 +52,18 @@ export default function ProviderCard({
   /** Read this provider aloud. Omitted where speech is not available. */
   onRead?: (id: string, text: string) => void;
   speaking?: boolean;
+  /**
+   * What tapping the card does.
+   *
+   * Signed-in surfaces pass this and it opens the CONVERSATION with the
+   * provider — the point of the whole product is the hand-off to a person, and
+   * a profile page between the two is a page nobody asked for. The public
+   * directory omits it, because a visitor who is not signed in has nobody to
+   * open a conversation as, and falls back to the profile.
+   */
+  onOpen?: (profile: ProviderProfile) => void;
+  /** Resolved download URL for `photoPath`, when there is one. */
+  photoUrl?: string | null;
 }) {
   // What they offer, then where they are — the two things someone scanning a
   // list actually chooses on.
@@ -65,14 +79,23 @@ export default function ProviderCard({
       whileHover={{ y: -4 }}
       className="relative rounded-[28px] bg-white shadow-[0_18px_40px_-22px_rgba(0,0,0,0.25)] p-6 flex flex-col"
     >
-      <Link
-        href={`/providers/${profile.uid}`}
-        className="absolute inset-0 rounded-[28px]"
-        aria-label={`${profile.displayName} — view profile`}
-      />
+      {onOpen ? (
+        <button
+          type="button"
+          onClick={() => onOpen(profile)}
+          className="absolute inset-0 rounded-[28px]"
+          aria-label={`Message ${profile.displayName}`}
+        />
+      ) : (
+        <Link
+          href={`/providers/${profile.uid}`}
+          className="absolute inset-0 rounded-[28px]"
+          aria-label={`${profile.displayName} — view profile`}
+        />
+      )}
 
       <div className="flex items-start gap-4">
-        <Avatar name={profile.displayName} size={compact ? 48 : 56} />
+        <Avatar src={photoUrl} name={profile.displayName} size={compact ? 48 : 56} />
         <div className="min-w-0 flex-1">
           <h3 className="text-[16px] font-medium leading-tight truncate">{profile.displayName}</h3>
           {kind ? <p className="mt-1 text-[12px] text-[var(--muted)] truncate">{kind}</p> : null}
@@ -126,6 +149,13 @@ export default function ProviderCard({
         </div>
       ) : null}
 
+      {!compact && profile.qualifications.length ? (
+        <p className="mt-4 text-[12px] text-[var(--muted)] truncate">
+          {profile.qualifications[0]}
+          {profile.qualifications.length > 1 ? ` +${profile.qualifications.length - 1}` : ""}
+        </p>
+      ) : null}
+
       {!compact ? (
         <dl className="mt-6 grid grid-cols-2 gap-4 text-[12px]">
           <div>
@@ -145,15 +175,22 @@ export default function ProviderCard({
             <Badge tone="warning">Sample profile</Badge>
           ) : (
             <span className="text-[12px] text-[var(--muted)]">
-              {compact
-                ? formatDalasi(profile.sessionRateMinor)
-                : profile.yearsExperience > 0
-                  ? `${profile.yearsExperience} yrs experience`
-                  : "Verified professional"}
+              {/*
+                A rating only when somebody has actually given one. Showing
+                "0.0 ★" for every new provider would be a worse lie than
+                showing nothing, and it is the number people trust most.
+              */}
+              {profile.ratingCount > 0
+                ? `${profile.ratingAvg.toFixed(1)} ★ · ${profile.ratingCount} rating${profile.ratingCount === 1 ? "" : "s"}`
+                : compact
+                  ? formatDalasi(profile.sessionRateMinor)
+                  : profile.yearsExperience > 0
+                    ? `${profile.yearsExperience} yrs experience`
+                    : "Verified professional"}
             </span>
           )}
           <span className="text-[12px] uppercase tracking-[0.14em] font-medium underline underline-offset-4">
-            View
+            {onOpen ? "Message" : "View"}
           </span>
         </div>
       </div>
