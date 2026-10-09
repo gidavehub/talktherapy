@@ -189,6 +189,19 @@ service cloud.firestore {
       // a dalasi.
       allow create, update: if isAdmin();
 
+      // The ONE exception: the provider may attach, change or clear a Google
+      // Meet link on their own session — the fallback for anyone who would
+      // rather meet there. That field and its timestamp, nothing else, and
+      // only a meet.google.com address. Any URL at all would be a way to put a
+      // link of somebody's choosing in front of a person at the exact moment
+      // they are about to see their provider.
+      allow update: if isSignedIn()
+        && request.auth.uid == resource.data.providerId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['meetUrl', 'updatedAt'])
+        && (request.resource.data.meetUrl == null
+            || (request.resource.data.meetUrl is string
+                && request.resource.data.meetUrl.matches('^https://meet[.]google[.]com/[A-Za-z0-9-]+([?].*)?$')));
+
       allow delete: if isAdmin();
     }
 

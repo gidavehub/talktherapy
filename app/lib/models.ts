@@ -308,6 +308,13 @@ export type Booking = {
   currency: "GMD";
   transactionId: string | null;
   patientNote: string;
+  /**
+   * A Google Meet link the provider may attach, for anyone who would rather
+   * meet there. The session itself happens inside Talk; this is the fallback
+   * the owner asked for, set by the provider and nobody else (firestore.rules
+   * lets them write this one field and only a meet.google.com address).
+   */
+  meetUrl: string | null;
   createdAt: number;
   updatedAt: number;
 };

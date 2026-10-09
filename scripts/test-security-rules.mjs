@@ -217,6 +217,21 @@ const CASES = [
   ["cancelling from the browser", "DENY", PATIENT, "update", `${DOCS}/bookings/bk_1`, booking,
     { ...booking, status: "cancelled" }],
 
+  // The Meet fallback: the provider may attach a link — that one field, only
+  // a meet.google.com address — and nobody else may.
+  ["the provider attaches a Meet link", "ALLOW", PROVIDER, "update", `${DOCS}/bookings/bk_1`, booking,
+    { ...booking, meetUrl: "https://meet.google.com/abc-defg-hij", updatedAt: 2 }],
+  ["the provider clears it", "ALLOW", PROVIDER, "update", `${DOCS}/bookings/bk_1`,
+    { ...booking, meetUrl: "https://meet.google.com/abc-defg-hij" }, { ...booking, meetUrl: null }],
+  ["the patient attaches a link", "DENY", PATIENT, "update", `${DOCS}/bookings/bk_1`, booking,
+    { ...booking, meetUrl: "https://meet.google.com/abc-defg-hij" }],
+  ["a link that is not Google Meet", "DENY", PROVIDER, "update", `${DOCS}/bookings/bk_1`, booking,
+    { ...booking, meetUrl: "https://evil.example/meet.google.com/x" }],
+  ["a lookalike domain", "DENY", PROVIDER, "update", `${DOCS}/bookings/bk_1`, booking,
+    { ...booking, meetUrl: "https://meet.google.com.evil.example/x" }],
+  ["marking it paid alongside the link", "DENY", PROVIDER, "update", `${DOCS}/bookings/bk_1`, booking,
+    { ...booking, meetUrl: "https://meet.google.com/abc-defg-hij", paymentStatus: "paid" }],
+
   // A provider owns their calendar; nobody else may touch it. A patient
   // taking a slot goes through the server, which is why this stays shut even
   // though booking needs the slot to change.

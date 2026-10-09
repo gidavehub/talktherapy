@@ -21,6 +21,7 @@ import {
   orderBy,
   query,
   setDoc,
+  updateDoc,
   where,
   type DocumentData,
 } from "firebase/firestore";
@@ -68,6 +69,7 @@ function toBooking(id: string, data: DocumentData): Booking {
     currency: "GMD",
     transactionId: typeof data.transactionId === "string" ? data.transactionId : null,
     patientNote: typeof data.patientNote === "string" ? data.patientNote : "",
+    meetUrl: typeof data.meetUrl === "string" && isMeetUrl(data.meetUrl) ? data.meetUrl : null,
     createdAt: typeof data.createdAt === "number" ? data.createdAt : 0,
     updatedAt: typeof data.updatedAt === "number" ? data.updatedAt : 0,
   };
@@ -222,6 +224,36 @@ export async function addSlot(providerId: string, startsAt: number): Promise<voi
  */
 export async function removeSlot(providerId: string, slotId: string): Promise<void> {
   await deleteDoc(doc(slotsRef(providerId), slotId));
+}
+
+// ----------------------------------------------------------- Meet fallback
+
+/**
+ * Is this a Google Meet meeting link?
+ *
+ * Checked on the client for a helpful message, and again in firestore.rules,
+ * which is the check that counts. Only meet.google.com: a field that accepted
+ * any URL would be a way to put an arbitrary link in front of somebody at the
+ * moment they are about to see their provider, which is the moment they are
+ * most likely to click it.
+ */
+export function isMeetUrl(value: string): boolean {
+  return /^https:\/\/meet\.google\.com\/[a-z0-9-]+(\?.*)?$/i.test(value.trim());
+}
+
+/**
+ * Attach a Meet link to a session, or clear it with null. Provider only — the
+ * rules refuse anybody else, and refuse any field but this one.
+ */
+export async function setMeetLink(bookingId: string, url: string | null): Promise<void> {
+  const value = url ? url.trim() : null;
+  if (value && !isMeetUrl(value)) {
+    throw new Error("That is not a Google Meet link. It should start with https://meet.google.com/");
+  }
+  await updateDoc(doc(firestore(), COLLECTIONS.bookings, bookingId), {
+    meetUrl: value,
+    updatedAt: Date.now(),
+  });
 }
 
 // ------------------------------------------------------------------- booking

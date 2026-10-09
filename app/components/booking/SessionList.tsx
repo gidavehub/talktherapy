@@ -10,6 +10,7 @@ import Button from "../ui/Button";
 import { useAuth } from "../AuthProvider";
 import { useChatPeer } from "../chat/useChatPeer";
 import ProviderAvatar from "../providers/ProviderAvatar";
+import MeetLink from "./MeetLink";
 import { useReadAloud } from "../../lib/useReadAloud";
 import { directChatId } from "../../lib/chat";
 import { formatDalasi } from "../../lib/money";
@@ -149,6 +150,11 @@ function SessionRow({
               Message
             </Link>
           ) : null}
+          <MeetLink
+            bookingId={booking.id}
+            meetUrl={booking.meetUrl}
+            canEdit={booking.providerId === selfUid}
+          />
           <button
             type="button"
             onClick={() => onCancel(booking.id)}

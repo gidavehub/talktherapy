@@ -10,6 +10,7 @@ import Button from "../ui/Button";
 import { useAuth } from "../AuthProvider";
 import { useChatPeer } from "../chat/useChatPeer";
 import ProviderAvatar from "../providers/ProviderAvatar";
+import MeetLink from "../booking/MeetLink";
 import { useNow } from "../../lib/useNow";
 import { watchBooking, spokenSlot } from "../../lib/booking";
 import { hasRelay, joinCall, joinWindow, type CallController, type CallState } from "../../lib/call";
@@ -354,6 +355,13 @@ export default function CallRoom({ bookingId }: { bookingId: string }) {
             <Button variant="secondary" onClick={() => void join(false)} disabled={!open}>
               Join by voice
             </Button>
+            {uid ? (
+              <MeetLink
+                bookingId={booking.id}
+                meetUrl={booking.meetUrl}
+                canEdit={booking.providerId === uid}
+              />
+            ) : null}
             {otherUid ? (
               <Link
                 href={`/chats/${[uid, otherUid].sort().join("__")}`}
