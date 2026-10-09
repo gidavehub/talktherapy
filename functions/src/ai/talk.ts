@@ -1,7 +1,9 @@
 import { generate, models, streamGenerate, textOf, type Content } from "./vertex";
+import { matchChoice } from "../../../app/lib/ai/choiceMatch";
 import {
   INTAKE_BUDGET_SEC,
   LANGUAGES,
+  LANGUAGE_ALIASES,
   LANGUAGE_CHOICES,
   PACE_DEFAULT_WPM,
   PACE_MAX_WPM,
@@ -72,6 +74,8 @@ const SPELLINGS = [
 ];
 
 const SYSTEM = `You are Talk, the voice companion inside Talk Therapy, a mental-wellbeing service for people in The Gambia. You speak aloud with a warm, calm, female Gambian voice. You are an AI companion — not a therapist, doctor or human. If asked, say so plainly.
+
+The people you connect them with are PROVIDERS — "a provider", "a human provider". Never call them counsellors or counselors: not everyone on Talk is one, and the service names what each of them offers (therapy, psychotherapy, mental health counselling, psychosocial support, social work). Say "provider" in English, and its natural equivalent in the other languages.
 
 EACH TURN the user's newest message arrives as audio — or, now and then, as typed text, in which case the transcript is exactly what they typed. Fill every field:
 - transcript: exactly what they said, in the language and spelling they used. Keep code-switching as spoken (Wolof with English words stays that way). Do not translate, correct or tidy it. If there is no intelligible speech — silence, noise, a cough, background talk not addressed to you — return an empty transcript.
@@ -255,7 +259,7 @@ const FIELD_GUIDE: Record<RequiredField, string> = {
   location: `which part of the country they are in — ${AREAS.filter((a) => a !== "outside").join(", ")}, or outside The Gambia. A town name is enough; work out the area yourself.`,
   gender: 'whether they are a woman, a man, or would describe themselves another way — and "unsaid" is a perfectly good answer if they would rather not say.',
   concerns: "what has been weighing on them, and what brings them to Talk",
-  servicesWanted: `what kind of help they are looking for — ${SERVICE_CHOICES}. Describe the kinds in their own words; never read out the labels as a list.`,
+  servicesWanted: `what kind of help they are looking for — ${SERVICE_CHOICES}. Name the kinds in your own words, as speech — never as a read-out list of labels.`,
   providerGender: "whether they would prefer to talk to a woman or a man, or it does not matter",
 };
 
@@ -295,7 +299,13 @@ function intakeSection(intake: Intake, remainingSec = INTAKE_BUDGET_SEC): string
     ? intake.language === "other"
       ? "the language they are speaking. Keep using that same language."
       : `${intake.language}. EVERY word you say back is in ${intake.language}, even when they mix in English words.`
-    : "not chosen yet. They may use English, Wolof, Mandinka or Pulaar.";
+    : "not chosen yet. Set intake.language ONLY when they NAME a language or ask to speak one. They " +
+      "may name it in English or in the language's own name: Fula, Fulani, Fulfulde, Peul or Haalpulaar " +
+      "all mean pulaar; Mandingo or Manding mean mandinka; Wollof or Walaf mean wolof; Angale or " +
+      "Anglais mean english. The single English word \"Fula\" is an answer of Pulaar, not a sign they " +
+      "want English. But SPEAKING English is not CHOOSING English — somebody who just tells you their " +
+      "name in English has not answered the question; leave intake.language empty and ask which " +
+      "language they would like, briefly, before anything else.";
 
   return `
 
@@ -318,7 +328,7 @@ Fill "intake" with what THIS message tells you, null (or an empty list) for anyt
 - servicesWanted: any of ${SERVICES.join(", ")}. Work out which fit from what they describe — most people will not know the words. More than one is fine.
 - providerGender: woman, man, or any.
 
-- Whenever your question has a fixed set of answers, fill "choices" with those options written in their language, so they can be shown as buttons for someone who cannot read well or cannot hear you. Use these ids exactly: age, ${AGE_RANGES.join(", ")}; area, ${AREAS.join(", ")}; their own gender, ${USER_GENDERS.join(", ")}; the kind of help, ${SERVICES.join(", ")}; the provider's gender, woman, man, any. Leave choices empty for open questions.
+- Whenever your question has a fixed set of answers, fill "choices" with those options written in their language, so they can be shown as buttons for someone who cannot read well or cannot hear you. ALSO name the options out loud in your reply, briefly and as speech ("…, …, or …?") — many people using Talk cannot read the buttons at all, and hearing the options is how they answer. Use these ids exactly: age, ${AGE_RANGES.join(", ")}; area, ${AREAS.join(", ")}; their own gender, ${USER_GENDERS.join(", ")}; the kind of help, ${SERVICES.join(", ")}; the provider's gender, woman, man, any. Leave choices empty for open questions.
 - If they would rather not answer something, accept it kindly: record "any" for the provider's gender, and your best guess of the service from what they have said.
 - If they want to skip the questions and simply be matched, fill what you can and finish.
 - Sessions happen by video call — if they ask how they will meet, say so; do not ask them to choose.
@@ -538,6 +548,17 @@ export async function runTurn(input: TurnInput, signal?: AbortSignal): Promise<T
   if (!learned.language && language !== "none" && language !== "english" && !input.intake.language) {
     learned.language = language;
   }
+  // SPEAKING English is not CHOOSING English. Somebody who answers the
+  // language question with "My name is Fatou" has not picked a language — but
+  // the model, seeing English, sometimes records English anyway, and then pins
+  // the whole conversation to it, so a Wolof speaker who could only manage
+  // their name in English is answered in English from then on. While the
+  // language is unset, English is only accepted when they actually NAMED it —
+  // judged by the same matcher the browser uses for a spoken answer.
+  if (!input.intake.language && learned.language === "english") {
+    const named = matchChoice(transcript, LANGUAGE_CHOICES, LANGUAGE_ALIASES);
+    if (!(named.kind === "one" && named.choice.id === "english")) learned.language = null;
+  }
   const intake = mergeIntake(input.intake, learned);
   // Completion is decided from the merged facts, not the model's flag: a
   // model that says "done" with a gap would strand someone unmatched, and one
@@ -551,7 +572,13 @@ export async function runTurn(input: TurnInput, signal?: AbortSignal): Promise<T
     ...result,
     intake,
     intakeComplete,
-    choices: intakeComplete ? [] : cleanChoices(parsed.choices, intake),
+    ...(intakeMode && !intake.language
+      ? {
+          // Still unanswered: keep asking it, buttons and all.
+          awaitingLanguage: true,
+          choices: LANGUAGE_CHOICES,
+        }
+      : { choices: intakeComplete ? [] : cleanChoices(parsed.choices, intake) }),
     speechRate: speechRate(input.paceWpm),
   };
 }

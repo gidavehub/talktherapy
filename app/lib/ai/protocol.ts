@@ -88,6 +88,27 @@ export const LANGUAGE_CHOICES: Choice[] = [
 ];
 
 /**
+ * Every way somebody might SAY each language — in English, and in the
+ * language's own name for itself.
+ *
+ * This is what makes "if you say 'Fula', it selects Fula" work. Nobody in The
+ * Gambia calls Pulaar "Pulaar" in English; they say Fula, or Fulani, or Peul.
+ * Kept beside LANGUAGE_CHOICES so the words live next to the buttons they
+ * answer, and shared with the server, which uses them to tell the model what
+ * an answer to the language question can sound like.
+ *
+ * No "other" key, deliberately: nothing on this path may ever set the
+ * language to "other". "ful" is three letters, so the matcher only accepts it
+ * as a whole word — it must never be heard inside "careful".
+ */
+export const LANGUAGE_ALIASES: Record<string, string[]> = {
+  english: ["english", "inglish", "angale", "angalee", "anglais", "angilee"],
+  wolof: ["wolof", "wollof", "walaf", "olof"],
+  mandinka: ["mandinka", "mandinko", "mandingo", "manding", "mandinkakango"],
+  pulaar: ["pulaar", "pular", "fula", "fulah", "fulani", "fulfulde", "peul", "pullo", "haalpulaar", "ful"],
+};
+
+/**
  * Talk matches the person's speaking pace. Measured from their own speech;
  * these bounds stop a very slow or very fast speaker dragging her with them.
  */

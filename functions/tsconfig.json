@@ -24,6 +24,7 @@
     "src/**/*.ts",
     "../app/lib/payments/modempay-protocol.ts",
     "../app/lib/ai/protocol.ts",
+    "../app/lib/ai/choiceMatch.ts",
     "../app/lib/matching.ts"
   ]
 }

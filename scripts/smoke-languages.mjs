@@ -55,6 +55,36 @@ console.log("greeting offers the four languages");
   check(/English/.test(t.reply) && /Wolof/.test(t.reply), "names them out loud too");
 }
 
+// The language ANSWERED BY NAME, out loud — "if you say 'Fula', it selects
+// Fula". Nobody calls Pulaar "Pulaar" in English. Before the fix, saying
+// "Fula" at the language question removed the four buttons, left the
+// language unset, and Talk carried on asking the age in English.
+//
+// The server must either settle it, or keep asking — never the old outcome
+// of no buttons, no question, and no language.
+console.log("\nanswering the language question by name");
+for (const [said, expected] of [
+  ["Fula", "pulaar"],
+  ["Wollof", "wolof"],
+  ["Mandingo", "mandinka"],
+  ["Angale", "english"],
+]) {
+  const opening = await call("/companionGreet", { mode: "intake", intake: {}, displayName: null });
+  const t = await call("/companionTurn", {
+    text: said,
+    history: [{ role: "talk", text: opening.reply }],
+    summary: "",
+    mode: "intake",
+    intake: {},
+  });
+  const settled = t.intake?.language === expected;
+  const stillAsking = t.awaitingLanguage === true && (t.choices ?? []).length === 4;
+  check(
+    settled || stillAsking,
+    `"${said}" → ${settled ? `settled as ${expected}` : stillAsking ? "still asking, buttons kept" : `LOST (language ${t.intake?.language}, ${(t.choices ?? []).length} buttons, awaiting ${t.awaitingLanguage})`}`,
+  );
+}
+
 // A short line in each language, plus an English interruption that must NOT
 // make her switch.
 const CASES = [

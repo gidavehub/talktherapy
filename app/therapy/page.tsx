@@ -23,6 +23,7 @@ import { formatDalasi } from "@/lib/money";
 import { useMatches } from "@/lib/useMatches";
 import { useOpenProvider } from "@/lib/useOpenProvider";
 import { useReadAloud } from "@/lib/useReadAloud";
+import { IconSpeaker } from "@/components/ui/icons";
 import ProviderCard from "@/components/providers/ProviderCard";
 
 /**
@@ -65,9 +66,6 @@ export default function TherapyPage() {
   const router = useRouter();
   const { open: openProvider } = useOpenProvider();
   const { user, profile, ready } = useAuth();
-  // Talk narrates the shortlist once. The speaker on each card is how somebody
-  // hears it again without asking her to repeat the whole thing.
-  const { read: readAloud, speakingId: readingId } = useReadAloud(profile?.intake?.language ?? null);
 
   // Read once, lazily, from the URL: ?intake redoes the intake for someone
   // already set up; ?debug shows capture diagnostics.
@@ -124,8 +122,27 @@ export default function TherapyPage() {
     displayName: profile?.displayName ?? user?.displayName ?? null,
     onIntake,
     onIntakeDone,
+    // Saying an option goes through the SAME handler as tapping it — so a
+    // provider said aloud opens their conversation, an age range said aloud
+    // answers the question, and the two can never behave differently.
+    onChoiceHeard: handleChoice,
   });
   const { mic } = talk;
+  // Talk narrates the shortlist once; the speaker on each card is how
+  // somebody hears it again. It follows the language being SPOKEN, not the
+  // one saved on the profile, which is a turn behind the moment it is chosen.
+  const { read: readAloud, speakingId: readingId } = useReadAloud(
+    talk.language ?? profile?.intake?.language ?? null,
+  );
+
+  // Hearing the options read out must not be heard back as an answer. The
+  // microphone is off while they are read, and back on when the reading ends.
+  const readingOptions = useRef(false);
+  useEffect(() => {
+    if (readingId === "choices" || !readingOptions.current) return;
+    readingOptions.current = false;
+    talk.setListening(true);
+  }, [readingId, talk]);
 
   // The three she will introduce: ranked against everything she just learned,
   // derived rather than stored so it cannot fall out of step with the intake.
@@ -170,23 +187,6 @@ export default function TherapyPage() {
     }
     await talk.start();
   }, [profile, talk, uid]);
-
-  // Picking out loud: she just read the names, so match what they say back
-  // against them. Deliberately forgiving — first name, surname, or the whole
-  // thing — and it never guesses between two names it hears equally.
-  useEffect(() => {
-    if (!shortlist) return;
-    const lastUser = [...talk.lines].reverse().find((l) => l.role === "user");
-    if (!lastUser) return;
-    const said = lastUser.text.toLowerCase();
-    const hits = shortlist.filter((m) =>
-      m.profile.displayName
-        .toLowerCase()
-        .split(/[ ]+/)
-        .some((part) => part.length > 2 && said.includes(part)),
-    );
-    if (hits.length === 1) void openProvider(hits[0].profile);
-  }, [shortlist, talk.lines, openProvider]);
 
   const denied = mic.status === "denied" || mic.status === "unsupported" || mic.status === "error";
   // Without a microphone the keyboard is the only way to answer, so it is open.
@@ -354,6 +354,9 @@ export default function TherapyPage() {
               animate={{ y: 0, opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={SPRING_SOFT}
+              role="group"
+              aria-live="polite"
+              aria-label="Answers you can say or tap"
               className="relative z-10 mt-2 flex flex-wrap items-center justify-center gap-2 max-w-[560px]"
             >
               {talk.choices.map((choice) => (
@@ -369,6 +372,31 @@ export default function TherapyPage() {
                   {choice.label}
                 </motion.button>
               ))}
+
+              {/* The options, read aloud — for somebody who cannot read the
+                  buttons and missed them in what Talk said. Only while she is
+                  listening, so it never talks over her. */}
+              {talk.phase === "listening" ? (
+                <motion.button
+                  type="button"
+                  onClick={() => {
+                    readingOptions.current = true;
+                    talk.setListening(false);
+                    void readAloud("choices", talk.choices.map((c) => c.label).join(", "));
+                  }}
+                  whileTap={{ scale: 0.92 }}
+                  transition={SPRING_SNAP}
+                  aria-label="Hear the options"
+                  aria-pressed={readingId === "choices"}
+                  className={`h-12 w-12 rounded-full border flex items-center justify-center transition-colors ${
+                    readingId === "choices"
+                      ? "border-[var(--accent)] bg-[var(--accent)] text-white"
+                      : "border-white/25 bg-white/5 text-white hover:bg-white/15"
+                  }`}
+                >
+                  <IconSpeaker size={16} />
+                </motion.button>
+              ) : null}
             </motion.div>
           ) : null}
         </AnimatePresence>
