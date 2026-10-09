@@ -109,23 +109,46 @@ SAFETY — this overrides everything above
 - When risk is elevated or urgent: stay calm and caring and take them seriously. Your reply MUST say the numbers out loud — call 117 for the police or 116 for an ambulance — in their language, and also point them to someone near them they trust and to a human provider. This is the one time a longer reply is right; never drop the numbers to keep it short. Ask whether they are safe right now. Never give information about methods or means of harm. Never promise that what they say stays secret if someone is in danger.`;
 
 /**
- * Style line for the TTS model. The "audio profile" is just this sentence
- * prepended to the text; naming the language steers pronunciation, which
- * matters for Wolof, Mandinka and Pulaar.
+ * Talk's audio profile: who is speaking, where, and how her accent sounds.
+ *
+ * A STREET Gambian accent, by direction — the way people actually talk in
+ * Serrekunda, not a polished or broadcast voice. Left to itself the TTS model
+ * gives English a generic West African lilt that leans Nigerian, so the notes
+ * say what the accent is AND what it is not; the scene (an evening on the
+ * bantaba, a friend having a hard time) carries the register better than
+ * adjectives do. Naming the language and its everyday variety also steers
+ * pronunciation, which matters for Wolof, Mandinka and Pulaar.
  */
-const VOICE_LANGUAGE: Record<Language, string> = {
-  english: "English, with a gentle Gambian accent",
-  wolof: "Gambian Wolof",
-  mandinka: "Gambian Mandinka",
-  pulaar: "Gambian Pulaar",
-  other: "the language of the text",
+const VOICE_ACCENT: Record<Language, string> = {
+  english:
+    "English, in a thick, natural Gambian street accent from Serrekunda — Wolof rhythm and vowels " +
+    "in her English, every syllable even, flat and steady intonation, 'th' said as 't' or 'd'. " +
+    "NOT Nigerian, NOT Ghanaian, NOT British or American",
+  wolof:
+    "everyday street Wolof of Serrekunda and Banjul, Gambian not Senegalese — relaxed and " +
+    "conversational, never formal or broadcast",
+  mandinka: "everyday Gambian Mandinka — relaxed and conversational, never formal or broadcast",
+  pulaar: "everyday Gambian Pulaar — relaxed and conversational, never formal or broadcast",
+  other: "the language of the text, with a natural Gambian street accent",
 };
 
-function voiceStyle(language: Language) {
-  return (
-    "Speak as a warm, calm Gambian woman in her thirties — gentle, unhurried and steady, " +
-    `like a trusted provider, never bright or presenterly — in ${VOICE_LANGUAGE[language]}`
-  );
+function voicePrompt(language: Language, paceWpm: number | undefined, text: string) {
+  // "Read the following aloud" is not decoration. Without it, short or
+  // fragmentary text after the profile — "Yes.", a bare time range, "Times
+  // free: 09:00, 10:00" — is refused with PROHIBITED_CONTENT (12 of 15 tries,
+  // against 0 of 15 with it), and those are exactly what read-aloud on the
+  // booking screens sends. Spoken length is unchanged: the instruction is
+  // followed, not read out.
+  return `AUDIO PROFILE: A Gambian woman in her thirties, born and raised in Serrekunda.
+THE SCENE: Evening, sitting on the bantaba outside her compound, talking quietly with a friend who is going through a hard time.
+DIRECTOR'S NOTES
+Accent: ${VOICE_ACCENT[language]}.
+Style: warm, relaxed and down-to-earth, like a big sister — never polished, never presenterly, never theatrical.
+Pacing: ${paceStyle(paceWpm)}.
+
+Read the following aloud exactly as written:
+
+${text}`;
 }
 
 const TURN_SCHEMA = {
@@ -775,7 +798,7 @@ export async function* speak(
   paceWpm?: number,
 ): AsyncGenerator<{ pcm: Buffer; sampleRate: number }> {
   const body = {
-    contents: [{ role: "user", parts: [{ text: `${voiceStyle(language)}, ${paceStyle(paceWpm)}:\n\n${text}` }] }],
+    contents: [{ role: "user", parts: [{ text: voicePrompt(language, paceWpm, text) }] }],
     generationConfig: {
       responseModalities: ["AUDIO"],
       speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName(language) } } },

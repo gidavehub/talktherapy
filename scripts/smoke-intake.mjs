@@ -1,8 +1,7 @@
 /**
- * The onboarding conversation, end to end, against a running dev server.
+ * The onboarding conversation, end to end, against the DEPLOYED functions.
  *
- *   TALK_DEV_ALLOW_ANON_AI=1 in .env.local, `npm run dev`, then:
- *   node scripts/smoke-intake.mjs [baseUrl]
+ *   node scripts/smoke-intake.mjs
  *
  * Plays a new user who starts in English, says they would rather speak Wolof,
  * and answers the rest in Wolof. Checks that Talk:
@@ -15,13 +14,13 @@
  * is covered by smoke-companion.mjs.
  */
 
-const BASE = process.argv[2] || "http://localhost:3000";
+import { BASE, authHeader } from "./lib/functions.mjs";
 
 async function call(path, body) {
   const t0 = performance.now();
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeader },
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`${path} ${res.status}: ${await res.text()}`);
@@ -43,7 +42,7 @@ const history = [];
 
 console.log("greeting");
 {
-  const r = await call("/api/companion/greet", { mode: "intake", intake, displayName: null });
+  const r = await call("/companionGreet", { mode: "intake", intake, displayName: null });
   console.log(`   Talk: ${r.turn.reply}  (${r.ms}ms, ${r.audioSeconds}s audio)`);
   check(r.turn.greeting === true && r.audioSeconds > 1, "Talk speaks first, with voice");
   history.push({ role: "talk", text: r.turn.reply });
@@ -99,7 +98,7 @@ const SCRIPT = [
 ];
 
 for (const step of SCRIPT) {
-  const r = await call("/api/companion/turn", { text: step.say, history, summary: "", mode: "intake", intake });
+  const r = await call("/companionTurn", { text: step.say, history, summary: "", mode: "intake", intake });
   const t = r.turn;
   intake = t.intake ?? intake;
   console.log(`\nuser: ${step.say}`);

@@ -61,14 +61,6 @@ const STATUS: Record<Phase, string> = {
   speaking: "Tap to interrupt.",
 };
 
-/**
- * Signed-out visitors are sent to sign in — except under `next dev`, where the
- * page stays usable so the conversation can be exercised locally (the API
- * then decides, via TALK_DEV_ALLOW_ANON_AI). NODE_ENV is inlined at build
- * time, so a production bundle always redirects.
- */
-const DEV_ANON = process.env.NODE_ENV === "development";
-
 export default function TherapyPage() {
   const router = useRouter();
   const { open: openProvider } = useOpenProvider();
@@ -91,7 +83,10 @@ export default function TherapyPage() {
   const [finished, setFinished] = useState<Intake | null>(null);
 
   useEffect(() => {
-    if (ready && !user && !DEV_ANON) router.replace("/sign-in?next=%2Ftherapy");
+    // Signed-out visitors go to sign in, under `next dev` too: the companion
+    // functions refuse any request without an ID token, so there is nothing a
+    // signed-out page could do but fail.
+    if (ready && !user) router.replace("/sign-in?next=%2Ftherapy");
   }, [ready, user, router]);
 
   const uid = user?.uid ?? null;
@@ -200,7 +195,7 @@ export default function TherapyPage() {
   const lastTalk = findLast(talk.lines, "talk");
   const translated = Boolean(lastUser?.english || lastTalk?.english);
   const learned = REQUIRED_FIELDS.length - missingFields(talk.intake).length;
-  const canStart = ready || DEV_ANON;
+  const canStart = ready;
 
   // A tap on the blob never ends the session — that is the button's job. A
   // tap meant to interrupt Talk that lands a moment after she finished would

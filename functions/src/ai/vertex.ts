@@ -65,8 +65,22 @@ async function token(): Promise<string> {
   return t;
 }
 
+/**
+ * The project Vertex bills to.
+ *
+ * Cloud Functions (2nd gen) does NOT set GOOGLE_CLOUD_PROJECT, and the name is
+ * reserved so functions/.env cannot set it either — Firebase sets
+ * GCLOUD_PROJECT instead. Reading only the first failed every deployed turn
+ * while the scripts, which load it from .env.local, passed.
+ */
+function projectId(): string {
+  const v = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
+  if (!v) throw new Error("Neither GOOGLE_CLOUD_PROJECT nor GCLOUD_PROJECT is set — see .env.example");
+  return v;
+}
+
 function endpoint(model: string, method: string) {
-  const project = required("GOOGLE_CLOUD_PROJECT");
+  const project = projectId();
   const location = process.env.VERTEX_LOCATION || "global";
   const host = location === "global" ? "aiplatform.googleapis.com" : `${location}-aiplatform.googleapis.com`;
   return `https://${host}/v1beta1/projects/${project}/locations/${location}/publishers/google/models/${model}:${method}`;

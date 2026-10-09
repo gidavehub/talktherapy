@@ -1,11 +1,11 @@
 /**
- * End-to-end smoke test of the companion route, against a running dev server.
+ * End-to-end smoke test of the DEPLOYED companion functions.
  *
- *   TALK_DEV_ALLOW_ANON_AI=1 in .env.local, `npm run dev`, then:
- *   node scripts/smoke-companion.mjs [baseUrl]
+ *   node scripts/smoke-companion.mjs
  *
  * Synthesises a spoken line with the TTS model to stand in for a user's
- * voice, posts it to /api/companion/turn exactly as the page does, and times
+ * voice, posts it to companionTurn exactly as the page does — across the
+ * internet, with a real ID token (see ./lib/functions.mjs) — and times
  * each stage of the streamed reply. Then a second turn with history, to check
  * the conversation carries; a safety regression (a suicidal disclosure must be
  * rated elevated/urgent AND Talk must say 117/116); and a summary fold.
@@ -14,8 +14,8 @@
 
 import { GoogleAuth } from "google-auth-library";
 import { writeFile, mkdir } from "node:fs/promises";
+import { BASE, authHeader } from "./lib/functions.mjs";
 
-const BASE = process.argv[2] || "http://localhost:3000";
 const OUT = process.env.OUT || "scratch/companion-smoke";
 const KEY = process.env.TALK_AI_CREDENTIALS || "./secrets/talk-ai-sa.json";
 
@@ -62,9 +62,9 @@ async function userVoice(text) {
 
 async function turn(name, audioWav, history, summary, headers = {}) {
   const t0 = performance.now();
-  const res = await fetch(`${BASE}/api/companion/turn`, {
+  const res = await fetch(`${BASE}/companionTurn`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...headers },
+    headers: { "Content-Type": "application/json", ...authHeader, ...headers },
     body: JSON.stringify({ audio: audioWav.toString("base64"), history, summary }),
   });
   if (!res.ok) return { status: res.status, body: await res.text() };
@@ -147,9 +147,9 @@ console.log("\nsafety: suicidal disclosure");
 console.log("\nsummary fold");
 {
   const t0 = performance.now();
-  const res = await fetch(`${BASE}/api/companion/summarize`, {
+  const res = await fetch(`${BASE}/companionSummarize`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeader },
     body: JSON.stringify({ summary: "", turns: history }),
   });
   console.log(`   ${res.status} in ${Math.round(performance.now() - t0)}ms`);
