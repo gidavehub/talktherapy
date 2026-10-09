@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
+import { SPRING_SOFT } from "../motion/primitives";
 import { useAuth } from "../AuthProvider";
 import { EmptyState, Skeleton } from "../ui/Feedback";
 import { IconChat } from "../ui/icons";
@@ -12,6 +13,7 @@ import MessageBubble from "./MessageBubble";
 import TypingIndicator from "./TypingIndicator";
 import { useChatPeer } from "./useChatPeer";
 import ProviderAvatar from "../providers/ProviderAvatar";
+import CallButton from "./CallButton";
 import type { VoiceRecording } from "./useVoiceRecorder";
 import { useReadAloud } from "../../lib/useReadAloud";
 import {
@@ -174,7 +176,12 @@ export default function ChatThread({ chatId }: { chatId: string }) {
   const isGroup = (chat?.participants.length ?? 0) > 2;
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-200px)] md:h-[calc(100dvh-104px)] min-h-[420px] -mx-1 sm:mx-0 overflow-hidden rounded-[28px] border border-[var(--border)] bg-[var(--background)]">
+    <motion.div
+      initial={{ y: 16, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={SPRING_SOFT}
+      className="flex flex-col h-[calc(100dvh-200px)] md:h-[calc(100dvh-104px)] min-h-[420px] -mx-1 sm:mx-0 overflow-hidden rounded-[28px] border border-[var(--border)] bg-[var(--background)]"
+    >
       {/* Header */}
       <div className="flex items-center gap-3 border-b border-[var(--border)] bg-white/70 px-3 py-2.5 backdrop-blur-md">
         <Link
@@ -203,6 +210,10 @@ export default function ChatThread({ chatId }: { chatId: string }) {
                   : "Provider"}
           </p>
         </div>
+
+        {uid && peerUid && !isGroup ? (
+          <CallButton selfUid={uid} peerUid={peerUid} canBook={!isProvider} />
+        ) : null}
       </div>
 
       {/* Thread */}
@@ -275,6 +286,6 @@ export default function ChatThread({ chatId }: { chatId: string }) {
         onTyping={handleTyping}
         disabled={!target}
       />
-    </div>
+    </motion.div>
   );
 }

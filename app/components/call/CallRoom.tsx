@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { motion } from "motion/react";
-import { SPRING_SNAP } from "../motion/primitives";
+import { AnimatePresence, motion } from "motion/react";
+import { SPRING_SNAP, SPRING_SOFT } from "../motion/primitives";
 import { Alert, Spinner } from "../ui/Feedback";
 import { IconMic, IconPhone, IconVideo } from "../ui/icons";
 import Button from "../ui/Button";
@@ -81,6 +81,12 @@ export default function CallRoom({ bookingId }: { bookingId: string }) {
   const [micOn, setMicOn] = useState(true);
   const [cameraOn, setCameraOn] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** This side ended up voice only — chosen, or because the camera failed. */
+  const [audioOnly, setAudioOnly] = useState(false);
+  /** Whether the other person is sending a picture right now. */
+  const [remoteVideo, setRemoteVideo] = useState(false);
+  /** Asked for video and did not get it: worth saying, so nobody thinks they are on camera. */
+  const [cameraFellBack, setCameraFellBack] = useState(false);
 
   /** The live call. A ref because nothing renders from it and it must survive. */
   const callRef = useRef<CallController | null>(null);
@@ -90,28 +96,44 @@ export default function CallRoom({ bookingId }: { bookingId: string }) {
   const otherUid = booking && uid ? booking.participants.find((p) => p !== uid) ?? null : null;
   const peer = useChatPeer(otherUid, "The other person");
 
-  const join = useCallback(async () => {
-    if (!booking || !uid || callRef.current) return;
-    setError(null);
-    setJoined(true);
+  const join = useCallback(
+    async (withVideo: boolean) => {
+      if (!booking || !uid || callRef.current) return;
+      setError(null);
+      setJoined(true);
+      setCameraFellBack(false);
 
-    try {
-      const call = await joinCall(bookingId, uid, booking.participants, {
-        onRemoteStream: setRemoteStream,
-        onState: (next, why) => {
-          setState(next);
-          setDetail(why ?? null);
-        },
-      });
-      callRef.current = call;
-      setLocalStream(call.localStream);
-    } catch {
-      setJoined(false);
-      setError(
-        "Talk could not reach your camera or microphone. Check the permission in your browser and try again.",
-      );
-    }
-  }, [booking, bookingId, uid]);
+      try {
+        const call = await joinCall(
+          bookingId,
+          uid,
+          booking.participants,
+          {
+            onRemoteStream: setRemoteStream,
+            onRemoteVideo: setRemoteVideo,
+            onState: (next, why) => {
+              setState(next);
+              setDetail(why ?? null);
+            },
+          },
+          { video: withVideo },
+        );
+        callRef.current = call;
+        setLocalStream(call.localStream);
+        setAudioOnly(call.audioOnly);
+        setCameraOn(!call.audioOnly);
+        setCameraFellBack(withVideo && call.audioOnly);
+      } catch {
+        setJoined(false);
+        // Only the microphone can fail us now: a missing camera already fell
+        // back to voice inside joinCall.
+        setError(
+          "Talk could not reach your microphone. Check the permission in your browser and try again.",
+        );
+      }
+    },
+    [booking, bookingId, uid],
+  );
 
   const hangUp = useCallback(async () => {
     const call = callRef.current;
@@ -119,6 +141,7 @@ export default function CallRoom({ bookingId }: { bookingId: string }) {
     setJoined(false);
     setLocalStream(null);
     setRemoteStream(null);
+    setRemoteVideo(false);
     await call?.hangUp();
   }, []);
 
@@ -151,38 +174,81 @@ export default function CallRoom({ bookingId }: { bookingId: string }) {
   const cancelled = booking.status === "cancelled";
   const open = joinWindow(booking.startsAt, booking.endsAt, now);
 
+  const live = state === "connected" || state === "reconnecting";
+  // Their picture only when there IS one. A voice call shows their face from
+  // their profile instead of a black rectangle that looks like a fault.
+  const showRemoteVideo = Boolean(remoteStream) && live && remoteVideo;
+
   return (
     <div className="space-y-4">
-      <div className="relative overflow-hidden rounded-[28px] bg-[var(--dark)] aspect-[3/4] sm:aspect-video">
-        {remoteStream && (state === "connected" || state === "reconnecting") ? (
+      <motion.div
+        initial={{ y: 18, opacity: 0, scale: 0.985 }}
+        animate={{ y: 0, opacity: 1, scale: 1 }}
+        transition={SPRING_SOFT}
+        className="relative overflow-hidden rounded-[28px] bg-[var(--dark)] aspect-[3/4] sm:aspect-video"
+      >
+        {/*
+          Always mounted while there is a remote stream, visible or not: on a
+          voice call this element is what PLAYS their voice. Hiding it the way
+          a video is hidden would silence the call.
+        */}
+        {remoteStream ? (
           <Video
             stream={remoteStream}
             muted={false}
-            className="absolute inset-0 h-full w-full object-cover"
+            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
+              showRemoteVideo ? "opacity-100" : "opacity-0"
+            }`}
           />
-        ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center">
-            <ProviderAvatar photoPath={peer.photoPath} name={peer.name} size={74} />
-            <div>
-              <p className="text-[16px] text-white">{peer.name}</p>
-              <p className="mt-1 text-[12px] uppercase tracking-[0.18em] text-white/55">
-                {joined ? STATUS_TEXT[state] : spokenSlot(booking.startsAt, booking.endsAt)}
-              </p>
-            </div>
-            {joined && (state === "waiting" || state === "connecting" || state === "starting") ? (
-              <Spinner className="text-white/70" />
-            ) : null}
-          </div>
-        )}
+        ) : null}
+
+        <AnimatePresence>
+          {!showRemoteVideo ? (
+            <motion.div
+              key="face"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center"
+            >
+              {/* A slow halo while connected by voice, so a quiet line still
+                  looks alive rather than frozen. */}
+              <div className="relative">
+                {live ? (
+                  <motion.span
+                    aria-hidden
+                    className="absolute inset-0 rounded-full bg-white/10"
+                    animate={{ scale: [1, 1.35, 1], opacity: [0.5, 0, 0.5] }}
+                    transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+                  />
+                ) : null}
+                <ProviderAvatar photoPath={peer.photoPath} name={peer.name} size={88} />
+              </div>
+              <div>
+                <p className="text-[17px] text-white">{peer.name}</p>
+                <p className="mt-1 text-[12px] uppercase tracking-[0.18em] text-white/55">
+                  {!joined
+                    ? spokenSlot(booking.startsAt, booking.endsAt)
+                    : live
+                      ? "Voice call"
+                      : STATUS_TEXT[state]}
+                </p>
+              </div>
+              {joined && (state === "waiting" || state === "connecting" || state === "starting") ? (
+                <Spinner className="text-white/70" />
+              ) : null}
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
 
         {/* Your own picture, small, in the corner — and mirrored, because a
             video of yourself that moves the wrong way is disconcerting. */}
-        {localStream && cameraOn ? (
+        {localStream && cameraOn && !audioOnly ? (
           <Video
             stream={localStream}
             muted
             mirrored
-            className="absolute right-3 top-3 h-[132px] w-[99px] sm:h-[150px] sm:w-[112px] rounded-[18px] object-cover shadow-[0_12px_40px_-12px_rgba(0,0,0,0.6)]"
+            className="absolute right-3 top-3 h-[132px] w-[99px] sm:h-[150px] sm:w-[112px] rounded-[18px] object-cover shadow-[var(--shadow-floating)]"
           />
         ) : null}
 
@@ -212,31 +278,42 @@ export default function CallRoom({ bookingId }: { bookingId: string }) {
               whileTap={{ scale: 0.92 }}
               transition={SPRING_SNAP}
               aria-label="End the call"
-              className="h-[60px] w-[60px] rounded-full bg-[var(--accent)] text-white flex items-center justify-center shadow-[0_12px_36px_-10px_rgba(255,90,31,0.8)]"
+              className="h-[60px] w-[60px] rounded-full bg-[var(--accent)] text-white flex items-center justify-center shadow-[var(--shadow-accent)]"
             >
               <IconPhone size={21} />
             </motion.button>
 
-            <motion.button
-              type="button"
-              onClick={() => {
-                const next = !cameraOn;
-                setCameraOn(next);
-                callRef.current?.setCameraEnabled(next);
-              }}
-              whileTap={{ scale: 0.92 }}
-              transition={SPRING_SNAP}
-              aria-pressed={!cameraOn}
-              aria-label={cameraOn ? "Turn your camera off" : "Turn your camera on"}
-              className={`h-[52px] w-[52px] rounded-full flex items-center justify-center transition-colors ${
-                cameraOn ? "bg-white/15 text-white hover:bg-white/25" : "bg-white text-[var(--dark)]"
-              }`}
-            >
-              <IconVideo size={19} />
-            </motion.button>
+            {/* No camera toggle on a voice call: there is no camera to toggle,
+                and a button that does nothing is worse than none. */}
+            {!audioOnly ? (
+              <motion.button
+                type="button"
+                onClick={() => {
+                  const next = !cameraOn;
+                  setCameraOn(next);
+                  callRef.current?.setCameraEnabled(next);
+                }}
+                whileTap={{ scale: 0.92 }}
+                transition={SPRING_SNAP}
+                aria-pressed={!cameraOn}
+                aria-label={cameraOn ? "Turn your camera off" : "Turn your camera on"}
+                className={`h-[52px] w-[52px] rounded-full flex items-center justify-center transition-colors ${
+                  cameraOn ? "bg-white/15 text-white hover:bg-white/25" : "bg-white text-[var(--dark)]"
+                }`}
+              >
+                <IconVideo size={19} />
+              </motion.button>
+            ) : null}
           </div>
         ) : null}
-      </div>
+      </motion.div>
+
+      {cameraFellBack ? (
+        <Alert tone="info" title="You joined by voice">
+          Your camera was not available, so you are on a voice call. You can
+          still see them if their camera is on.
+        </Alert>
+      ) : null}
 
       {error ? (
         <Alert tone="warning" title="Could not start">
@@ -264,9 +341,18 @@ export default function CallRoom({ bookingId }: { bookingId: string }) {
             </Alert>
           ) : null}
 
+          {/*
+            Two ways in, side by side. Voice is not a lesser option tucked
+            away: on mobile data it is often the call that actually connects,
+            and it is the only one for somebody whose camera is broken, absent,
+            or simply not something they want on today.
+          */}
           <div className="flex flex-wrap items-center gap-3">
-            <Button onClick={() => void join()} disabled={!open}>
-              Join the session
+            <Button onClick={() => void join(true)} disabled={!open}>
+              Join with video
+            </Button>
+            <Button variant="secondary" onClick={() => void join(false)} disabled={!open}>
+              Join by voice
             </Button>
             {otherUid ? (
               <Link
@@ -279,7 +365,8 @@ export default function CallRoom({ bookingId }: { bookingId: string }) {
           </div>
 
           <p className="text-[12px] text-[var(--muted)] leading-relaxed max-w-[460px]">
-            Your camera and microphone only turn on when you tap join.
+            Nothing turns on until you choose. Joining by voice uses far less
+            data.
             {!hasRelay()
               ? " On mobile data the connection may not get through yet — a relay server is still to be set up."
               : ""}
@@ -287,7 +374,7 @@ export default function CallRoom({ bookingId }: { bookingId: string }) {
         </div>
       ) : state === "ended" ? (
         <div className="flex flex-wrap items-center gap-3">
-          <Button onClick={() => void join()}>Rejoin</Button>
+          <Button onClick={() => void join(!audioOnly)}>Rejoin</Button>
           <Link
             href="/sessions"
             className="rounded-full px-4 py-2 text-[12.5px] text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-black/5 transition-colors"

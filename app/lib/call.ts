@@ -52,10 +52,26 @@ export type CallState =
 export type CallHandlers = {
   onRemoteStream: (stream: MediaStream) => void;
   onState: (state: CallState, detail?: string) => void;
+  /**
+   * Whether the other person is sending video. A voice-only call shows their
+   * face from the profile instead of a black rectangle.
+   */
+  onRemoteVideo?: (hasVideo: boolean) => void;
+};
+
+export type JoinOptions = {
+  /**
+   * Ask for the camera. False joins by voice only — which on Gambian mobile
+   * data is often the call that actually connects, and the only call somebody
+   * can join when their camera is broken, absent, or refused.
+   */
+  video?: boolean;
 };
 
 export type CallController = {
   localStream: MediaStream;
+  /** True when this side ended up voice only, by choice or because the camera failed. */
+  audioOnly: boolean;
   /** Mute or unmute the microphone. Returns the new state. */
   setMicEnabled: (on: boolean) => void;
   setCameraEnabled: (on: boolean) => void;
@@ -137,28 +153,73 @@ async function clearSignalling(bookingId: string) {
  * after. The returned controller owns the teardown — call `hangUp` once, from
  * anywhere, and every listener, track and connection goes with it.
  */
+const AUDIO: MediaTrackConstraints = {
+  echoCancellation: true,
+  noiseSuppression: true,
+  autoGainControl: true,
+};
+
+/**
+ * The person's microphone, and their camera if asked for and available.
+ *
+ * A camera that is refused, missing or already in use must NOT stop somebody
+ * reaching their provider. If video was asked for and fails, this falls back
+ * to voice only rather than failing the whole call — the microphone is the
+ * thing a session cannot happen without; the camera is not.
+ */
+async function localMedia(wantVideo: boolean): Promise<{ stream: MediaStream; audioOnly: boolean }> {
+  if (wantVideo) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: AUDIO,
+      });
+      return { stream, audioOnly: false };
+    } catch {
+      // Fall through to voice only.
+    }
+  }
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO });
+  return { stream, audioOnly: true };
+}
+
 export async function joinCall(
   bookingId: string,
   selfUid: string,
   participants: string[],
   handlers: CallHandlers,
+  options: JoinOptions = {},
 ): Promise<CallController> {
   handlers.onState("starting");
 
-  const localStream = await navigator.mediaDevices.getUserMedia({
-    video: { width: { ideal: 640 }, height: { ideal: 480 } },
-    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-  });
+  const { stream: localStream, audioOnly } = await localMedia(options.video !== false);
 
   const pc = new RTCPeerConnection({ iceServers: iceServers() });
   for (const track of localStream.getTracks()) pc.addTrack(track, localStream);
+
+  // Voice only on THIS side must not mean voice only on both. Without a video
+  // transceiver, an offer from somebody with no camera has no video section at
+  // all, and the provider's camera has nowhere to send its picture. Receive
+  // only, so we still see them while they cannot see us.
+  if (audioOnly) pc.addTransceiver("video", { direction: "recvonly" });
 
   // One stream object for the life of the call: handing the <video> element a
   // new MediaStream on every track event makes it flicker.
   const remoteStream = new MediaStream();
   handlers.onRemoteStream(remoteStream);
   pc.ontrack = (event) => {
-    for (const track of event.streams[0]?.getTracks() ?? []) remoteStream.addTrack(track);
+    const tracks = event.streams[0]?.getTracks() ?? [event.track];
+    for (const track of tracks) {
+      if (!remoteStream.getTracks().includes(track)) remoteStream.addTrack(track);
+      if (track.kind === "video") {
+        handlers.onRemoteVideo?.(true);
+        // Their camera going off mid-call — they turned it off, or it dropped —
+        // should put their face back, not leave a frozen frame.
+        track.onmute = () => handlers.onRemoteVideo?.(false);
+        track.onunmute = () => handlers.onRemoteVideo?.(true);
+        track.onended = () => handlers.onRemoteVideo?.(false);
+      }
+    }
   };
 
   const caller = isCaller(selfUid, participants);
@@ -275,6 +336,7 @@ export async function joinCall(
 
   return {
     localStream,
+    audioOnly,
     setMicEnabled: (on) => {
       for (const track of localStream.getAudioTracks()) track.enabled = on;
     },
