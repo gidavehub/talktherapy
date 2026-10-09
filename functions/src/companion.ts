@@ -147,6 +147,8 @@ export const companionTurn = onRequest(options(120), async (req, res) => {
     intake: cleanIntake(body.intake, LANGUAGES),
     elapsedSec: num(body.elapsedSec, 4 * 60 * 60),
     paceWpm,
+    awaitingConsent: body.awaitingConsent === true,
+    displayName: typeof body.displayName === "string" ? body.displayName.slice(0, 80) : null,
   };
 
   await speakingResponse(res, "companion/turn", () => runTurn(input, signal), paceWpm);
@@ -169,6 +171,8 @@ export const companionGreet = onRequest(options(60), async (req, res) => {
     mode: body.mode === "intake" ? ("intake" as const) : ("companion" as const),
     intake: cleanIntake(body.intake, LANGUAGES),
     displayName: typeof body.displayName === "string" ? body.displayName.slice(0, 80) : null,
+    // Only an explicit false asks: see GreetRequest.consented.
+    consented: body.consented === false ? false : undefined,
   };
 
   await speakingResponse(res, "companion/greet", () => runGreeting(input, signal));

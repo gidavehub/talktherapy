@@ -71,6 +71,14 @@ type Options = {
    * can never do different things.
    */
   onChoiceHeard?: (choice: Choice) => void;
+  /**
+   * Whether they have already heard and agreed to the consent. When false,
+   * Talk says it — after the language, before the first question — and waits
+   * for a yes, spoken or tapped.
+   */
+  consented?: boolean;
+  /** They said yes. Record it; this hook only reports it. */
+  onConsent?: (consent: { how: "spoken" | "tapped"; version: string | null; language: Language | null }) => void;
 };
 
 /**
@@ -78,10 +86,7 @@ type Options = {
  * ended. Acting mid-stream would start a second request while the first one's
  * reply was still arriving.
  */
-type Heard =
-  | { kind: "language"; language: Language }
-  | { kind: "reask-language" }
-  | { kind: "choice"; choice: Choice };
+type Heard = { kind: "language"; language: Language } | { kind: "choice"; choice: Choice };
 
 const RISK_RANK: Record<Risk, number> = { none: 0, low: 1, elevated: 2, urgent: 3 };
 /** Pause after Talk stops before listening again, so her tail is not heard. */
@@ -97,6 +102,8 @@ export function useConversation({
   onIntake,
   onIntakeDone,
   onChoiceHeard,
+  consented,
+  onConsent,
 }: Options) {
   const mic = useAudioLevel();
   // The hook returns a fresh object every render; its functions are stable.
@@ -120,24 +127,22 @@ export function useConversation({
   const [choices, setChoices] = useState<Choice[]>([]);
   const [awaitingLanguage, setAwaitingLanguage] = useState(false);
   const awaitingLanguageRef = useRef(false);
+  /** Talk has spoken the consent and is waiting for a yes. */
+  const [awaitingConsent, setAwaitingConsent] = useState(false);
+  const awaitingConsentRef = useRef(false);
+  /** Agreed this session — so a later greeting does not ask again. */
+  const consentedRef = useRef(false);
+  /**
+   * The page has silenced the microphone (it is reading something aloud). A
+   * line of Talk's ending must not switch it back on underneath.
+   */
+  const mutedRef = useRef(false);
   /**
    * The options on screen right now — the question that was just asked. Kept
    * in a ref beside the state so a turn's answer is matched against what was
    * actually shown, not against a render that has not happened yet.
    */
   const choicesRef = useRef<Choice[]>([]);
-  /**
-   * How many times the language question has been asked again because the
-   * answer could not be placed. Capped: somebody whose answer is never
-   * understood must not be trapped asking the same question for ever.
-   */
-  const languageMissRef = useRef(0);
-  /**
-   * The last question answered by voice, by its options' ids. A question can
-   * only be answered by voice once — which is what stops the label Talk is
-   * sent from matching its own question again and looping.
-   */
-  const askedSigRef = useRef("");
   const intake = sessionIntake ?? initialIntake ?? EMPTY_INTAKE;
   const language = heardLanguage ?? intake.language;
 
@@ -164,11 +169,34 @@ export function useConversation({
   const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Latest callbacks and settings, read at call time so the session never
   // needs rebuilding when the page re-renders with new closures.
-  const opts = useRef({ getToken, mode, displayName, onIntake, onIntakeDone, onChoiceHeard, intake });
+  const opts = useRef({
+    getToken,
+    mode,
+    displayName,
+    onIntake,
+    onIntakeDone,
+    onChoiceHeard,
+    intake,
+    consented,
+    onConsent,
+  });
 
   useEffect(() => {
-    opts.current = { getToken, mode, displayName, onIntake, onIntakeDone, onChoiceHeard, intake };
-  }, [getToken, mode, displayName, onIntake, onIntakeDone, onChoiceHeard, intake]);
+    opts.current = {
+      getToken,
+      mode,
+      displayName,
+      onIntake,
+      onIntakeDone,
+      onChoiceHeard,
+      intake,
+      consented,
+      onConsent,
+    };
+  }, [getToken, mode, displayName, onIntake, onIntakeDone, onChoiceHeard, intake, consented, onConsent]);
+
+  /** Spoken consent is on file, or was given in this session. */
+  const hasConsent = useCallback(() => consentedRef.current || opts.current.consented !== false, []);
 
   const go = useCallback((next: Phase) => {
     phaseRef.current = next;
@@ -179,7 +207,7 @@ export function useConversation({
     if (!activeRef.current) return;
     if (resumeTimer.current) clearTimeout(resumeTimer.current);
     resumeTimer.current = null;
-    captureRef.current?.setEnabled(true);
+    captureRef.current?.setEnabled(!mutedRef.current);
     go("listening");
   }, [go]);
 
@@ -225,7 +253,16 @@ export function useConversation({
    * words, then her voice, then hands the floor back.
    */
   const speakRequest = useCallback(
-    async (path: string, body: Record<string, unknown>) => {
+    async (
+      path: string,
+      body: Record<string, unknown>,
+      /**
+       * This turn carries an option already chosen — tapped, or heard and
+       * resolved. Its own reply is never matched against the options again:
+       * that is what would loop.
+       */
+      { answered = false }: { answered?: boolean } = {},
+    ) => {
       if (!activeRef.current) return;
       captureRef.current?.setEnabled(false);
       go("thinking");
@@ -278,34 +315,38 @@ export function useConversation({
             const wasAwaitingLanguage = awaitingLanguageRef.current;
             const before = intakeRef.current;
             let setAside = false;
+            // A reply about danger is NEVER set aside, whatever else was
+            // heard: it carries the emergency numbers, and somebody who
+            // cannot read the panel on screen only has her voice.
+            const mayActHere =
+              !answered &&
+              !ev.greeting &&
+              !ev.blocked &&
+              Boolean(ev.transcript) &&
+              RISK_RANK[ev.risk] < RISK_RANK.elevated &&
+              // The consent is the server's to read: it has its own schema.
+              !awaitingConsentRef.current;
 
-            if (!ev.greeting && !ev.blocked && ev.transcript) {
+            if (mayActHere) {
               if (wasAwaitingLanguage && !ev.intake?.language) {
                 // The language question. Saying "Fula" must do exactly what
                 // tapping Fula does — and the model hears that English word as
-                // English, so this cannot be left to it.
+                // English, so this cannot be left to it. Anything that is not
+                // plainly a language is left to the server, whose reply asks
+                // again with the buttons still there.
                 const m = matchChoice(ev.transcript, LANGUAGE_CHOICES, LANGUAGE_ALIASES);
                 if (m.kind === "one") {
                   result.heard = { kind: "language", language: m.choice.id as Language };
-                  setAside = true;
-                } else if (languageMissRef.current < 2) {
-                  // Unclear, or two languages named: ask again rather than
-                  // start the intake in English. The re-ask is the fixed
-                  // opening line — no model call.
-                  languageMissRef.current += 1;
-                  result.heard = { kind: "reask-language" };
                   setAside = true;
                 }
               } else if (asked.length && !wasAwaitingLanguage) {
                 // Any other question. Only when the server learned nothing for
                 // it — otherwise acting here as well would answer it twice and
                 // skip the next question.
-                const signature = asked.map((c) => c.id).join("|");
                 const learnedNothing = missingFields(before)[0] === missingFields(ev.intake ?? before)[0];
-                if (learnedNothing && signature !== askedSigRef.current) {
+                if (learnedNothing) {
                   const m = matchChoice(ev.transcript, asked);
                   if (m.kind === "one") {
-                    askedSigRef.current = signature;
                     result.heard = { kind: "choice", choice: m.choice };
                     setAside = true;
                   }
@@ -349,12 +390,22 @@ export function useConversation({
               setLanguage(lang);
             }
             if (ev.intakeComplete) doneRef.current = true;
+            if (ev.consentGranted === "yes" && !consentedRef.current) {
+              consentedRef.current = true;
+              opts.current.onConsent?.({
+                how: answered ? "tapped" : "spoken",
+                version: ev.consentVersion ?? null,
+                language: intakeRef.current.language,
+              });
+            }
             if (!setAside) {
               const next = ev.choices ?? [];
               setChoices(next);
               choicesRef.current = next;
               setAwaitingLanguage(Boolean(ev.awaitingLanguage));
               awaitingLanguageRef.current = Boolean(ev.awaitingLanguage);
+              setAwaitingConsent(Boolean(ev.awaitingConsent));
+              awaitingConsentRef.current = Boolean(ev.awaitingConsent);
             } else {
               // The buttons go while the answer is acted on; the next turn
               // brings the next question's.
@@ -402,7 +453,7 @@ export function useConversation({
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buf = "";
-        for (;;) {
+        read: for (;;) {
           const { done, value } = await reader.read();
           if (done) break;
           buf += decoder.decode(value, { stream: true });
@@ -411,12 +462,17 @@ export function useConversation({
             const line = buf.slice(0, i).trim();
             buf = buf.slice(i + 1);
             if (line) handle(JSON.parse(line) as TurnEvent);
+            // Answered out loud: stop here. The rest of this stream is the
+            // voice of a reply nobody will hear — waiting for it left a long
+            // "Thinking…" in which a tap or a dropped line lost the answer.
+            if (result.heard) break read;
           }
         }
 
         if (result.heard) {
-          // Something was answered out loud; the caller acts on it, which
-          // starts the next request. Nothing to play, nothing to resume.
+          // Closing the request also tells the server to stop synthesising.
+          controller.abort();
+          if (abortRef.current === controller) abortRef.current = null;
           void maybeFold();
           return result.heard;
         }
@@ -448,9 +504,14 @@ export function useConversation({
       history: historyRef.current,
       summary: summaryRef.current,
       mode: opts.current.mode,
-      intake: opts.current.mode === "intake" ? intakeRef.current : undefined,
+      // In every mode, not only the intake. The server's safety rules for
+      // somebody under 18 read it — and most returning people, a child in
+      // danger among them, are in companion mode.
+      intake: intakeRef.current,
       elapsedSec: startedAtRef.current ? Math.round((Date.now() - startedAtRef.current) / 1000) : 0,
       paceWpm: paceRef.current ?? undefined,
+      awaitingConsent: awaitingConsentRef.current,
+      displayName: opts.current.displayName,
     }),
     [],
   );
@@ -470,15 +531,19 @@ export function useConversation({
       choicesRef.current = [];
       setAwaitingLanguage(false);
       awaitingLanguageRef.current = false;
-      languageMissRef.current = 0;
       opts.current.onIntake?.(next);
+      // A tap can land while the language question is still being spoken.
+      // Two streams into one player garble both and can leave her stuck.
+      abortRef.current?.abort();
+      playerRef.current?.stop();
       return speakRequest(COMPANION.greet, {
         mode: "intake",
         intake: next,
         displayName: opts.current.displayName,
+        consented: hasConsent(),
       });
     },
-    [speakRequest],
+    [hasConsent, speakRequest],
   );
 
   /** Act on what a turn heard, once its stream has ended. */
@@ -489,18 +554,10 @@ export function useConversation({
         void settleLanguage(heard.language);
         return;
       }
-      if (heard.kind === "reask-language") {
-        void speakRequest(COMPANION.greet, {
-          mode: "intake",
-          intake: intakeRef.current,
-          displayName: opts.current.displayName,
-        });
-        return;
-      }
       // An option was chosen by voice. The page says what that means; with no
-      // page handler, it is sent as if typed.
+      // page handler, it is sent as if tapped.
       if (opts.current.onChoiceHeard) opts.current.onChoiceHeard(heard.choice);
-      else void speakRequest(COMPANION.turn, turnBody({ text: heard.choice.label }));
+      else void speakRequest(COMPANION.turn, turnBody({ text: heard.choice.label }), { answered: true });
     },
     [settleLanguage, speakRequest, turnBody],
   );
@@ -511,7 +568,11 @@ export function useConversation({
    * transcribe Talk.
    */
   const setListening = useCallback((on: boolean) => {
-    captureRef.current?.setEnabled(on);
+    mutedRef.current = !on;
+    // Back on only if it is the person's turn. Switching it on while Talk is
+    // thinking or speaking would hear her as their answer.
+    const theirTurn = phaseRef.current === "listening" || phaseRef.current === "hearing";
+    captureRef.current?.setEnabled(on && theirTurn);
   }, []);
 
   const stop = useCallback(() => {
@@ -534,6 +595,7 @@ export function useConversation({
     activeRef.current = true;
     doneRef.current = false;
     startedAtRef.current = Date.now();
+    consentedRef.current = false;
     // Resume from whatever is known: the saved intake, or this session's.
     intakeRef.current = opts.current.intake;
     setError(null);
@@ -579,21 +641,24 @@ export function useConversation({
     };
     rafRef.current = requestAnimationFrame(loop);
 
-    // Onboarding opens with Talk's voice, not instructions on a screen.
-    if (opts.current.mode === "intake") {
+    // Onboarding opens with Talk's voice, not instructions on a screen. So
+    // does any conversation with somebody who has not yet heard the consent:
+    // nothing they say is kept before they agree to it.
+    if (opts.current.mode === "intake" || !hasConsent()) {
       await speakRequest(COMPANION.greet, {
-        mode: "intake",
+        mode: opts.current.mode,
         intake: intakeRef.current,
         displayName: opts.current.displayName,
+        consented: hasConsent(),
       });
       return;
     }
     listen();
-  }, [afterTurn, go, listen, micGraph, micStart, speakRequest, turnBody]);
+  }, [afterTurn, go, hasConsent, listen, micGraph, micStart, speakRequest, turnBody]);
 
   /** A typed message, for anyone who cannot or would rather not speak right now. */
   const sendText = useCallback(
-    (text: string) => {
+    (text: string, { answered = false }: { answered?: boolean } = {}) => {
       const clean = text.trim();
       if (!clean || !activeRef.current) return;
       const p = phaseRef.current;
@@ -601,7 +666,7 @@ export function useConversation({
         abortRef.current?.abort();
         playerRef.current?.stop();
       }
-      void speakRequest(COMPANION.turn, turnBody({ text: clean })).then(afterTurn);
+      void speakRequest(COMPANION.turn, turnBody({ text: clean }), { answered }).then(afterTurn);
     },
     [afterTurn, speakRequest, turnBody],
   );
@@ -637,7 +702,10 @@ export function useConversation({
         void settleLanguage(choice.id as Language);
         return;
       }
-      sendText(choice.label);
+      // Everything else — the consent's Yes and No included — goes as the
+      // button's own words, marked as already chosen. The server reads a
+      // tapped consent directly, without a model.
+      sendText(choice.label, { answered: true });
     },
     [sendText, settleLanguage],
   );
@@ -693,6 +761,7 @@ export function useConversation({
     textOnly,
     choices,
     awaitingLanguage,
+    awaitingConsent,
     choose,
     present,
     start,

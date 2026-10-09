@@ -8,23 +8,26 @@ import { SPRING_SOFT, SPRING_SNAP } from "@/components/motion/primitives";
 import TalkBlob from "@/components/voice/TalkBlob";
 import { useAuth } from "@/components/AuthProvider";
 import { updateUserProfile } from "@/lib/auth";
+import { recordConsent } from "@/lib/wellbeing";
 import { useConversation, type Line, type Phase } from "@/lib/ai/useConversation";
-import { LANGUAGE_LABEL } from "@/lib/ai/protocol";
+import { LANGUAGE_LABEL, type Language } from "@/lib/ai/protocol";
 import {
   REQUIRED_FIELDS,
   SERVICE_LABELS,
+  isMinor,
   localeOf,
   missingFields,
   rankProviders,
   type Intake,
 } from "@/lib/matching";
-import { LOCALE_LABELS } from "@/lib/models";
+import { DEFAULT_CONSENTS, LOCALE_LABELS } from "@/lib/models";
 import { formatDalasi } from "@/lib/money";
 import { useMatches } from "@/lib/useMatches";
 import { useOpenProvider } from "@/lib/useOpenProvider";
 import { useReadAloud } from "@/lib/useReadAloud";
 import { IconSpeaker } from "@/components/ui/icons";
 import ProviderCard from "@/components/providers/ProviderCard";
+import GuardianConsentModal from "@/components/therapy/GuardianConsentModal";
 
 /**
  * Talk — the voice surface, and for a new person, the whole onboarding.
@@ -64,7 +67,9 @@ const STATUS: Record<Phase, string> = {
 
 export default function TherapyPage() {
   const router = useRouter();
-  const { open: openProvider } = useOpenProvider();
+  // Choosing a provider is gated for somebody under 18 (see useGuardianGate):
+  // the guardian form first, then their conversation.
+  const { open: openProvider, guardian } = useOpenProvider();
   const { user, profile, ready } = useAuth();
 
   // Read once, lazily, from the URL: ?intake redoes the intake for someone
@@ -92,13 +97,59 @@ export default function TherapyPage() {
 
   // Progress is saved after every answer, so leaving halfway and coming back
   // picks up where Talk left off rather than starting again.
+  //
+  // The first answer that says they are under 18 also brings up the guardian
+  // form — once, and without stopping the conversation: "Not now" closes it
+  // and Talk carries on. It is choosing a provider that waits for it.
+  const guardianAsked = useRef(false);
+  const guardianOnFile = Boolean(profile?.consents?.guardianConsent);
+  const { ask: askGuardian } = guardian;
   const onIntake = useCallback(
     (intake: Intake) => {
       if (!uid) return;
       const locale = localeOf(intake.language);
       void updateUserProfile(uid, { intake, ...(locale ? { locale } : {}) }).catch(() => {});
+      if (isMinor(intake) && !guardianOnFile && !guardianAsked.current) {
+        guardianAsked.current = true;
+        askGuardian();
+      }
     },
-    [uid],
+    [askGuardian, guardianOnFile, uid],
+  );
+
+  /**
+   * They heard the consent and said yes — out loud, or by tapping Yes.
+   *
+   * Written to the append-only ledger, with what was spoken and how they
+   * answered, and to the profile so it is not asked again. Pressing Start used
+   * to count as consent; for somebody who cannot read the small print under
+   * the button, it never was.
+   *
+   * Each write stands alone: one failing must not stop the others, and none
+   * of them may stop the conversation.
+   */
+  const consents = profile?.consents;
+  const onConsent = useCallback(
+    async ({ how, version, language }: { how: "spoken" | "tapped"; version: string | null; language: Language | null }) => {
+      if (!uid) return;
+      const detail = { via: how, version, language: language ?? "english" };
+      const now = Date.now();
+      await Promise.allSettled([
+        recordConsent(uid, "dataProcessing", true, "therapy/spoken", detail),
+        recordConsent(uid, "aiDisclosure", true, "therapy/spoken", detail),
+      ]);
+      await updateUserProfile(uid, {
+        consents: {
+          ...DEFAULT_CONSENTS,
+          ...consents,
+          dataProcessing: true,
+          aiDisclosure: true,
+          acceptedTermsAt: consents?.acceptedTermsAt ?? now,
+          spokenConsentAt: now,
+        },
+      }).catch(() => {});
+    },
+    [consents, uid],
   );
 
   const onIntakeDone = useCallback(
@@ -126,23 +177,39 @@ export default function TherapyPage() {
     // provider said aloud opens their conversation, an age range said aloud
     // answers the question, and the two can never behave differently.
     onChoiceHeard: handleChoice,
+    // Talk says the consent, in their language, before the first question —
+    // until they have agreed to it once.
+    consented: Boolean(profile?.consents?.spokenConsentAt),
+    onConsent,
   });
   const { mic } = talk;
   // Talk narrates the shortlist once; the speaker on each card is how
   // somebody hears it again. It follows the language being SPOKEN, not the
   // one saved on the profile, which is a turn behind the moment it is chosen.
-  const { read: readAloud, speakingId: readingId } = useReadAloud(
-    talk.language ?? profile?.intake?.language ?? null,
-  );
+  const {
+    read: readAloud,
+    stop: stopReading,
+    speakingId: readingId,
+  } = useReadAloud(talk.language ?? profile?.intake?.language ?? null);
 
-  // Hearing the options read out must not be heard back as an answer. The
-  // microphone is off while they are read, and back on when the reading ends.
-  const readingOptions = useRef(false);
+  // The microphone is hushed while the options are read aloud — so they are
+  // not heard back as an answer — and while the guardian form is open, so a
+  // parent and child talking it through are not sent to Talk. The hook only
+  // switches it back on when it is the person's turn.
+  const { setListening } = talk;
+  const hush = readingId === "choices" || guardian.modal.open;
   useEffect(() => {
-    if (readingId === "choices" || !readingOptions.current) return;
-    readingOptions.current = false;
-    talk.setListening(true);
-  }, [readingId, talk]);
+    setListening(!hush);
+  }, [hush, setListening]);
+
+  // The form must never sit over the emergency numbers. The moment anything
+  // suggests danger it closes, and the crisis panel below is what they see.
+  const risky = talk.risk === "elevated" || talk.risk === "urgent";
+  const { open: guardianOpen, onClose: closeGuardian } = guardian.modal;
+  useEffect(() => {
+    if (risky && guardianOpen) closeGuardian();
+  }, [closeGuardian, guardianOpen, risky]);
+  const minor = isMinor(talk.intake);
 
   // The three she will introduce: ranked against everything she just learned,
   // derived rather than stored so it cannot fall out of step with the intake.
@@ -177,16 +244,9 @@ export default function TherapyPage() {
     if (finished && matches && matches.length === 0) router.replace("/matches?welcome=1");
   }, [finished, matches, router]);
 
-  const begin = useCallback(async () => {
-    // Pressing Start under "By starting you agree…" is the consent. Recorded
-    // once, with the time, the first time it happens.
-    if (uid && profile && !profile.consents.acceptedTermsAt) {
-      void updateUserProfile(uid, {
-        consents: { ...profile.consents, dataProcessing: true, aiDisclosure: true, acceptedTermsAt: Date.now() },
-      }).catch(() => {});
-    }
-    await talk.start();
-  }, [profile, talk, uid]);
+  // Pressing Start is not consent. Talk asks for it out loud — see onConsent.
+  const { start } = talk;
+  const begin = useCallback(() => start(), [start]);
 
   const denied = mic.status === "denied" || mic.status === "unsupported" || mic.status === "error";
   // Without a microphone the keyboard is the only way to answer, so it is open.
@@ -215,6 +275,9 @@ export default function TherapyPage() {
    * them — the same place saying their name goes.
    */
   function handleChoice(choice: { id: string; label: string }) {
+    // A tap while the options are being read out ends the reading — and with
+    // it the hush — rather than leaving it to talk over Talk's answer.
+    stopReading();
     const picked = shortlist?.find((m) => m.profile.uid === choice.id);
     if (picked) {
       void openProvider(picked.profile);
@@ -226,6 +289,7 @@ export default function TherapyPage() {
   function submitDraft(e: React.FormEvent) {
     e.preventDefault();
     if (!draft.trim()) return;
+    stopReading();
     talk.sendText(draft);
     setDraft("");
   }
@@ -379,11 +443,7 @@ export default function TherapyPage() {
               {talk.phase === "listening" ? (
                 <motion.button
                   type="button"
-                  onClick={() => {
-                    readingOptions.current = true;
-                    talk.setListening(false);
-                    void readAloud("choices", talk.choices.map((c) => c.label).join(", "));
-                  }}
+                  onClick={() => void readAloud("choices", talk.choices.map((c) => c.label).join(", "))}
                   whileTap={{ scale: 0.92 }}
                   transition={SPRING_SNAP}
                   aria-label="Hear the options"
@@ -400,6 +460,20 @@ export default function TherapyPage() {
             </motion.div>
           ) : null}
         </AnimatePresence>
+
+        {talk.awaitingConsent ? (
+          <p className="relative z-10 mt-3 text-[11px] text-white/40 text-center max-w-[360px] leading-relaxed">
+            The written version:{" "}
+            <Link href="/terms" className="underline underline-offset-2 text-white/60">
+              Terms
+            </Link>{" "}
+            and{" "}
+            <Link href="/privacy" className="underline underline-offset-2 text-white/60">
+              Privacy Policy
+            </Link>
+            .
+          </p>
+        ) : null}
 
         {shortlist ? (
           <motion.div
@@ -441,7 +515,7 @@ export default function TherapyPage() {
         {/* Once anything suggests danger, help stays on screen for the rest of
             the session. Talk says the numbers too — this is for anyone who
             cannot listen right now. */}
-        {talk.risk === "elevated" || talk.risk === "urgent" ? (
+        {risky ? (
           <motion.div
             initial={{ y: 8, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -449,7 +523,11 @@ export default function TherapyPage() {
             role="alert"
             className="relative z-10 mt-6 w-full max-w-[440px] rounded-2xl border border-[var(--accent)]/60 bg-[var(--accent)]/10 px-5 py-4 text-center"
           >
-            <p className="text-[13px] text-white/85">If you are in danger right now, call for help.</p>
+            <p className="text-[13px] text-white/85">
+              {minor
+                ? "If you are in danger right now, call for help — and tell an adult you trust: a parent, a teacher, a health worker."
+                : "If you are in danger right now, call for help."}
+            </p>
             <div className="mt-3 flex items-center justify-center gap-2">
               <a
                 href="tel:117"
@@ -465,10 +543,10 @@ export default function TherapyPage() {
               </a>
             </div>
             <Link
-              href="/crisis"
+              href={minor ? "/crisis#under-18" : "/crisis"}
               className="mt-3 inline-block text-[11px] uppercase tracking-[0.18em] text-white/70 underline underline-offset-4"
             >
-              More urgent help
+              {minor ? "Help for young people" : "More urgent help"}
             </Link>
           </motion.div>
         ) : null}
@@ -582,7 +660,8 @@ export default function TherapyPage() {
 
         {intakeMode && !talk.active ? (
           <p className="relative z-10 mt-4 text-[11px] text-white/40 text-center max-w-[320px] leading-relaxed">
-            By starting, you agree to our{" "}
+            Before she asks anything, Talk will tell you out loud what she keeps and ask whether that is
+            alright. The written version:{" "}
             <Link href="/terms" className="underline underline-offset-2 text-white/60">
               Terms
             </Link>{" "}
@@ -603,6 +682,8 @@ export default function TherapyPage() {
           </Link>
         </p>
       </main>
+
+      <GuardianConsentModal {...guardian.modal} language={talk.language ?? guardian.modal.language} />
     </div>
   );
 }

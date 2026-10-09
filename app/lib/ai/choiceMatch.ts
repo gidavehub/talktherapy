@@ -4,12 +4,19 @@
  * Many of the people Talk is for cannot read the buttons. The owner's own
  * example is the whole requirement: "if you say 'Fula', automatically it
  * selects Fula". So every multiple-choice question — the language, the age
- * range, where they live, which provider — can be answered by speaking, and
- * this is the one place that decides what was meant.
+ * range, where they live, which provider — can be answered by speaking.
  *
- * It is deliberately conservative. It acts only on ONE clear match and never
- * guesses between two: answering the wrong question for somebody is worse
- * than asking again.
+ * It acts only when the WHOLE utterance is an answer. "Fula", "Fula please",
+ * "I want Wolof", "the second one", "number two" — once the polite words
+ * around it are set aside, nothing is left but the option. Anything with a
+ * sentence in it ("Why do you need my age? I'm under a lot of stress", "This
+ * is my first time", "My English is not good", "I didn't understand") is NOT
+ * matched here: it goes to the model, which understands sentences, and whose
+ * reply is then heard in full. An earlier version looked for option words
+ * anywhere in what was said, and answered questions for people who were
+ * asking one — recording an adult as under 18 because they said "I
+ * understand". A missed match here costs one model turn. A wrong one answers
+ * for somebody, and can set a safeguarding flag that never clears.
  *
  * Pure — no React, no server imports — so the Cloud Functions can use it too,
  * and so scripts/test-choice-matching.mts can test it on its own.
@@ -53,158 +60,125 @@ export function fold(text: string): string {
     .trim();
 }
 
-const ORDINALS: Record<string, number> = {
-  first: 0,
-  "1st": 0,
-  second: 1,
-  "2nd": 1,
-  third: 2,
-  "3rd": 2,
-  fourth: 3,
-  "4th": 3,
-  fifth: 4,
-  "5th": 4,
-  sixth: 5,
-  "6th": 5,
-  last: -1,
-};
-
-const NUMBER_WORDS: Record<string, number> = {
-  one: 0,
-  two: 1,
-  three: 2,
-  four: 3,
-  five: 4,
-  six: 5,
-  "1": 0,
-  "2": 1,
-  "3": 2,
-  "4": 3,
-  "5": 4,
-  "6": 5,
-};
-
-/** A number only counts as a position when it is introduced as one. */
-const POSITION_WORDS = new Set(["number", "option", "choice", "no"]);
-
 /**
- * Words that turn a mention into a refusal: "I don't speak English, I speak
- * Fula" is an answer of Pulaar, not of both.
+ * The words AROUND an answer: "I'd like Fula please", "yes, Wolof", "a man".
+ * Set aside before deciding whether what is left is an answer.
  *
- * A HEURISTIC, and stated as one. It knows the common English framings and a
- * few short negators from the other languages; a negation it does not know
- * leaves two hits standing, which resolves to "many" — and "many" asks again
- * rather than guessing. So a miss here costs a repeated question, never a
- * wrong answer.
+ * A few common ones from Wolof, Mandinka and Pulaar too ("waaw", "rekk",
+ * "haa", "eey"). Incomplete by nature, and safely so: a word missing from
+ * this list leaves the utterance looking like a sentence, which sends it to
+ * the model — never to a wrong option.
  */
-const NEGATORS = new Set([
-  "not",
-  "no",
-  "nope",
-  "dont",
-  "doesnt",
-  "cant",
-  "cannot",
-  "never",
-  "du",
-  "dul",
-  "buka",
-  "alaa",
+const FILLER = new Set([
+  // English
+  "i", "im", "id", "ill", "ive", "me", "my", "am", "a", "an", "the", "to", "in", "is", "it", "its",
+  "please", "pls", "ok", "okay", "yes", "yeah", "yep", "um", "uh", "er", "erm", "hmm", "mm", "so",
+  "well", "just", "like", "want", "wanna", "would", "prefer", "choose", "pick", "take", "go", "with",
+  "speak", "talk", "use", "language", "lets", "let", "us", "thank", "thanks", "you", "for", "can",
+  "could", "will", "do", "say", "be", "that", "this", "region", "area", "in", "of",
+  // Wolof: yes, only, I (emphatic), want
+  "waaw", "rekk", "dama", "begg", "maa",
+  // Mandinka: yes, I, want
+  "haa", "nte", "lafita",
+  // Pulaar: yes, I, want, only
+  "eey", "mido", "yidi", "tan",
 ]);
 
 /**
- * Is the word at `at` being refused rather than chosen?
- *
- * Looks one word back and two — "I don't speak English" puts a verb between
- * the negator and the thing negated — but NEVER across a clause. A comma ends
- * a negation's reach: "No, English please" is an answer of English, and "not
- * Wolof, Mandinka" refuses Wolof and chooses Mandinka. Fold throws punctuation
- * away, which is why the clause of every word is kept alongside it.
+ * Words that make an utterance a refusal, or a hedge, rather than an answer.
+ * If any is present nothing is chosen here — "not Wolof, Mandinka", "I don't
+ * speak English", "no one" all go to the model. Wolof and Pulaar mostly
+ * negate with a suffix (dégguma, jaɓaani), so those are caught by ending.
  */
-function negated(tokens: string[], clauses: number[], at: number): boolean {
-  for (const back of [1, 2]) {
-    const i = at - back;
-    if (i < 0 || clauses[i] !== clauses[at]) break;
-    if (NEGATORS.has(tokens[i])) return true;
-  }
+const NEGATORS = new Set([
+  "no", "not", "nope", "nah", "dont", "doesnt", "didnt", "cant", "cannot", "couldnt", "wont",
+  "wouldnt", "isnt", "aint", "never", "neither", "nor", "without", "except", "instead",
+  "deedeet", "du", "dul", "duma", "buka", "alaa", "hani", "mang",
+]);
+const NEGATIVE_ENDING = /(uma|aani)$/;
+
+function negative(token: string): boolean {
+  return NEGATORS.has(token) || (token.length >= 5 && NEGATIVE_ENDING.test(token));
+}
+
+const ORDINALS: Record<string, number> = {
+  first: 0, "1st": 0, second: 1, "2nd": 1, third: 2, "3rd": 2,
+  fourth: 3, "4th": 3, fifth: 4, "5th": 4, sixth: 5, "6th": 5, last: -1,
+};
+
+const NUMBER_WORDS: Record<string, number> = {
+  one: 0, two: 1, three: 2, four: 3, five: 4, six: 5,
+  "1": 0, "2": 1, "3": 2, "4": 3, "5": 4, "6": 5,
+};
+
+/** Words that introduce a number as a position: "number two", "option three". */
+const POSITION_NOUNS = new Set(["number", "option", "choice", "button"]);
+
+/** Joining words inside a label ("18 to 24", "Kanifing and Serrekunda") — never an answer alone. */
+const LABEL_STOP = new Set(["and", "or", "the", "of", "to", "a", "an", "in", "not", "say", "rather", "prefer", "for", "with", "me"]);
+
+/**
+ * An answer given by position, and only when that is ALL it is: "second",
+ * "the second one", "number two", "option four", "two". A position word
+ * inside a sentence — "this is my first time", "first of all, my name is
+ * Fatou" — is not one.
+ */
+function position(rest: string[], count: number): number | null {
+  let index: number | null = null;
+  if (rest.length === 1 && rest[0] in ORDINALS) index = ORDINALS[rest[0]];
+  else if (rest.length === 2 && rest[0] in ORDINALS && (rest[1] === "one" || POSITION_NOUNS.has(rest[1]))) {
+    index = ORDINALS[rest[0]];
+  } else if (rest.length === 2 && POSITION_NOUNS.has(rest[0]) && rest[1] in NUMBER_WORDS) {
+    index = NUMBER_WORDS[rest[1]];
+  } else if (rest.length === 1 && rest[0] in NUMBER_WORDS) index = NUMBER_WORDS[rest[0]];
+  if (index === null) return null;
+  if (index < 0) index = count - 1;
+  return index >= 0 && index < count ? index : null;
+}
+
+/**
+ * The words that can stand for a choice: its label's words, its aliases, and
+ * the parts of its id — so "under 18" still answers when the label on screen
+ * is in Wolof. Joining words are left out, so "and" or "not" can never be an
+ * answer on their own.
+ */
+function wordsFor(choice: Choice, aliases?: Record<string, string[]>): Set<string> {
+  const words = new Set<string>();
+  const add = (text: string) => {
+    for (const w of fold(text).split(" ")) if (w && !LABEL_STOP.has(w)) words.add(w);
+  };
+  add(choice.label);
+  for (const alias of aliases?.[choice.id] ?? []) add(alias);
+  for (const part of choice.id.split(/[-_]/)) add(part);
+  return words;
+}
+
+/**
+ * Is `token` one of `words`? Exactly — or as a truncation of a longer word
+ * that leaves at most two letters off ("mandink", "pulaa"). Never the other
+ * way round: "fantastic" does not mean Fanta, and "understand" does not mean
+ * under.
+ */
+function heardAs(token: string, words: Set<string>): boolean {
+  if (words.has(token)) return true;
+  if (token.length < 5) return false;
+  for (const w of words) if (w.startsWith(token) && w.length - token.length <= 2) return true;
   return false;
 }
 
-/**
- * The words of an utterance, and which clause each belongs to.
- *
- * Clauses end at , ; . ! ? and at "but" — the places a spoken refusal stops
- * applying. Speech transcripts carry this punctuation; typed answers usually
- * do too.
- */
-function tokenize(said: string): { tokens: string[]; clauses: number[] } {
-  const tokens: string[] = [];
-  const clauses: number[] = [];
-  said.split(/[,;.!?]|\bbut\b/i).forEach((clause, index) => {
-    for (const word of fold(clause).split(" ")) {
-      if (!word) continue;
-      tokens.push(word);
-      clauses.push(index);
-    }
-  });
-  return { tokens, clauses };
+function labelsOf(choice: Choice, aliases?: Record<string, string[]>): string[] {
+  return [choice.label, ...(aliases?.[choice.id] ?? [])].map(fold).filter(Boolean);
 }
 
-function ordinalHit(tokens: string[], count: number): number[] {
-  const hits = new Set<number>();
-  tokens.forEach((token, i) => {
-    if (token in ORDINALS) {
-      const index = ORDINALS[token];
-      hits.add(index < 0 ? count - 1 : index);
-      return;
-    }
-    if (token in NUMBER_WORDS) {
-      const introduced = i > 0 && POSITION_WORDS.has(tokens[i - 1]);
-      // "two" or "two please" on its own is an answer by position; "I have
-      // two children" is not.
-      const bare = tokens.length <= 2;
-      if (introduced || bare) hits.add(NUMBER_WORDS[token]);
-    }
-  });
-  return [...hits].filter((i) => i >= 0 && i < count);
-}
-
-/** The words that can stand for a choice. */
-function termsFor(choice: Choice, aliases?: Record<string, string[]>): string[] {
-  const label = fold(choice.label);
-  const terms = new Set<string>([label, ...(aliases?.[choice.id] ?? []).map(fold)]);
-  for (const part of label.split(" ")) if (part.length >= 3) terms.add(part);
-  for (const part of choice.id.split(/[-_]/)) {
-    const folded = fold(part);
-    if (folded.length >= 3) terms.add(folded);
+/** Is `label` said as one run of words, with nothing but filler around it? */
+function saidWhole(tokens: string[], label: string): boolean {
+  const words = label.split(" ");
+  for (let i = 0; i + words.length <= tokens.length; i++) {
+    if (!words.every((w, j) => tokens[i + j] === w)) continue;
+    const around = [...tokens.slice(0, i), ...tokens.slice(i + words.length)];
+    if (around.every((t) => FILLER.has(t))) return true;
   }
-  terms.delete("");
-  return [...terms];
-}
-
-/**
- * Where in `tokens` a term is heard, or -1.
- *
- *   - several words: a contiguous run of exactly those words;
- *   - one word of 4+ letters: equal, or a shared 4+ letter beginning either
- *     way round, so "mandink", "pulaa" and "fatou" all count;
- *   - one word of under 4 letters: the whole word only — which is what stops
- *     "man" being heard in "many" and "ful" in "careful".
- */
-function findTerm(term: string, tokens: string[]): number {
-  const words = term.split(" ");
-  if (words.length > 1) {
-    for (let i = 0; i + words.length <= tokens.length; i++) {
-      if (words.every((w, j) => tokens[i + j] === w)) return i;
-    }
-    return -1;
-  }
-  if (term.length < 4) return tokens.indexOf(term);
-  return tokens.findIndex((token) => {
-    if (token === term) return true;
-    if (token.length < 4) return false;
-    return token.startsWith(term) || (term.startsWith(token) && token.length >= 4);
-  });
+  return false;
 }
 
 export function matchChoice(
@@ -213,30 +187,48 @@ export function matchChoice(
   aliases?: Record<string, string[]>,
 ): ChoiceMatch {
   if (!choices.length) return { kind: "none" };
-  const { tokens, clauses } = tokenize(said);
+  const tokens = fold(said).split(" ").filter(Boolean);
   if (!tokens.length) return { kind: "none" };
+  const rest = tokens.filter((t) => !FILLER.has(t));
 
-  // By position first. Somebody who understands none of the sentence around
-  // the options can still say "the second one" — and for them it is the only
-  // way in that does not depend on pronouncing a label.
-  const positions = ordinalHit(tokens, choices.length);
-  if (positions.length === 1) return { kind: "one", choice: choices[positions[0]] };
-  if (positions.length > 1) {
-    return { kind: "many", choices: positions.map((i) => choices[i]) };
-  }
+  // A label said in full, even one with "not" in it: "Rather not say",
+  // "I'd rather not say".
+  const exact = choices.filter((c) => labelsOf(c, aliases).some((l) => saidWhole(tokens, l)));
+  if (exact.length === 1) return { kind: "one", choice: exact[0] };
 
-  // Then by what they named.
-  const hit: Choice[] = [];
-  for (const choice of choices) {
-    const heard = termsFor(choice, aliases).some((term) => {
-      const at = findTerm(term, tokens);
-      if (at < 0) return false;
-      return !negated(tokens, clauses, at);
-    });
-    if (heard) hit.push(choice);
-  }
+  if (!rest.length) return { kind: "none" };
+  if (tokens.some(negative)) return { kind: "none" };
 
-  if (hit.length === 1) return { kind: "one", choice: hit[0] };
-  if (hit.length > 1) return { kind: "many", choices: hit };
+  const at = position(rest, choices.length);
+  if (at !== null) return { kind: "one", choice: choices[at] };
+
+  // Every word left must belong to the same one option.
+  const covering = choices.filter((c) => {
+    const words = wordsFor(c, aliases);
+    return rest.every((t) => heardAs(t, words));
+  });
+  if (covering.length === 1) return { kind: "one", choice: covering[0] };
+  if (covering.length > 1) return { kind: "many", choices: covering };
   return { kind: "none" };
+}
+
+/**
+ * Which options are MENTIONED anywhere in what was said — no judgement about
+ * whether they were chosen, refused or just talked about.
+ *
+ * For the server's language check, which asks a narrower question than
+ * matchChoice does: when the model records English, did the person say the
+ * word English at all? "I'm Fula, but I prefer English" mentions it; "My name
+ * is Fatou" does not.
+ */
+export function mentions(
+  said: string,
+  choices: Choice[],
+  aliases?: Record<string, string[]>,
+): Choice[] {
+  const tokens = new Set(fold(said).split(" ").filter(Boolean));
+  return choices.filter((c) => {
+    for (const w of wordsFor(c, aliases)) if (tokens.has(w)) return true;
+    return false;
+  });
 }

@@ -1,5 +1,5 @@
 import { generate, models, streamGenerate, textOf, type Content } from "./vertex";
-import { matchChoice } from "../../../app/lib/ai/choiceMatch";
+import { fold, mentions } from "../../../app/lib/ai/choiceMatch";
 import {
   INTAKE_BUDGET_SEC,
   LANGUAGES,
@@ -26,6 +26,7 @@ import {
   SERVICE_BLURBS,
   SPECIALIZATIONS,
   cleanIntake,
+  isMinor,
   mergeIntake,
   missingFields,
   type Intake,
@@ -82,7 +83,7 @@ EACH TURN the user's newest message arrives as audio — or, now and then, as ty
 - language: the main language they spoke: english, wolof, mandinka, pulaar, or other. Use "none" only when the transcript is empty.
 - english: a faithful English translation of the transcript. Identical to the transcript if they spoke English.
 - risk: your assessment of their safety right now (see SAFETY). Decide this before you write the reply.
-- helpLine: ONLY when risk is elevated or urgent — one short sentence in their language telling them to call 117 for the police or 116 for an ambulance now. Otherwise empty.
+- helpLine: ONLY when risk is elevated or urgent — one short sentence in their language telling them to call 117 for the police or 116 for an ambulance now. For someone under 18 it also tells them to tell an adult they trust — a parent, a teacher, a health worker — today. Otherwise empty.
 - reply: what you say back, in the SAME language they just used. Empty if the transcript is empty.
 - replyEnglish: a faithful English translation of your reply.
 
@@ -182,15 +183,23 @@ const TURN_SCHEMA = {
  * harm than a person in danger never hearing where to call.
  */
 const HELP_EN = "If you might act on these thoughts, please call 117 for the police or 116 for an ambulance right now.";
+/**
+ * The same numbers for a child — they are still the ones for immediate
+ * danger — plus the thing a child most needs told: an adult whose job it is
+ * to help. Never "call the police" alone.
+ */
+const HELP_EN_MINOR =
+  "If you are in danger, call 117 for the police or 116 for an ambulance right now, and tell an adult you trust — a parent, a teacher, a health worker — today.";
 
-function ensureHelp(result: TurnResult, helpLine: string): TurnResult {
+function ensureHelp(result: TurnResult, helpLine: string, minor = false): TurnResult {
   if (result.risk !== "elevated" && result.risk !== "urgent") return result;
   if (!result.reply || /\b11[67]\b/.test(result.reply)) return result;
-  const line = /\b11[67]\b/.test(helpLine) ? helpLine : HELP_EN;
+  const fallback = minor ? HELP_EN_MINOR : HELP_EN;
+  const line = /\b11[67]\b/.test(helpLine) ? helpLine : fallback;
   return {
     ...result,
     reply: `${result.reply} ${line}`,
-    replyEnglish: `${result.replyEnglish} ${HELP_EN}`,
+    replyEnglish: `${result.replyEnglish} ${fallback}`,
     helpAppended: true,
   };
 }
@@ -233,11 +242,38 @@ function historyContents(history: HistoryTurn[]): Content[] {
   return out;
 }
 
-function systemFor(summary: string, mode: ConversationMode, intake: Intake, remainingSec?: number) {
+function systemFor(
+  summary: string,
+  mode: ConversationMode,
+  intake: Intake,
+  remainingSec?: number,
+  awaitingConsent = false,
+) {
   const memory = summary.trim()
     ? `\n\nEARLIER IN THIS CONVERSATION (your own summary — the recent turns follow as messages):\n${summary.trim()}`
     : "";
-  return SYSTEM + (mode === "intake" ? intakeSection(intake, remainingSec) : "") + memory;
+  // The consent turn is its own small job: the intake waits until it is done.
+  const task = awaitingConsent ? CONSENT_SECTION : mode === "intake" ? intakeSection(intake, remainingSec) : "";
+  // In BOTH modes. Most returning people are in companion mode, and a child in
+  // danger there needs this as much as one who is mid-intake.
+  return SYSTEM + minorSafety(intake) + task + memory;
+}
+
+/**
+ * Safety, for somebody under 18. SAFETY above still applies in full — 117 and
+ * 116 are still the numbers for immediate danger — but a child also needs an
+ * adult whose job it is to protect them, and must never be left thinking their
+ * only option is to call the police alone.
+ */
+function minorSafety(intake: Intake): string {
+  if (!isMinor(intake)) return "";
+  return `
+
+THIS PERSON IS UNDER 18
+- When risk is elevated or urgent: keep 117 and 116 — they are still the numbers for immediate danger — AND name an adult whose job is to protect children: a teacher, a health worker, or the Department of Social Welfare. Encourage them to tell a parent or another adult they trust today.
+- Never tell a child their only option is to call the police on their own.
+- Never promise to keep a secret where a child is being harmed or is in danger. Say kindly that keeping them safe matters more.
+- Be plain and gentle, and do not ask for details of abuse — that is for the people who will help them in person.`;
 }
 
 // ------------------------------------------------------------------- intake
@@ -336,6 +372,36 @@ Fill "intake" with what THIS message tells you, null (or an empty list) for anyt
 - Safety comes first: if they share something heavy or unsafe, respond to that with care before any question, and follow the SAFETY rules.`;
 }
 
+/** Talk has just spoken the consent and is waiting for the answer. */
+const CONSENT_SECTION = `
+
+RIGHT NOW: CONSENT
+You have just told them what you keep, that the provider they choose will see a summary of it, and that you are an AI and not a therapist — and asked whether that is alright. Their message is the answer.
+- consentGranted: "yes" if they agree, in any words or language (yes, okay, fine, waaw, haa, eey, go on). "no" if they refuse. "unclear" for anything else, including a question.
+- If unclear: answer their question if they asked one, then ask again, more simply, whether that is alright. Ask NOTHING else.
+- If no or yes: keep the reply very short — the next thing they hear is decided for you.
+- SAFETY still comes first: if what they say is about danger or harm, rate the risk and respond to that, whatever they answered.`;
+
+const CONSENT_SCHEMA = {
+  ...TURN_SCHEMA,
+  properties: {
+    ...TURN_SCHEMA.properties,
+    consentGranted: { type: "STRING", enum: ["yes", "no", "unclear"] },
+  },
+  required: [...TURN_SCHEMA.required, "consentGranted"],
+  // What they answered, before anything is said back.
+  propertyOrdering: [
+    "transcript",
+    "language",
+    "english",
+    "risk",
+    "consentGranted",
+    "helpLine",
+    "reply",
+    "replyEnglish",
+  ],
+};
+
 const INTAKE_SCHEMA = {
   ...TURN_SCHEMA,
   properties: {
@@ -412,6 +478,10 @@ export type TurnInput = {
   elapsedSec?: number;
   /** The person's own speaking pace, words per minute. */
   paceWpm?: number;
+  /** This message answers the consent question. */
+  awaitingConsent?: boolean;
+  /** From the account, for the opening that follows a yes. */
+  displayName?: string | null;
 };
 
 /**
@@ -465,6 +535,9 @@ function cleanChoices(raw: unknown, intake: Intake): Choice[] {
 }
 
 export async function runTurn(input: TurnInput, signal?: AbortSignal): Promise<TurnResult> {
+  // Kept apart from everything below so a consent answer can never be merged
+  // into the intake as if it were an answer about age or place.
+  if (input.awaitingConsent) return consentTurn(input, signal);
   const intakeMode = input.mode === "intake";
   const message = input.audio
     ? { inlineData: { mimeType: "audio/wav", data: input.audio } }
@@ -538,26 +611,33 @@ export async function runTurn(input: TurnInput, signal?: AbortSignal): Promise<T
       replyEnglish: str(parsed.replyEnglish) || reply,
     },
     str(parsed.helpLine),
+    isMinor(input.intake),
   );
   if (!intakeMode || !transcript) return result;
 
   // Merge what this message told Talk into what was already known. The
   // conversation language counts as a preference once it is not English,
   // even if they never said so in words.
+  // The language is CHOSEN — named, or tapped — never guessed from how they
+  // happen to be speaking. (It used to be set from the detected language when
+  // that was not English; the prompt now tells the model to ask instead, and
+  // doing both left Talk asking "which language?" with no buttons and no way
+  // to answer it by voice.)
   const learned = cleanIntake(parsed.intake, LANGUAGES);
-  if (!learned.language && language !== "none" && language !== "english" && !input.intake.language) {
-    learned.language = language;
-  }
   // SPEAKING English is not CHOOSING English. Somebody who answers the
   // language question with "My name is Fatou" has not picked a language — but
   // the model, seeing English, sometimes records English anyway, and then pins
   // the whole conversation to it, so a Wolof speaker who could only manage
   // their name in English is answered in English from then on. While the
-  // language is unset, English is only accepted when they actually NAMED it —
-  // judged by the same matcher the browser uses for a spoken answer.
+  // language is unset, English is only accepted when the word was SAID —
+  // "I'm Fula, but I prefer English" said it; "My name is Fatou" did not.
+  let englishUnsaid = false;
   if (!input.intake.language && learned.language === "english") {
-    const named = matchChoice(transcript, LANGUAGE_CHOICES, LANGUAGE_ALIASES);
-    if (!(named.kind === "one" && named.choice.id === "english")) learned.language = null;
+    const said = mentions(transcript, LANGUAGE_CHOICES, LANGUAGE_ALIASES);
+    if (!said.some((c) => c.id === "english")) {
+      learned.language = null;
+      englishUnsaid = true;
+    }
   }
   const intake = mergeIntake(input.intake, learned);
   // Completion is decided from the merged facts, not the model's flag: a
@@ -568,19 +648,162 @@ export async function runTurn(input: TurnInput, signal?: AbortSignal): Promise<T
   const outOfTime = (input.elapsedSec ?? 0) >= INTAKE_BUDGET_SEC;
   const intakeComplete = missingFields(intake).length === 0 || outOfTime;
   if (intakeComplete && !intake.completedAt) intake.completedAt = Date.now();
+  // The model's reply assumed the English it recorded, so it has moved on to a
+  // question that must not be asked yet. Ask the language instead — unless
+  // the reply is answering danger, which is never replaced.
+  const risky = result.risk === "elevated" || result.risk === "urgent";
+  const reasked =
+    englishUnsaid && !intake.language && !intakeComplete && !risky
+      ? { reply: LANGUAGE_REASK, replyEnglish: LANGUAGE_REASK }
+      : {};
   return {
     ...result,
+    ...reasked,
     intake,
     intakeComplete,
-    ...(intakeMode && !intake.language
-      ? {
-          // Still unanswered: keep asking it, buttons and all.
-          awaitingLanguage: true,
-          choices: LANGUAGE_CHOICES,
-        }
-      : { choices: intakeComplete ? [] : cleanChoices(parsed.choices, intake) }),
+    // A finished intake asks nothing more — not even the language.
+    ...(intakeComplete
+      ? { choices: [] }
+      : !intake.language
+        ? {
+            // Still unanswered: keep asking it, buttons and all.
+            awaitingLanguage: true,
+            choices: LANGUAGE_CHOICES,
+          }
+        : { choices: cleanChoices(parsed.choices, intake) }),
     speechRate: speechRate(input.paceWpm),
   };
+}
+
+/**
+ * The answer to the consent question.
+ *
+ * A tap is read directly. Anything spoken goes to the model with a schema of
+ * its own — yes, no, or unclear — and with the full safety rules, because
+ * somebody can answer "no" and say they are in danger in the same breath.
+ *
+ * On a yes, the reply IS the opening that follows — the first question — so
+ * agreeing costs one round trip, not two. On a no, the fixed refusal is spoken
+ * and the question stays open: saying yes later still works.
+ */
+async function consentTurn(input: TurnInput, signal?: AbortSignal): Promise<TurnResult> {
+  const language: Language = input.intake.language ?? "english";
+  const script = CONSENT_SCRIPT[language];
+  const pending = {
+    awaitingConsent: true,
+    choices: consentChoices(language),
+    consentVersion: consentVersion(language),
+    intake: input.intake,
+    speechRate: speechRate(input.paceWpm),
+  };
+
+  const tapped = input.text ? tappedConsent(input.text) : null;
+  let granted: "yes" | "no" | "unclear";
+  let heard: TurnResult;
+
+  if (tapped) {
+    granted = tapped;
+    const text = input.text ?? "";
+    heard = { transcript: text, language, english: text, risk: "none", reply: "", replyEnglish: "" };
+  } else {
+    const message = input.audio
+      ? { inlineData: { mimeType: "audio/wav", data: input.audio } }
+      : { text: input.text ?? "" };
+    const res = await generate(
+      models.text,
+      {
+        systemInstruction: {
+          parts: [{ text: systemFor(input.summary, input.mode, input.intake, undefined, true) }],
+        },
+        contents: [...historyContents(input.history), { role: "user", parts: [message] }],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 2048,
+          responseMimeType: "application/json",
+          responseSchema: CONSENT_SCHEMA,
+          thinkingConfig: { thinkingLevel: "low" },
+        },
+        safetySettings: SAFETY_SETTINGS,
+      },
+      signal,
+    );
+    const finish = res.candidates?.[0]?.finishReason;
+    if (res.promptFeedback?.blockReason || finish === "SAFETY" || finish === "PROHIBITED_CONTENT") {
+      return {
+        transcript: "",
+        language: "english",
+        english: "",
+        risk: "low",
+        reply: BLOCKED_REPLY,
+        replyEnglish: BLOCKED_REPLY,
+        blocked: true,
+        ...pending,
+      };
+    }
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(textOf(res));
+    } catch {
+      throw new Error(`Model returned unparseable output (finishReason ${finish ?? "unknown"})`);
+    }
+    const transcript = str(parsed.transcript);
+    // Silence is not an answer. Nothing to say back; the question stands.
+    if (!transcript) {
+      return { transcript: "", language: "none", english: "", risk: "none", reply: "", replyEnglish: "", ...pending };
+    }
+    granted = pick(parsed.consentGranted, ["yes", "no", "unclear"] as const, "unclear");
+    const reply = str(parsed.reply);
+    heard = ensureHelp(
+      {
+        transcript,
+        language: pick<HeardLanguage>(parsed.language, LANGUAGES, "other"),
+        english: str(parsed.english) || transcript,
+        risk: pick<Risk>(parsed.risk, RISK_LEVELS, "none"),
+        reply,
+        replyEnglish: str(parsed.replyEnglish) || reply,
+      },
+      str(parsed.helpLine),
+      isMinor(input.intake),
+    );
+  }
+
+  // Danger outranks everything: the model's reply, with the numbers in it,
+  // is what they hear — whatever they answered.
+  const risky = heard.risk === "elevated" || heard.risk === "urgent";
+
+  if (granted === "yes") {
+    const next = risky
+      ? { reply: heard.reply, replyEnglish: heard.replyEnglish }
+      : await runGreeting(
+          {
+            mode: input.mode,
+            intake: input.intake,
+            displayName: input.displayName ?? null,
+            consented: true,
+            afterConsent: true,
+          },
+          signal,
+        );
+    return {
+      ...heard,
+      reply: next.reply,
+      replyEnglish: next.replyEnglish,
+      consentGranted: "yes",
+      consentVersion: consentVersion(language),
+      awaitingConsent: false,
+      choices: [],
+      intake: input.intake,
+      speechRate: speechRate(input.paceWpm),
+    };
+  }
+
+  const reply =
+    risky || (granted === "unclear" && heard.reply)
+      ? { reply: heard.reply, replyEnglish: heard.replyEnglish }
+      : granted === "no"
+        ? { reply: script.declined, replyEnglish: CONSENT_SCRIPT.english.declined }
+        : { reply: script.text, replyEnglish: CONSENT_SCRIPT.english.text };
+  return { ...heard, ...reply, consentGranted: granted, ...pending };
 }
 
 // ----------------------------------------------------------------- greeting
@@ -606,6 +829,135 @@ function firstName(displayName: string | null | undefined): string | null {
 // does not speak the sentence around them.
 const LANGUAGE_PROMPT =
   "Salaam aleekum, and welcome to Talk. Which language would you like to speak — English, Wolof, Mandinka, or Pulaar?";
+
+/**
+ * Asked again when the model recorded English that was never named — its own
+ * reply was then written as if English were settled, and moves on to a
+ * question nobody should hear yet.
+ */
+const LANGUAGE_REASK = "Which language would you like to speak — English, Wolof, Mandinka, or Pulaar?";
+
+/**
+ * The consent, spoken before the first question: what Talk keeps, that the
+ * provider they choose will see a summary of it, and that she is an AI and
+ * not a therapist.
+ *
+ * FIXED TEXT, per language, never generated in the moment. It is the one
+ * legally load-bearing sentence in the product: a paraphrase that differs
+ * from one session to the next cannot be shown to be what somebody agreed to.
+ * The ledger records which version was spoken (CONSENT_VERSION).
+ *
+ * The English is the source. The Wolof, Mandinka and Pulaar were drafted once
+ * by the model, back-translated to check the meaning survived, and frozen
+ * here — and are marked as drafts in the ledger until a Gambian translator
+ * has checked them.
+ */
+const CONSENT_VERSION = "2026-10";
+const CONSENT_DRAFT: Record<Language, boolean> = {
+  english: false,
+  wolof: true,
+  mandinka: true,
+  pulaar: true,
+  other: false,
+};
+const CONSENT_SCRIPT: Record<Language, { text: string; yes: string; no: string; declined: string }> = {
+  english: {
+    text:
+      "Before we begin: I keep what you tell me so I can find you the right provider, and the provider you choose will see a short summary of it. I am an AI, not a therapist. Is that alright with you?",
+    yes: "Yes, that's alright",
+    no: "No",
+    declined:
+      "That's alright. I can't go on without your yes, but if you change your mind, just say yes. If you are in danger right now, call 117 for the police or 116 for an ambulance.",
+  },
+  // TODO(translation): human translator, not a model. Back-translation of the
+  // draft: "Before we begin: what you tell me I will save so I can find the
+  // provider best for you, and the provider you choose will see a short
+  // summary of what you said. I am an AI, not a therapist. Is that fine with you?"
+  wolof: {
+    text:
+      "Bala nu koy tàmbli: li nga may wax dama koy denc ngir man laa seetal provider bi la gënël, te provider bi nga tànn dina gis summary bu gàtt ci li nga wax. Man AI laa, duma therapist. Ndax loolu baax na ci yaw?",
+    yes: "Waaw, loolu baax na",
+    no: "Déedéet",
+    declined:
+      "Amul problem. Mënuma wéy te waxuloo waaw, waaye boo soppee sa xel, waxal waaw rekk. Boo nekkee ci danger léegi, woo 117 ngir police walla 116 ngir ambulance.",
+  },
+  // TODO(translation): human translator, not a model. Back-translation of the
+  // draft: "Before we start: I will save your words so that we can find the
+  // right provider for you, and the provider you choose will see parts of it.
+  // I am an AI, not a doctor. Does that sound okay to you?"
+  mandinka: {
+    text:
+      "Kabuŋ ŋa damina: n b'i la kumoolu mara la le walasa ŋa provider ñaamato soto i ye, aniŋ i ye provider meŋ sugandi a b'a duntolu je la. Nte mu AI le ti, nte te dandanlaa ti. Wo dantaŋ be bori la i bulu?",
+    yes: "Haa, wo be beteyaala le",
+    no: "Hani",
+    declined:
+      "N te noola ka taa ñɛ fo ni i ko haa, bari ni i la mirando yelenta, a fo doron haa. Ni i be toroo kono saayin, karandi 117 ka kanta poliso la fo 116 ka kanta ambulanso la.",
+  },
+  // TODO(translation): human translator, not a model. Back-translation of the
+  // draft: "Before we start: I save what you say to help you get a provider
+  // that suits you, and the provider you choose will see a short summary of
+  // what you said. I am an AI, not a mental health doctor. Is that okay with you?"
+  pulaar: {
+    text:
+      "Ko adii nde min puɗɗotoo: miɗo moofta ko kaal-ɗaa koo ngam wallitde ma heɓde provider mo moƴƴani ma, kadi provider mo cuɓ-ɗaa oo maa yiy daartol pamarol e ko mbi-ɗaa koo. Min ko mi AI, wonaa mi cafroowo hakkille. Ɗuum ina moƴƴi e maa?",
+    yes: "Eey, ɗum no moƴƴi",
+    no: "Alaa",
+    declined:
+      "Alaa caɗeele. Mi waawaa jokkude so a jaɓaani, kono so a waylii miijo maa, wi'u tan eey. So aɗa e baasal jooni, noddu 117 ngam poliis walla 116 ngam ambulance.",
+  },
+  other: {
+    text:
+      "Before we begin: I keep what you tell me so I can find you the right provider, and the provider you choose will see a short summary of it. I am an AI, not a therapist. Is that alright with you?",
+    yes: "Yes, that's alright",
+    no: "No",
+    declined:
+      "That's alright. I can't go on without your yes, but if you change your mind, just say yes. If you are in danger right now, call 117 for the police or 116 for an ambulance.",
+  },
+};
+
+function consentVersion(language: Language): string {
+  return `${CONSENT_VERSION}-${language}${CONSENT_DRAFT[language] ? "-draft" : ""}`;
+}
+
+function consentChoices(language: Language): Choice[] {
+  const script = CONSENT_SCRIPT[language];
+  return [
+    { id: "consent-yes", label: script.yes },
+    { id: "consent-no", label: script.no },
+  ];
+}
+
+/** Talk asks for consent: the fixed text, with Yes and No as buttons. */
+function consentPrompt(language: Language, intake: Intake): TurnResult {
+  return {
+    transcript: "",
+    language,
+    english: "",
+    risk: "none",
+    reply: CONSENT_SCRIPT[language].text,
+    replyEnglish: CONSENT_SCRIPT.english.text,
+    greeting: true,
+    awaitingConsent: true,
+    choices: consentChoices(language),
+    consentVersion: consentVersion(language),
+    intake,
+  };
+}
+
+/**
+ * A tapped button arrives as the button's own words. Those need no model to
+ * read — and must not get one, because a tap is unambiguous and a model is not.
+ */
+function tappedConsent(text: string): "yes" | "no" | null {
+  const said = fold(text);
+  for (const script of Object.values(CONSENT_SCRIPT)) {
+    if (said === fold(script.yes)) return "yes";
+    if (said === fold(script.no)) return "no";
+  }
+  if (said === "yes") return "yes";
+  if (said === "no") return "no";
+  return null;
+}
 
 /**
  * Talk introduces the people she found.
@@ -718,7 +1070,15 @@ const GREETING_SCHEMA = {
 };
 
 export async function runGreeting(
-  input: { mode: ConversationMode; intake: Intake; displayName: string | null },
+  input: {
+    mode: ConversationMode;
+    intake: Intake;
+    displayName: string | null;
+    /** `false`: say the consent before anything else. See GreetRequest.consented. */
+    consented?: boolean;
+    /** They have just said yes — thank them briefly instead of greeting again. */
+    afterConsent?: boolean;
+  },
   signal?: AbortSignal,
 ): Promise<TurnResult> {
   const { intake } = input;
@@ -744,23 +1104,31 @@ export async function runGreeting(
     };
   }
 
+  // Consent comes next — after the language, so it is heard in theirs, and
+  // before the first question, so nothing is kept before they agree.
+  if (input.consented === false) return consentPrompt(language, intake);
+
+  const nameQuestion = name ? `whether you may call them ${name}` : "what they would like to be called";
   if (input.mode === "intake" && !started) {
     // The language is settled, so the opening is spoken in it — the first
     // thing they hear is their own language, not English.
     const opening = await sayInLanguage(
       language,
-      `Greet them warmly, say you are Talk, an AI companion who will help find them the right provider, and ask ${
-        name ? `whether you may call them ${name}` : "what they would like to be called"
-      }. Two short sentences at most.`,
+      input.afterConsent
+        ? `They have just said yes to how Talk works; they have not told you anything else yet. Thank them in two or three words, then ask ${nameQuestion}. Two short sentences at most.`
+        : `Greet them warmly, say you are Talk, an AI companion who will help find them the right provider, and ask ${nameQuestion}. Two short sentences at most.`,
       signal,
     );
     return { transcript: "", language, english: "", risk: "none", ...opening, greeting: true, intake };
   }
 
+  const lead = input.afterConsent
+    ? `They have just said yes to how Talk works. In ${language}, thank them in two or three words${name ? ` by name (${name})` : ""}`
+    : null;
   const ask =
     input.mode === "intake"
-      ? `They are coming back to finish getting started. In ${language}, welcome them back${name ? ` by name (${name})` : ""} in one short sentence, then ask about: ${FIELD_GUIDE[missingFields(intake)[0] ?? "concerns"]}.`
-      : `They have opened a conversation with you. In ${language}, greet them warmly${name ? ` by name (${name})` : ""} and ask, in one short sentence, what is on their mind today.`;
+      ? `${lead ?? `They are coming back to finish getting started. In ${language}, welcome them back${name ? ` by name (${name})` : ""} in one short sentence`}, then ask about: ${FIELD_GUIDE[missingFields(intake)[0] ?? "concerns"]}.`
+      : `${lead ?? `They have opened a conversation with you. In ${language}, greet them warmly${name ? ` by name (${name})` : ""}`} and ask, in one short sentence, what is on their mind today.`;
 
   const res = await generate(
     models.text,

@@ -68,6 +68,10 @@ export type TurnRequest = {
   elapsedSec?: number;
   /** How fast this person speaks, in words per minute. */
   paceWpm?: number;
+  /** This turn answers the spoken consent question. */
+  awaitingConsent?: boolean;
+  /** From the account, so the opening after a yes can use their name. */
+  displayName?: string | null;
 };
 
 export const MAX_TEXT_CHARS = 2000;
@@ -124,6 +128,12 @@ export type GreetRequest = {
   intake?: unknown;
   /** From the account, so Talk can greet by name when she knows it. */
   displayName?: string | null;
+  /**
+   * Whether they have already heard and agreed to the consent. `false` makes
+   * Talk say it before anything else; absent means a client from before the
+   * consent step existed, which is left to behave as it did.
+   */
+  consented?: boolean;
 };
 
 /** What the model heard and what it will say. */
@@ -151,6 +161,12 @@ export type TurnResult = {
   choices?: Choice[];
   /** True while Talk is waiting for the language to be chosen. */
   awaitingLanguage?: boolean;
+  /** True while Talk is waiting for a yes to the consent she just spoke. */
+  awaitingConsent?: boolean;
+  /** What the consent turn heard. The client records a "yes" in the ledger. */
+  consentGranted?: "yes" | "no" | "unclear";
+  /** Which fixed consent text was spoken — the ledger stores it as evidence. */
+  consentVersion?: string;
   /** Playback rate for her voice, so she speaks at the person's pace. */
   speechRate?: number;
 };
