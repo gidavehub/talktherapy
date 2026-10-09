@@ -165,6 +165,18 @@ function SessionRow({
           </button>
         </div>
       ) : null}
+
+      {/*
+        Wave works — through mobile money on the payment page — but nothing
+        here said so, and Wave is what most people in The Gambia pay with.
+        Somebody deciding whether they CAN pay should not have to tap through
+        to find out.
+      */}
+      {!cancelled && !past && booking.paymentStatus === "unpaid" && booking.amountMinor > 0 && booking.patientId === selfUid ? (
+        <p className="mt-2.5 text-[11.5px] text-[var(--muted)] leading-relaxed">
+          Pay with Wave, Afrimoney, QMoney or a card.
+        </p>
+      ) : null}
     </motion.div>
   );
 }

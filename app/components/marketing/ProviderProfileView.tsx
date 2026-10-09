@@ -290,6 +290,44 @@ export default function ProviderProfileView({ providerId }: { providerId: string
           </Link>
         </p>
       </motion.aside>
+
+      {/*
+        On a phone the rail above sits below the whole bio, areas of focus and
+        qualifications list — so the one thing somebody came here to do was a
+        long scroll down an unfamiliar page. The same two actions, pinned
+        where a thumb already is. The spacer keeps the bar from covering the
+        end of the page.
+      */}
+      {canMessage ? (
+        <>
+          <div aria-hidden className="h-24 lg:hidden" />
+          <motion.div
+            initial={{ y: 80 }}
+            animate={{ y: 0 }}
+            transition={{ ...SPRING_SOFT, delay: 0.3 }}
+            className="lg:hidden fixed inset-x-0 bottom-0 z-30 border-t border-[var(--border)] bg-white/95 backdrop-blur-md px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+          >
+            <div className="mx-auto flex max-w-[560px] gap-2">
+              <button
+                type="button"
+                onClick={() => void startChat()}
+                disabled={opening}
+                className="flex-1 h-12 rounded-full bg-[var(--accent)] text-white text-[12px] uppercase tracking-[0.14em] font-medium flex items-center justify-center gap-2 shadow-[var(--shadow-accent)] disabled:opacity-70"
+              >
+                <IconChat size={15} />
+                {opening ? "Opening" : "Message"}
+              </button>
+              <Link
+                href={`/book/${providerId}`}
+                className="flex-1 h-12 rounded-full border border-[var(--border)] text-[12px] uppercase tracking-[0.14em] font-medium flex items-center justify-center gap-2"
+              >
+                <IconCalendar size={15} />
+                Book
+              </Link>
+            </div>
+          </motion.div>
+        </>
+      ) : null}
     </div>
   );
 }
