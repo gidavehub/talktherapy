@@ -21,7 +21,25 @@ import type {
   PaymentRecord,
 } from "../../app/lib/payments/modempay-protocol";
 
-if (getApps().length === 0) initializeApp();
+/**
+ * The project, pinned.
+ *
+ * In Cloud Functions `initializeApp()` with no arguments works out the
+ * project for itself. Run on a developer's machine it does not: it falls back
+ * to that machine's Application Default Credentials, and on this one those
+ * belong to a DIFFERENT project (quota project swipe-8bb22). The booking
+ * transaction then read and wrote another project's Firestore without a single
+ * error — every slot "no longer offered", every provider missing — which looks
+ * exactly like a booking bug and is not one.
+ *
+ * GCLOUD_PROJECT is what the runtime sets, so deployed behaviour is unchanged.
+ * Locally it is pinned, so the worst case is a loud permission error rather
+ * than a quiet conversation with somebody else's database.
+ */
+const PROJECT_ID =
+  process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || "talk-therapy-509209";
+
+if (getApps().length === 0) initializeApp({ projectId: PROJECT_ID });
 
 export const db = () => getFirestore();
 

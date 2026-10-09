@@ -27,6 +27,14 @@ import { getFirestore } from "firebase-admin/firestore";
 const KEY = process.env.TALK_ADMIN_CREDENTIALS || "./secrets/talk-admin-sa.json";
 const PROJECT = process.env.GOOGLE_CLOUD_PROJECT || "talk-therapy-509209";
 
+// The transaction under test uses the functions' DEFAULT app, which takes its
+// credentials from Application Default Credentials. On this machine those are
+// another project's, so without this the test talks to a different Firestore
+// and every assertion fails for a reason that has nothing to do with booking.
+// Set BEFORE the import below, which is when that app is created.
+process.env.GOOGLE_APPLICATION_CREDENTIALS ||= KEY;
+process.env.GCLOUD_PROJECT ||= PROJECT;
+
 /** The real transaction, as deployed. */
 const { bookSlot, cancelBooking } = await import("../functions/lib/functions/src/bookings.js");
 
@@ -135,6 +143,15 @@ async function main() {
   );
 
   console.log("\nCancelling");
+  if (!first.json.bookingId) {
+    // Without this, a failed first booking turned into a crash below that
+    // skipped the cleanup and left smoke- slots in the live database.
+    check(false, "nothing was booked, so there is nothing to cancel");
+    await slots().doc(slotId).delete().catch(() => {});
+    await slots().doc(pastId).delete().catch(() => {});
+    process.exitCode = 1;
+    return;
+  }
   const cancelled = await cancel(first.json.bookingId);
   check(cancelled.status === 200, `answered 200 (got ${cancelled.status})`);
 

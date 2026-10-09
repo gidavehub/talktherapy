@@ -1,7 +1,13 @@
 /**
- * The language-fidelity regression, against a running dev server.
+ * The language-fidelity regression, against the DEPLOYED companion functions.
  *
- *   node scripts/smoke-languages.mjs [baseUrl]
+ *   node scripts/smoke-languages.mjs
+ *
+ * Calls them the way the browser does, with a real ID token minted by
+ * scripts/lib/functions.mjs. It used to POST to /api/companion/* on a dev
+ * server; those routes moved into Cloud Functions and this was the one test
+ * left behind — which meant the regression for the exact bug the team reported
+ * would 404 rather than fail.
  *
  * The reported bug: speak Fula or Mandinka, get answered in Wolof. The fix is
  * that the language is CHOSEN, not guessed, and never silently changed. This
@@ -15,12 +21,12 @@
  * Typed turns, so it tests judgement rather than transcription.
  */
 
-const BASE = process.argv[2] || "http://localhost:3000";
+import { BASE, authHeader } from "./lib/functions.mjs";
 
 async function call(path, body) {
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeader },
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`${path} ${res.status}: ${(await res.text()).slice(0, 200)}`);
@@ -43,7 +49,7 @@ const check = (ok, what) => {
 
 console.log("greeting offers the four languages");
 {
-  const t = await call("/api/companion/greet", { mode: "intake", intake: {}, displayName: null });
+  const t = await call("/companionGreet", { mode: "intake", intake: {}, displayName: null });
   check(t.awaitingLanguage === true, "waits for the language to be chosen");
   check((t.choices ?? []).length === 4, `four choices offered: ${(t.choices ?? []).map((c) => c.label).join(", ")}`);
   check(/English/.test(t.reply) && /Wolof/.test(t.reply), "names them out loud too");
@@ -62,13 +68,13 @@ for (const [language, line, maxEnglish] of CASES) {
   console.log(`\n${language}`);
   const intake = { language };
 
-  const greeting = await call("/api/companion/greet", { mode: "intake", intake, displayName: null });
+  const greeting = await call("/companionGreet", { mode: "intake", intake, displayName: null });
   console.log(`   opens: ${greeting.reply}`);
   check(Boolean(greeting.reply), "opens with something");
   check(englishiness(greeting.reply) <= maxEnglish, `the opening is in ${language} (englishiness ${englishiness(greeting.reply).toFixed(0)}%)`);
 
   const history = [{ role: "talk", text: greeting.reply }];
-  const turn = await call("/api/companion/turn", { text: line, history, summary: "", mode: "intake", intake });
+  const turn = await call("/companionTurn", { text: line, history, summary: "", mode: "intake", intake });
   console.log(`   replies: ${turn.reply}`);
   check(turn.intake?.language === language, `language stays ${language} (got ${turn.intake?.language})`);
   check(englishiness(turn.reply) <= maxEnglish, `reply is in ${language} (englishiness ${englishiness(turn.reply).toFixed(0)}%)`);
@@ -76,7 +82,7 @@ for (const [language, line, maxEnglish] of CASES) {
   // The old failure mode, inverted: an English sentence mid-conversation must
   // not drag her out of the language they chose.
   history.push({ role: "user", text: line, language }, { role: "talk", text: turn.reply, language });
-  const after = await call("/api/companion/turn", {
+  const after = await call("/companionTurn", {
     text: "Sorry, can you say that again?",
     history,
     summary: "",

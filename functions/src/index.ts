@@ -65,6 +65,19 @@ const MODEM_PAY_WEBHOOK_SECRET = defineSecret("MODEM_PAY_WEBHOOK_SECRET");
 /** Matches the other projects in this account. */
 const REGION = "us-east4";
 
+/**
+ * Callables are invoked by the PUBLIC internet, by design — the browser calls
+ * them, and Firebase checks the caller's ID token inside the function.
+ *
+ * Stated explicitly rather than left to the default, because the default is
+ * only applied when a function is CREATED. checkPayment's first create failed
+ * in a Cloud Build race and the retry UPDATED it instead, without the public
+ * invoker binding — so Google's edge answered every call with a 401 before
+ * the function ran, and a paid session whose webhook was slow could never
+ * reconcile. Every deploy now sets it, whichever path the deploy takes.
+ */
+const CALLABLE = { region: REGION, invoker: "public" as const };
+
 /** This function's own public URL — what every payment's callback_url is set to. */
 const WEBHOOK_URL = `https://${REGION}-talk-therapy-509209.cloudfunctions.net/modemWebhook`;
 
@@ -153,7 +166,7 @@ async function fetchTransaction(id: string) {
  * time comes from the slot and the fee from the provider's profile, both read
  * inside the transaction.
  */
-export const bookSession = onCall({ region: REGION }, async (request) => {
+export const bookSession = onCall(CALLABLE, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in to book a session.");
 
@@ -182,7 +195,7 @@ export const bookSession = onCall({ region: REGION }, async (request) => {
  * Either side may cancel, and neither has to explain. Somebody who cannot face
  * a session today should not have to ask permission to say so.
  */
-export const cancelSession = onCall({ region: REGION }, async (request) => {
+export const cancelSession = onCall(CALLABLE, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
 
@@ -216,7 +229,7 @@ export const cancelSession = onCall({ region: REGION }, async (request) => {
  * a dalasi.
  */
 export const startSessionPayment = onCall(
-  { region: REGION, secrets: [MODEM_PAY_SECRET_KEY] },
+  { ...CALLABLE, secrets: [MODEM_PAY_SECRET_KEY] },
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in to pay for a session.");
@@ -298,7 +311,7 @@ export const startSessionPayment = onCall(
  * already fulfilled. Whichever arrives first wins; the other finds it done.
  */
 export const checkPayment = onCall(
-  { region: REGION, secrets: [MODEM_PAY_SECRET_KEY] },
+  { ...CALLABLE, secrets: [MODEM_PAY_SECRET_KEY] },
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");

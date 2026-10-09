@@ -30,7 +30,15 @@ import {
 } from "../../../app/lib/ai/protocol";
 import { speak } from "./talk";
 
-if (getApps().length === 0) initializeApp();
+// Pinned for the same reason as functions/src/payments.ts: off Cloud Functions
+// the default app would take this machine's ADC project, and an ID token's
+// audience would be checked against the wrong one.
+if (getApps().length === 0) {
+  initializeApp({
+    projectId:
+      process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || "talk-therapy-509209",
+  });
+}
 
 /**
  * The browser calls these from another origin, so every one needs CORS.
