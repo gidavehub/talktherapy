@@ -5,9 +5,9 @@ import { useState } from "react";
 import { motion } from "motion/react";
 import { SPRING_SOFT } from "@/components/motion/primitives";
 import { useAuth } from "@/components/AuthProvider";
-import ProviderCard from "@/components/providers/ProviderCard";
+import ProviderCard, { ProviderCardSkeleton } from "@/components/providers/ProviderCard";
 import Button from "@/components/ui/Button";
-import { EmptyState, Pill, Spinner } from "@/components/ui/Feedback";
+import { EmptyState, Pill } from "@/components/ui/Feedback";
 import { IconPeople } from "@/components/ui/icons";
 import { intakeChips } from "@/lib/matching";
 import { useMatches } from "@/lib/useMatches";
@@ -83,8 +83,15 @@ export default function ProvidersForYouPage() {
       ) : null}
 
       {loading ? (
-        <div className="flex items-center gap-3 text-[var(--muted)] py-16 justify-center">
-          <Spinner />
+        <div
+          role="status"
+          aria-label="Finding providers for you"
+          aria-busy="true"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6"
+        >
+          <ProviderCardSkeleton />
+          <ProviderCardSkeleton />
+          <ProviderCardSkeleton />
         </div>
       ) : error ? (
         <EmptyState

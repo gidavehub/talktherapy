@@ -7,17 +7,18 @@ import { SPRING_SOFT } from "@/components/motion/primitives";
 import { useAuth } from "@/components/AuthProvider";
 import Card, { StatTile, DarkPanel } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
-import { Alert } from "@/components/ui/Feedback";
+import { Alert, EmptyState } from "@/components/ui/Feedback";
 import MoodTrendChart from "@/components/app/MoodTrendChart";
 import HomeActivity from "@/components/app/HomeActivity";
-import ProviderCard from "@/components/providers/ProviderCard";
-import { Spinner } from "@/components/ui/Feedback";
+import ProviderCard, { ProviderCardSkeleton } from "@/components/providers/ProviderCard";
 import { useMatches } from "@/lib/useMatches";
+import { useOpenProvider } from "@/lib/useOpenProvider";
 import {
   IconMood,
   IconJournal,
   IconMic,
   IconResources,
+  IconPeople,
 } from "@/components/ui/icons";
 import {
   averageMood,
@@ -56,7 +57,11 @@ function greeting(): string {
 export default function DashboardPage() {
   const { user, profile } = useAuth();
   const intake = profile?.intake ?? null;
-  const { matches, loading: matchesLoading } = useMatches(intake);
+  // `error` was never read here, so a failed directory read rendered as
+  // "Providers are being verified" — a cheerful sentence about the wrong
+  // problem, on the first screen somebody sees.
+  const { matches, error: matchesError, loading: matchesLoading } = useMatches(intake);
+  const { open: openProvider } = useOpenProvider();
   const [moods, setMoods] = useState<MoodEntry[] | null>(null);
   const [journal, setJournal] = useState<JournalEntry[] | null>(null);
 
@@ -119,9 +124,17 @@ export default function DashboardPage() {
           </Link>
         </div>
         {matchesLoading ? (
-          <div className="flex justify-center py-10 text-[var(--muted)]">
-            <Spinner />
+          <div role="status" aria-label="Finding providers for you" aria-busy="true" className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <ProviderCardSkeleton compact />
+            <ProviderCardSkeleton compact />
+            <ProviderCardSkeleton compact />
           </div>
+        ) : matchesError ? (
+          <EmptyState
+            icon={<IconPeople />}
+            title="We could not load providers just now"
+            description="This is on our side, not yours. Pull to refresh, or try again in a minute."
+          />
         ) : matches && matches.length ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {matches.slice(0, 3).map((m, i) => (
@@ -132,13 +145,16 @@ export default function DashboardPage() {
                 reasons={intake ? m.reasons : undefined}
                 best={Boolean(intake) && i === 0 && m.reasons.length > 0}
                 compact
+                onOpen={(p) => void openProvider(p)}
               />
             ))}
           </div>
         ) : (
-          <p className="text-[14px] text-[var(--muted)]">
-            Providers are being verified — who fits you will appear here.
-          </p>
+          <EmptyState
+            icon={<IconPeople />}
+            title="Providers are being verified"
+            description="Every provider is checked before they appear. Who fits you will show here as soon as they are ready."
+          />
         )}
         {!intake ? (
           <Link

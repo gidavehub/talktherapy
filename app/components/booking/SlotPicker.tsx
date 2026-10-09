@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { SPRING_SNAP, SPRING_SOFT } from "../motion/primitives";
-import { Alert, EmptyState, Spinner } from "../ui/Feedback";
+import { Alert, EmptyState, Skeleton, SkeletonList } from "../ui/Feedback";
 import { IconCalendar, IconSpeaker } from "../ui/icons";
 import Button from "../ui/Button";
 import { useAuth } from "../AuthProvider";
@@ -84,9 +84,16 @@ export default function SlotPicker({ providerId }: { providerId: string }) {
 
   if (slots === null) {
     return (
-      <div className="flex justify-center py-16 text-[var(--muted)]">
-        <Spinner />
-      </div>
+      <SkeletonList count={3} label="Loading the free times" className="max-w-[620px] space-y-3">
+        <div className="rounded-[22px] bg-white px-4 py-3.5">
+          <Skeleton className="h-3.5 w-40" />
+          <div className="mt-3 flex gap-2">
+            <Skeleton rounded="rounded-full" className="h-11 w-[84px]" />
+            <Skeleton rounded="rounded-full" className="h-11 w-[84px]" />
+            <Skeleton rounded="rounded-full" className="h-11 w-[84px]" />
+          </div>
+        </div>
+      </SkeletonList>
     );
   }
 

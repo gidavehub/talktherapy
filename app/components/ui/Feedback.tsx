@@ -127,6 +127,58 @@ export function Spinner({
   );
 }
 
+/**
+ * A placeholder in the shape of what is about to arrive.
+ *
+ * Preferred over a spinner wherever the layout is known in advance — a list
+ * of conversations, a provider card, a session row. A spinner says "wait"; a
+ * skeleton says "here is where it goes", so nothing jumps when it lands and
+ * the page feels like it opened rather than like it is thinking.
+ *
+ * The pulse respects `prefers-reduced-motion` through `motion-safe:`, so
+ * somebody who has asked for stillness gets a still grey shape.
+ */
+export function Skeleton({
+  className = "",
+  rounded = "rounded-2xl",
+}: {
+  /** Size it with width/height utilities, e.g. "h-4 w-32". */
+  className?: string;
+  rounded?: string;
+}) {
+  return (
+    <span
+      aria-hidden
+      className={`block bg-black/[.06] motion-safe:animate-pulse ${rounded} ${className}`}
+    />
+  );
+}
+
+/**
+ * Several placeholder rows, announced once as loading rather than once per
+ * row — a screen reader hearing "loading" eight times is noise.
+ */
+export function SkeletonList({
+  count = 4,
+  children,
+  className = "space-y-2",
+  label = "Loading",
+}: {
+  count?: number;
+  /** One row's placeholder, rendered `count` times. */
+  children: React.ReactNode;
+  className?: string;
+  label?: string;
+}) {
+  return (
+    <div role="status" aria-label={label} aria-busy="true" className={className}>
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i}>{children}</div>
+      ))}
+    </div>
+  );
+}
+
 export function EmptyState({
   title,
   description,

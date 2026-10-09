@@ -249,11 +249,23 @@ export default function AppShell({
                   />
                 ) : null}
                 <span
-                  className={`w-5 h-5 flex items-center justify-center ${
+                  className={`relative w-5 h-5 flex items-center justify-center ${
                     active ? "text-[var(--accent)]" : "text-[var(--muted)]"
                   }`}
                 >
                   {item.icon}
+                  {item.badge ? (
+                    <motion.span
+                      key={item.badge}
+                      initial={{ scale: 0.4, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={SPRING_SNAP}
+                      aria-label={`${item.badge} unread`}
+                      className="absolute -top-1.5 -right-2.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[9px] font-medium leading-none text-white ring-2 ring-white tabular-nums"
+                    >
+                      {item.badge > 99 ? "99+" : item.badge}
+                    </motion.span>
+                  ) : null}
                 </span>
                 <span
                   className={`text-[10px] tracking-wide ${

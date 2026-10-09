@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { SPRING_SOFT } from "../motion/primitives";
-import { Alert, EmptyState, Spinner } from "../ui/Feedback";
+import { Alert, EmptyState, Skeleton, SkeletonList } from "../ui/Feedback";
 import { IconCalendar, IconChat, IconSpeaker, IconVideo } from "../ui/icons";
 import Button from "../ui/Button";
 import { useAuth } from "../AuthProvider";
@@ -201,9 +201,17 @@ export default function SessionList() {
 
   if (!user || bookings === null) {
     return (
-      <div className="flex justify-center py-16 text-[var(--muted)]">
-        <Spinner />
-      </div>
+      <SkeletonList count={3} label="Loading your sessions">
+        <div className="rounded-[22px] bg-white px-4 py-3.5">
+          <div className="flex items-center gap-3.5">
+            <Skeleton rounded="rounded-full" className="h-11 w-11 shrink-0" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton className="h-3.5 w-2/5" />
+              <Skeleton className="h-3 w-3/5" />
+            </div>
+          </div>
+        </div>
+      </SkeletonList>
     );
   }
 

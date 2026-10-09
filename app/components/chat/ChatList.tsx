@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { SPRING_SOFT, SPRING_SNAP } from "../motion/primitives";
 import { useAuth } from "../AuthProvider";
-import { EmptyState, Spinner } from "../ui/Feedback";
+import { EmptyState, Skeleton, SkeletonList } from "../ui/Feedback";
 import { IconChat, IconSpeaker } from "../ui/icons";
 import Button from "../ui/Button";
 import { useChatPeer } from "./useChatPeer";
@@ -148,9 +148,15 @@ export default function ChatList() {
 
   if (!user || chats === null) {
     return (
-      <div className="flex justify-center py-16 text-[var(--muted)]">
-        <Spinner />
-      </div>
+      <SkeletonList count={4} label="Loading your conversations">
+        <div className="flex items-center gap-3.5 rounded-[22px] bg-white px-4 py-3.5">
+          <Skeleton rounded="rounded-full" className="h-[46px] w-[46px] shrink-0" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <Skeleton className="h-3.5 w-1/3" />
+            <Skeleton className="h-3 w-2/3" />
+          </div>
+        </div>
+      </SkeletonList>
     );
   }
 

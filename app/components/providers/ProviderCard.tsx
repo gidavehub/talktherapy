@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { motion } from "motion/react";
 import { SPRING_SOFT } from "../motion/primitives";
-import { Badge } from "../ui/Feedback";
+import { Badge, Skeleton } from "../ui/Feedback";
 import ProviderAvatar from "./ProviderAvatar";
 import { formatDalasi } from "../../lib/money";
 import { LOCALE_LABELS, type ProviderProfile } from "../../lib/models";
@@ -193,5 +193,36 @@ export default function ProviderCard({
         </div>
       </div>
     </motion.div>
+  );
+}
+
+/**
+ * A provider card that has not arrived yet.
+ *
+ * The same outline as the real card — face, name, a line of what they offer,
+ * the footer rule — so the grid holds its shape while it loads and nothing
+ * jumps when the providers land. `compact` matches the dashboard size.
+ */
+export function ProviderCardSkeleton({ compact = false }: { compact?: boolean }) {
+  return (
+    <div aria-hidden className="rounded-[28px] bg-white shadow-[var(--shadow-raised)] p-6 flex flex-col">
+      <div className="flex items-start gap-4">
+        <Skeleton rounded="rounded-full" className={compact ? "h-12 w-12 shrink-0" : "h-14 w-14 shrink-0"} />
+        <div className="min-w-0 flex-1 space-y-2 pt-1">
+          <Skeleton className="h-4 w-2/3" />
+          <Skeleton className="h-3 w-1/2" />
+        </div>
+      </div>
+      <div className="mt-5 flex gap-1.5">
+        <Skeleton rounded="rounded-full" className="h-7 w-20" />
+        <Skeleton rounded="rounded-full" className="h-7 w-24" />
+      </div>
+      <div className="mt-auto pt-5">
+        <div className="pt-5 border-t border-[var(--border)] flex items-center justify-between">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-3 w-14" />
+        </div>
+      </div>
+    </div>
   );
 }

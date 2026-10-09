@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import { useAuth } from "../AuthProvider";
-import { EmptyState, Spinner } from "../ui/Feedback";
+import { EmptyState, Skeleton } from "../ui/Feedback";
 import { IconChat } from "../ui/icons";
 import Composer from "./Composer";
 import DateSeparator, { startsNewDay } from "./DateSeparator";
@@ -212,8 +212,17 @@ export default function ChatThread({ chatId }: { chatId: string }) {
         className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-4"
       >
         {loading ? (
-          <div className="flex h-full items-center justify-center text-[var(--muted)]">
-            <Spinner />
+          <div role="status" aria-label="Loading the conversation" aria-busy="true" className="space-y-2.5">
+            {[
+              ["justify-start", "w-[58%]"],
+              ["justify-end", "w-[44%]"],
+              ["justify-start", "w-[66%]"],
+              ["justify-end", "w-[38%]"],
+            ].map(([side, width], i) => (
+              <div key={i} className={`flex ${side}`}>
+                <Skeleton rounded="rounded-[22px]" className={`h-11 ${width}`} />
+              </div>
+            ))}
           </div>
         ) : messages.length === 0 ? (
           <EmptyState

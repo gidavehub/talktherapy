@@ -6,6 +6,7 @@ import { useAuth } from "../AuthProvider";
 import AppShell from "../ui/AppShell";
 import Orb from "../Orb";
 import { PATIENT_NAV, PROVIDER_NAV } from "../../lib/nav";
+import { useUnreadCount } from "../../lib/useUnread";
 
 /**
  * Gate + chrome for the signed-in app, both sides of it.
@@ -40,6 +41,7 @@ function Splash({ label }: { label: string }) {
 
 export default function AppGate({ children }: { children: React.ReactNode }) {
   const { user, profile, ready } = useAuth();
+  const unread = useUnreadCount();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -72,7 +74,10 @@ export default function AppGate({ children }: { children: React.ReactNode }) {
   const isProvider = profile.role === "provider";
   if (!isProvider && !profile.onboarded) return <Splash label="Taking you to Talk" />;
 
-  return (
-    <AppShell nav={isProvider ? PROVIDER_NAV : PATIENT_NAV}>{children}</AppShell>
+  // Messages carries the count of what is waiting, on both sides of the app.
+  const nav = (isProvider ? PROVIDER_NAV : PATIENT_NAV).map((item) =>
+    item.href === "/chats" && unread > 0 ? { ...item, badge: unread } : item,
   );
+
+  return <AppShell nav={nav}>{children}</AppShell>;
 }
