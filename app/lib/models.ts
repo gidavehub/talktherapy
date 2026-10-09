@@ -653,6 +653,17 @@ export type Chat = {
   id: string;
   participants: string[];
   /**
+   * A group session's name, set by the provider who started it — "Thursday
+   * grief group". Null for a two-person chat, which is named by the other
+   * person.
+   */
+  title: string | null;
+  /**
+   * Who started a group session. The provider leads it; firestore.rules only
+   * lets a provider create one. Null for a two-person chat.
+   */
+  createdBy: string | null;
+  /**
    * uid -> display name, written once when the chat is opened.
    *
    * Denormalised because there is no other way for a provider to learn a

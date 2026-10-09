@@ -122,6 +122,8 @@ function toChat(id: string, data: DocumentData): Chat {
     id,
     participants: stringList(data.participants),
     names: stringMap(data.names),
+    title: typeof data.title === "string" && data.title.trim() ? data.title.trim() : null,
+    createdBy: typeof data.createdBy === "string" ? data.createdBy : null,
     lastMessage: typeof data.lastMessage === "string" ? data.lastMessage : "",
     // Falls back to createdAt, not to now: an empty chat should sort by when it
     // was opened rather than drifting to the top of the list on every render.
@@ -247,6 +249,7 @@ export async function createGroupChat(
   participants: string[],
   createdBy: string,
   names: Record<string, string> = {},
+  title = "",
 ): Promise<string> {
   const unique = Array.from(new Set(participants));
   if (!unique.includes(createdBy)) {
@@ -263,6 +266,10 @@ export async function createGroupChat(
   const ref = await addDoc(collection(firestore(), CHATS), {
     participants: unique.sort(),
     names: stringMap(names),
+    title: title.trim().slice(0, 80) || null,
+    // The provider leading it. firestore.rules checks this is the caller and
+    // that the caller is a provider.
+    createdBy,
     lastMessage: "",
     lastMessageAt: serverTimestamp(),
     unread: Object.fromEntries(unique.map((uid) => [uid, 0])),
@@ -681,6 +688,18 @@ export function otherParticipant(chat: Chat, selfUid: string): string | null {
 export function nameOf(chat: Chat, uid: string | null): string | null {
   if (!uid) return null;
   return chat.names[uid] ?? null;
+}
+
+/**
+ * What a conversation is called in a list or a header.
+ *
+ * A group session by its title; a two-person chat by the other person, which
+ * the caller resolves (it may need a profile lookup), so this returns null
+ * for that case rather than guessing.
+ */
+export function groupTitle(chat: Chat): string | null {
+  if (chat.participants.length <= 2) return null;
+  return chat.title || "Group session";
 }
 
 /** Unread count for one person, tolerating the field being absent. */

@@ -129,6 +129,18 @@ const CASES = [
   ["a chat at an id that is not its participants", "DENY", PATIENT, "create",
     `${DOCS}/chats/something-else`, null, chat],
 
+  // Group sessions are provider-led: only a provider may start one, and must
+  // record themselves as the one who did. A client cannot gather other
+  // clients into a room.
+  ["a provider starts a group session", "ALLOW", PROVIDER, "create", `${DOCS}/chats/group_1`, null,
+    { ...chat, participants: [PATIENT, PROVIDER, STRANGER], title: "Thursday group", createdBy: PROVIDER }],
+  ["a patient starts a group", "DENY", PATIENT, "create", `${DOCS}/chats/group_2`, null,
+    { ...chat, participants: [PATIENT, PROVIDER, STRANGER], title: "Our group", createdBy: PATIENT }],
+  ["a provider starts a group in somebody else's name", "DENY", PROVIDER, "create", `${DOCS}/chats/group_3`, null,
+    { ...chat, participants: [PATIENT, PROVIDER, STRANGER], createdBy: PATIENT }],
+  ["a provider starts a group they are not in", "DENY", PROVIDER, "create", `${DOCS}/chats/group_4`, null,
+    { ...chat, participants: [PATIENT, STRANGER, "another-uid"], createdBy: PROVIDER }],
+
   // --- sending -----------------------------------------------------------
   ["sending a message as yourself", "ALLOW", PATIENT, "create", `${DOCS}/chats/${CHAT}/messages/m2`, null, message],
   ["sending a message as somebody else", "DENY", PROVIDER, "create", `${DOCS}/chats/${CHAT}/messages/m2`, null, message],
@@ -310,6 +322,8 @@ const testCase = ([, expectation, uid, method, path, existing, incoming]) => ({
     ? { functionMocks: [parentChatMock] }
     : {}),
   ...(path.includes("/providerProfiles/") ? { functionMocks: userDocMocks } : {}),
+  // Starting a group asks whether the caller is a provider.
+  ...(method === "create" && /\/chats\/[^/]+$/.test(path) ? { functionMocks: userDocMocks } : {}),
   // Creating a call room reads the booking it belongs to, which is the whole
   // point of that rule — so the evaluator has to be told what it says.
   ...(method === "create" && path.includes("/calls/")

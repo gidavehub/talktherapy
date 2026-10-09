@@ -288,8 +288,19 @@ service cloud.firestore {
         && request.auth.uid in request.resource.data.participants
         && request.resource.data.participants.size() >= 2
         && request.resource.data.participants.size() <= 50
-        && (request.resource.data.participants.size() > 2
-            || chatId == request.resource.data.participants.join('__'));
+        && (
+          // A two-person chat lives at the id derived from the pair.
+          (request.resource.data.participants.size() == 2
+            && chatId == request.resource.data.participants.join('__'))
+          ||
+          // A group session is PROVIDER-LED: only a provider may start one,
+          // and must record themselves as the one who did. A client cannot
+          // gather other clients into a room — peer groups are a later, more
+          // deliberate decision, not something that falls out of this rule.
+          (request.resource.data.participants.size() > 2
+            && hasRole('provider')
+            && request.resource.data.createdBy == request.auth.uid)
+        );
 
       // Participants are immutable, and this is the most important line in the
       // block. Everything else here — the preview, the unread counters, the

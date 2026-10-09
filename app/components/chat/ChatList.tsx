@@ -11,7 +11,8 @@ import Button from "../ui/Button";
 import { useChatPeer } from "./useChatPeer";
 import ProviderAvatar from "../providers/ProviderAvatar";
 import { useReadAloud } from "../../lib/useReadAloud";
-import { nameOf, otherParticipant, unreadFor, watchChats } from "../../lib/chat";
+import { groupTitle, nameOf, otherParticipant, unreadFor, watchChats } from "../../lib/chat";
+import GroupComposer from "./GroupComposer";
 import type { Chat } from "../../lib/models";
 
 /**
@@ -71,7 +72,7 @@ function ChatRow({
   const peerUid = otherParticipant(chat, selfUid);
   const isGroup = chat.participants.length > 2;
   const peer = useChatPeer(peerUid, nameOf(chat, peerUid) || fallbackName);
-  const name = isGroup ? "Group conversation" : peer.name;
+  const name = isGroup ? groupTitle(chat) ?? "Group session" : peer.name;
   const unread = unreadFor(chat, selfUid);
 
   const preview = chat.lastMessage || "No messages yet";
@@ -139,6 +140,7 @@ export default function ChatList() {
   const { user, profile, role } = useAuth();
   const isProvider = role === "provider";
   const [chats, setChats] = useState<Chat[] | null>(null);
+  const [composing, setComposing] = useState(false);
   const { read, speakingId } = useReadAloud(profile?.intake?.language ?? null);
 
   useEffect(() => {
@@ -182,6 +184,25 @@ export default function ChatList() {
 
   return (
     <div className="space-y-2">
+      {/* Provider-led group sessions start here, from the people they
+          already work with. Clients never see this control. */}
+      {isProvider ? (
+        <>
+          <div className="flex justify-end pb-1">
+            <Button variant="secondary" size="sm" onClick={() => setComposing(true)}>
+              New group session
+            </Button>
+          </div>
+          <GroupComposer
+            open={composing}
+            onClose={() => setComposing(false)}
+            chats={chats}
+            selfUid={user.uid}
+            selfName={profile?.displayName ?? null}
+          />
+        </>
+      ) : null}
+
       {chats.map((chat, index) => (
         <ChatRow
           key={chat.id}

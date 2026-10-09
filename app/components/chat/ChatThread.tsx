@@ -19,6 +19,7 @@ import { useReadAloud } from "../../lib/useReadAloud";
 import {
   clearTyping,
   markRead,
+  groupTitle,
   nameOf,
   otherParticipant,
   sendImage,
@@ -198,7 +199,7 @@ export default function ChatThread({ chatId }: { chatId: string }) {
 
         <div className="min-w-0 flex-1">
           <p className="truncate text-[14px] font-medium leading-tight">
-            {isGroup ? "Group conversation" : peer.name}
+            {isGroup && chat ? groupTitle(chat) : peer.name}
           </p>
           <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--muted)]">
             {typingUids.length > 0
@@ -258,7 +259,11 @@ export default function ChatThread({ chatId }: { chatId: string }) {
                     mine={mine}
                     // Only worth naming in a group — in a 1:1 the alignment
                     // already says who spoke.
-                    senderName={isGroup && !mine ? peer.name : null}
+                    senderName={
+                      isGroup && !mine
+                        ? (chat?.names[message.senderId] ?? "Someone in the group")
+                        : null
+                    }
                     onRead={read}
                     speaking={speakingId === message.id}
                   />
