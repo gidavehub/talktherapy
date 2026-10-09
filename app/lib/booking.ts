@@ -69,6 +69,7 @@ function toBooking(id: string, data: DocumentData): Booking {
     currency: "GMD",
     transactionId: typeof data.transactionId === "string" ? data.transactionId : null,
     patientNote: typeof data.patientNote === "string" ? data.patientNote : "",
+    patientMinor: data.patientMinor === true,
     meetUrl: typeof data.meetUrl === "string" && isMeetUrl(data.meetUrl) ? data.meetUrl : null,
     createdAt: typeof data.createdAt === "number" ? data.createdAt : 0,
     updatedAt: typeof data.updatedAt === "number" ? data.updatedAt : 0,

@@ -122,6 +122,7 @@ function toChat(id: string, data: DocumentData): Chat {
     id,
     participants: stringList(data.participants),
     names: stringMap(data.names),
+    minor: data.minor === true,
     title: typeof data.title === "string" && data.title.trim() ? data.title.trim() : null,
     createdBy: typeof data.createdBy === "string" ? data.createdBy : null,
     lastMessage: typeof data.lastMessage === "string" ? data.lastMessage : "",
@@ -196,6 +197,8 @@ export async function openChat(
   patientId: string,
   providerId: string,
   names: Record<string, string> = {},
+  /** The patient is under 18 — see Chat.minor. */
+  minor = false,
 ): Promise<string> {
   const chatId = directChatId(patientId, providerId);
   if (!firebaseConfigured()) return chatId;
@@ -216,7 +219,12 @@ export async function openChat(
   // chat's preview and unread counts with this initial state.
   try {
     const existing = await getDoc(ref);
-    if (existing.exists()) return chatId;
+    if (existing.exists()) {
+      // A chat opened before the age question was answered. The flag only
+      // ever goes ON from here; nothing on this path turns it off.
+      if (minor && existing.data().minor !== true) await updateDoc(ref, { minor: true });
+      return chatId;
+    }
   } catch (error) {
     if ((error as { code?: string }).code !== "permission-denied") throw error;
   }
@@ -224,6 +232,7 @@ export async function openChat(
   await setDoc(ref, {
     participants: [patientId, providerId].sort(),
     names: stringMap(names),
+    minor,
     lastMessage: "",
     lastMessageAt: serverTimestamp(),
     // Every participant gets an explicit zero. An absent key and a zero mean

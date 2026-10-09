@@ -99,7 +99,19 @@ service cloud.firestore {
       // when; nobody can rewrite history, including them.
       match /consentEvents/{eventId} {
         allow read: if isSelf(uid) || isAdmin();
-        allow create: if isSelf(uid);
+
+        // A consent record is evidence, so its shape is fixed and its time is
+        // the SERVER's. Without the last clause a client could write a
+        // recordedAt of its choosing — a consent "given" last week, before the
+        // session it is being used to justify. `detail` carries the language,
+        // spoken-or-tapped, and a guardian's relationship and typed name.
+        allow create: if isSelf(uid)
+          && request.resource.data.keys().hasOnly(['key', 'granted', 'surface', 'recordedAt', 'detail'])
+          && request.resource.data.key is string
+          && request.resource.data.granted is bool
+          && request.resource.data.surface is string
+          && request.resource.data.recordedAt == request.time;
+
         allow update, delete: if false;
       }
     }

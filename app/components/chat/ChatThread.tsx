@@ -7,6 +7,7 @@ import { SPRING_SOFT } from "../motion/primitives";
 import { useAuth } from "../AuthProvider";
 import { EmptyState, Skeleton } from "../ui/Feedback";
 import { IconChat } from "../ui/icons";
+import MinorFlag from "../ui/MinorFlag";
 import Composer from "./Composer";
 import DateSeparator, { startsNewDay } from "./DateSeparator";
 import MessageBubble from "./MessageBubble";
@@ -201,15 +202,20 @@ export default function ChatThread({ chatId }: { chatId: string }) {
           <p className="truncate text-[14px] font-medium leading-tight">
             {isGroup && chat ? groupTitle(chat) : peer.name}
           </p>
-          <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--muted)]">
-            {typingUids.length > 0
-              ? "Typing"
-              : isGroup
-                ? `${chat?.participants.length} people`
-                : isProvider
-                  ? "In your care"
-                  : "Provider"}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--muted)]">
+              {typingUids.length > 0
+                ? "Typing"
+                : isGroup
+                  ? `${chat?.participants.length} people`
+                  : isProvider
+                    ? "In your care"
+                    : "Provider"}
+            </p>
+            {/* Beside the name, where it cannot be scrolled past. Provider
+                side only: nobody needs to be labelled to themselves. */}
+            {isProvider && !isGroup && chat?.minor ? <MinorFlag size="row" className="text-[11px]" /> : null}
+          </div>
         </div>
 
         {uid && peerUid && !isGroup ? (

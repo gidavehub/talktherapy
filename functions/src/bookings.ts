@@ -30,6 +30,7 @@ const COLLECTIONS = {
   slots: "slots",
   bookings: "bookings",
   providerProfiles: "providerProfiles",
+  users: "users",
 } as const;
 
 type BookingStatus = "pending" | "confirmed" | "completed" | "cancelled" | "no_show";
@@ -42,6 +43,8 @@ export type BookOutcome =
 const TAKEN = "Somebody else has just taken that time. Please pick another.";
 const GONE = "That time is no longer being offered.";
 const PAST = "That time has already passed.";
+const GUARDIAN =
+  "Because you are under 18, a parent or guardian needs to fill in a short form with you first.";
 
 function slotRef(providerId: string, slotId: string) {
   return db()
@@ -49,6 +52,12 @@ function slotRef(providerId: string, slotId: string) {
     .doc(providerId)
     .collection(COLLECTIONS.slots)
     .doc(slotId);
+}
+
+/** Under 18 by the patient's own intake — the same test as isMinor. */
+function minorFrom(user: FirebaseFirestore.DocumentData | undefined): boolean {
+  const intake = user?.intake;
+  return intake?.minor === true || intake?.ageRange === "under-18";
 }
 
 export async function bookSlot(input: {
@@ -61,9 +70,14 @@ export async function bookSlot(input: {
   const slot = slotRef(input.providerId, input.slotId);
   const provider = store.collection(COLLECTIONS.providerProfiles).doc(input.providerId);
   const booking = store.collection(COLLECTIONS.bookings).doc();
+  const patient = store.collection(COLLECTIONS.users).doc(input.patientId);
 
   return store.runTransaction(async (tx) => {
-    const [slotSnap, providerSnap] = await Promise.all([tx.get(slot), tx.get(provider)]);
+    const [slotSnap, providerSnap, patientSnap] = await Promise.all([
+      tx.get(slot),
+      tx.get(provider),
+      tx.get(patient),
+    ]);
 
     if (!slotSnap.exists) return { ok: false as const, reason: GONE };
 
@@ -79,6 +93,13 @@ export async function bookSlot(input: {
       // A provider taken out of the directory mid-booking. Refusing is kinder
       // than taking the booking and cancelling it afterwards.
       return { ok: false as const, reason: GONE };
+    }
+
+    // The same gate the page applies before it ever calls this — repeated here
+    // so a stale tab cannot book around it. It gates the session, never help.
+    const patientData = patientSnap.data();
+    if (minorFrom(patientData) && patientData?.consents?.guardianConsent !== true) {
+      return { ok: false as const, reason: GUARDIAN };
     }
 
     const fee = (providerSnap.data() ?? {}).sessionRateMinor;
@@ -100,6 +121,9 @@ export async function bookSlot(input: {
       currency: "GMD",
       transactionId: null,
       patientNote: input.note.slice(0, 500),
+      // The provider's trustworthy copy of the under-18 flag: read from the
+      // patient's record here, never taken from the request.
+      patientMinor: minorFrom(patientData),
       createdAt: now,
       updatedAt: now,
     });

@@ -33,6 +33,7 @@ export {
 } from "./Feedback";
 
 export { default as Modal } from "./Modal";
+export { default as MinorFlag } from "./MinorFlag";
 export { default as Tabs, NavTabs } from "./Tabs";
 export type { TabItem } from "./Tabs";
 

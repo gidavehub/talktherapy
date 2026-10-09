@@ -41,6 +41,7 @@ const { bookSlot, cancelBooking } = await import("../functions/lib/functions/src
 /** A seeded sample provider: verified, so the transaction will accept them. */
 const PROVIDER = "sample-awa-jallow";
 const PATIENT = "smoke-bookings-uid";
+const MINOR = "smoke-bookings-minor-uid";
 
 const db = getFirestore(
   initializeApp({ credential: cert(KEY), projectId: PROJECT }, "smoke-bookings"),
@@ -59,8 +60,8 @@ const slots = () => db.collection("availability").doc(PROVIDER).collection("slot
  * same: an outcome and a reason. The callables map these onto HttpsError
  * codes — `aborted` for a taken time, `not-found` for somebody else's.
  */
-async function book(providerId, slotId, note = "") {
-  const result = await bookSlot({ patientId: PATIENT, providerId, slotId, note });
+async function book(providerId, slotId, note = "", patientId = PATIENT) {
+  const result = await bookSlot({ patientId, providerId, slotId, note });
   return { status: result.ok ? 200 : 409, json: result.ok ? result : { error: result.reason } };
 }
 
@@ -102,6 +103,7 @@ async function main() {
   );
   check(booking.status === "pending" && booking.paymentStatus === "unpaid", "pending and unpaid");
   check(booking.startsAt === startsAt, "at the time the SLOT said, not a time the client sent");
+  check(booking.patientMinor === false, "an adult's session carries no under-18 flag");
 
   // The fee has to come from the provider's profile. A client that could name
   // its own price would book a D3,000 session for a dalasi.
@@ -183,13 +185,52 @@ async function main() {
   const stillThere = (await theirs.get()).data() ?? {};
   check(stillThere.status === "pending", "and left it alone");
 
+  console.log("\nSomebody under 18");
+  // The flag a provider trusts is the one the server stamps from the patient's
+  // own record — and the session waits for a parent or guardian's form.
+  const minorRef = db.collection("users").doc(MINOR);
+  await minorRef.set({
+    uid: MINOR,
+    role: "patient",
+    intake: { ageRange: "under-18", minor: true },
+    consents: { guardianConsent: false },
+  });
+  const minorSlotId = `smoke-minor-${startsAt}`;
+  await slots().doc(minorSlotId).set({
+    providerId: PROVIDER,
+    startsAt: startsAt + 60 * 60_000,
+    endsAt: startsAt + 105 * 60_000,
+    status: "open",
+    bookingId: null,
+  });
+  const unsigned = await book(PROVIDER, minorSlotId, "", MINOR);
+  if (unsigned.json.bookingId) created.push(unsigned.json.bookingId);
+  check(unsigned.status === 409, `refused before a guardian has signed (got ${unsigned.status})`);
+  check(
+    typeof unsigned.json.error === "string" && unsigned.json.error.includes("guardian"),
+    `and says why: ${unsigned.json.error}`,
+  );
+  const stillOpen = (await slots().doc(minorSlotId).get()).data() ?? {};
+  check(stillOpen.status === "open", "the hour stays free for them");
+
+  await minorRef.update({ "consents.guardianConsent": true });
+  const signed = await book(PROVIDER, minorSlotId, "", MINOR);
+  if (signed.json.bookingId) created.push(signed.json.bookingId);
+  check(signed.status === 200, `booked once the form is signed (got ${signed.status}: ${signed.json.error ?? "ok"})`);
+  const minorBooking = signed.json.bookingId
+    ? ((await db.collection("bookings").doc(signed.json.bookingId).get()).data() ?? {})
+    : {};
+  check(minorBooking.patientMinor === true, "the session tells the provider they are under 18");
+
   // ---- clean up -----------------------------------------------------------
   await Promise.all([
     slots().doc(slotId).delete(),
     slots().doc(pastId).delete(),
+    slots().doc(minorSlotId).delete(),
+    minorRef.delete(),
     ...created.map((id) => db.collection("bookings").doc(id).delete()),
   ]);
-  console.log(`\nCleaned up: 2 slots, ${created.length} bookings`);
+  console.log(`\nCleaned up: 3 slots, 1 user, ${created.length} bookings`);
 
   console.log(failures ? `\n${failures} CHECK(S) FAILED` : "\nALL CHECKS PASSED");
   process.exitCode = failures ? 1 : 0;

@@ -11,6 +11,7 @@ import { useAuth } from "../AuthProvider";
 import { useChatPeer } from "../chat/useChatPeer";
 import ProviderAvatar from "../providers/ProviderAvatar";
 import MeetLink from "./MeetLink";
+import MinorFlag from "../ui/MinorFlag";
 import { useReadAloud } from "../../lib/useReadAloud";
 import { directChatId } from "../../lib/chat";
 import { formatDalasi } from "../../lib/money";
@@ -62,7 +63,10 @@ function SessionRow({
   const past = booking.endsAt < now;
   const cancelled = booking.status === "cancelled";
 
-  const line = `${when(booking)} with ${peer.name}`;
+  // Read from the booking, which the server stamped — on the provider's
+  // screen the signed-in profile is the provider's own, not the patient's.
+  const minor = booking.patientMinor && booking.providerId === selfUid;
+  const line = `${when(booking)} with ${peer.name}${minor ? ", who is under 18" : ""}`;
 
   return (
     <motion.div
@@ -79,7 +83,8 @@ function SessionRow({
           <p className="mt-0.5 text-[12.5px] text-[var(--muted)] leading-snug">
             {when(booking)}
           </p>
-          <p className="mt-0.5 text-[11px] uppercase tracking-[0.14em] text-[var(--muted)]">
+          <p className="mt-0.5 flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-[var(--muted)]">
+            {minor ? <MinorFlag size="row" /> : null}
             {cancelled
               ? "Cancelled"
               : past

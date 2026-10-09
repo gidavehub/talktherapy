@@ -13,6 +13,7 @@ import HomeActivity from "@/components/app/HomeActivity";
 import ProviderCard, { ProviderCardSkeleton } from "@/components/providers/ProviderCard";
 import { useMatches } from "@/lib/useMatches";
 import { useOpenProvider } from "@/lib/useOpenProvider";
+import GuardianConsentModal from "@/components/therapy/GuardianConsentModal";
 import {
   IconMood,
   IconJournal,
@@ -61,7 +62,7 @@ export default function DashboardPage() {
   // "Providers are being verified" — a cheerful sentence about the wrong
   // problem, on the first screen somebody sees.
   const { matches, error: matchesError, loading: matchesLoading } = useMatches(intake);
-  const { open: openProvider } = useOpenProvider();
+  const { open: openProvider, guardian } = useOpenProvider();
   const [moods, setMoods] = useState<MoodEntry[] | null>(null);
   const [journal, setJournal] = useState<JournalEntry[] | null>(null);
 
@@ -338,6 +339,8 @@ export default function DashboardPage() {
         </Link>
         .
       </p>
+
+      <GuardianConsentModal {...guardian.modal} />
     </div>
   );
 }

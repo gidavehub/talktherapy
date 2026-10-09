@@ -225,6 +225,15 @@ export type Intake = {
   /** The language they want support in — chosen, not guessed. */
   language: Language | null;
   ageRange: AgeRange | null;
+  /**
+   * Under 18 — the safeguarding flag a provider sees before anything else.
+   *
+   * DERIVED from the age answer in cleanIntake, never taken from the model:
+   * a safeguarding flag the model could write is one it could unset. And
+   * STICKY in mergeIntake: somebody who said 17 and later says 25 keeps it,
+   * because the cost of dropping it wrongly is a child treated as an adult.
+   */
+  minor: boolean;
   /** Their part of the country. */
   location: Area | null;
   /** Their own gender, not the one they want to be seen by. */
@@ -242,6 +251,7 @@ export const EMPTY_INTAKE: Intake = {
   preferredName: null,
   language: null,
   ageRange: null,
+  minor: false,
   location: null,
   gender: null,
   concerns: [],
@@ -279,7 +289,7 @@ function isEmptyField(intake: Intake, field: RequiredField): boolean {
 
 /** Under-18 answers put a flag in front of whoever takes the session. */
 export function isMinor(intake: Intake | null): boolean {
-  return intake?.ageRange === "under-18";
+  return intake?.minor === true || intake?.ageRange === "under-18";
 }
 
 export function missingFields(intake: Intake): RequiredField[] {
@@ -313,6 +323,9 @@ export function cleanIntake(raw: unknown, languages: readonly Language[]): Intak
     preferredName: text(r.preferredName, 60),
     language: oneOf(r.language, languages),
     ageRange: oneOf(r.ageRange, AGE_RANGES),
+    // Never trusted as given: derived from the age answer, or kept when an
+    // earlier stored intake already carried it.
+    minor: r.minor === true || oneOf(r.ageRange, AGE_RANGES) === "under-18",
     location: oneOf(r.location, AREAS),
     gender: oneOf(r.gender, USER_GENDERS),
     concerns: manyOf(r.concerns, SPECIALIZATIONS),
@@ -329,6 +342,11 @@ export function mergeIntake(prev: Intake, patch: Partial<Intake>): Intake {
   for (const key of Object.keys(patch) as (keyof Intake)[]) {
     const value = patch[key];
     if (value == null) continue;
+    // Sticky: a later turn reporting false never clears it. See `minor`.
+    if (key === "minor") {
+      if (value === true) next.minor = true;
+      continue;
+    }
     if (key === "concerns" || key === "servicesWanted") {
       const add = value as string[];
       if (add.length) {
@@ -429,6 +447,7 @@ export function rankProviders(profiles: ProviderProfile[], intake: Intake | null
 export function intakeChips(intake: Intake | null): string[] {
   if (!intake) return [];
   const chips: string[] = [];
+  if (isMinor(intake)) chips.push(AGE_LABELS["under-18"]);
   const locale = localeOf(intake.language);
   if (locale) chips.push(LOCALE_NAME[locale]);
   for (const c of intake.concerns.slice(0, 3)) chips.push(SPECIALIZATION_LABELS[c]);

@@ -4,6 +4,8 @@ import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../components/AuthProvider";
 import { openChat } from "./chat";
+import { isMinor } from "./matching";
+import { useGuardianGate } from "./useGuardianGate";
 import type { ProviderProfile } from "./models";
 
 /**
@@ -18,14 +20,20 @@ import type { ProviderProfile } from "./models";
  * Both names are written onto the chat as it is opened. That is the only
  * moment anyone can read both: the provider's from the public directory, the
  * patient's from their own profile. Without it the provider opens a thread
- * that cannot say who is in it.
+ * that cannot say who is in it. The under-18 flag rides the same way, for the
+ * same reason.
+ *
+ * Somebody under 18 meets the guardian form first (see useGuardianGate), and
+ * lands in the chat once it is signed. Callers render the form:
+ * `<GuardianConsentModal {...guardian.modal} />`.
  */
 export function useOpenProvider() {
   const { user, profile } = useAuth();
   const router = useRouter();
   const [opening, setOpening] = useState<string | null>(null);
+  const guardian = useGuardianGate();
 
-  const open = useCallback(
+  const go = useCallback(
     async (provider: Pick<ProviderProfile, "uid" | "displayName">) => {
       if (!user) {
         router.push(`/sign-in?next=${encodeURIComponent(`/providers/${provider.uid}`)}`);
@@ -41,7 +49,7 @@ export function useOpenProvider() {
         const chatId = await openChat(user.uid, provider.uid, {
           ...(mine ? { [user.uid]: mine } : {}),
           ...(provider.displayName ? { [provider.uid]: provider.displayName } : {}),
-        });
+        }, isMinor(profile?.intake ?? null));
         router.push(`/chats/${chatId}`);
       } catch {
         // Their profile has a Message button that does the same thing and can
@@ -54,5 +62,15 @@ export function useOpenProvider() {
     [profile, router, user],
   );
 
-  return { open, opening };
+  const { guard } = guardian;
+  const open = useCallback(
+    async (provider: Pick<ProviderProfile, "uid" | "displayName">) => {
+      // Signed-out people go to sign in first; the form comes after.
+      if (!user) return go(provider);
+      guard(() => void go(provider));
+    },
+    [go, guard, user],
+  );
+
+  return { open, opening, guardian };
 }

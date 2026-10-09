@@ -6,6 +6,8 @@ import { motion } from "motion/react";
 import { SPRING_SNAP, SPRING_SOFT } from "../motion/primitives";
 import { Alert, EmptyState, Skeleton, SkeletonList } from "../ui/Feedback";
 import { IconCalendar, IconSpeaker } from "../ui/icons";
+import GuardianConsentModal from "../therapy/GuardianConsentModal";
+import { useGuardianGate } from "../../lib/useGuardianGate";
 import Button from "../ui/Button";
 import { useAuth } from "../AuthProvider";
 import { useReadAloud } from "../../lib/useReadAloud";
@@ -66,7 +68,7 @@ export default function SlotPicker({ providerId }: { providerId: string }) {
 
   useEffect(() => watchOpenSlots(providerId, setSlots), [providerId]);
 
-  const confirm = useCallback(async () => {
+  const book = useCallback(async () => {
     if (!chosen || !user) return;
     setBooking(true);
     setError(null);
@@ -81,6 +83,14 @@ export default function SlotPicker({ providerId }: { providerId: string }) {
     setChosen(null);
     setError(result.error ?? "Could not book that time.");
   }, [chosen, note, providerId, router, user]);
+
+  // Under 18: the guardian form first, then the booking goes through with the
+  // time they already picked (see useGuardianGate).
+  const guardian = useGuardianGate();
+  const { guard } = guardian;
+  const confirm = useCallback(async () => {
+    guard(() => void book());
+  }, [book, guard]);
 
   if (slots === null) {
     return (
@@ -248,6 +258,8 @@ export default function SlotPicker({ providerId }: { providerId: string }) {
           </div>
         </motion.div>
       ) : null}
+
+      <GuardianConsentModal {...guardian.modal} />
     </div>
   );
 }

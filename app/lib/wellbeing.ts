@@ -28,7 +28,7 @@ import {
 import { firebaseConfigured, firestore } from "./firebase";
 import {
   COLLECTIONS,
-  type Consents,
+  type BooleanConsentKey,
   type JournalEntry,
   type MoodEntry,
   type MoodScore,
@@ -262,9 +262,11 @@ export async function deleteJournalEntry(uid: string, entryId: string): Promise<
  */
 export async function recordConsent(
   uid: string,
-  key: keyof Consents,
+  key: BooleanConsentKey,
   granted: boolean,
   surface: string,
+  /** The evidence column — see ConsentEvent.detail. */
+  detail?: Record<string, unknown>,
 ): Promise<void> {
   const userRef = doc(firestore(), COLLECTIONS.users, uid);
 
@@ -275,7 +277,7 @@ export async function recordConsent(
 
   await addDoc(
     collection(firestore(), COLLECTIONS.users, uid, COLLECTIONS.consentEvents),
-    { key, granted, surface, recordedAt: serverTimestamp() },
+    { key, granted, surface, recordedAt: serverTimestamp(), ...(detail ? { detail } : {}) },
   );
 }
 

@@ -109,6 +109,18 @@ const payment = {
   needsReview: false,
 };
 
+/** The evaluator's clock for every request below. */
+const NOW = "2026-10-03T12:05:00Z";
+const BACKDATED = "2026-09-26T12:05:00Z";
+
+/** One entry in the consent ledger, stamped by the server as it lands. */
+const consent = {
+  key: "dataProcessing",
+  granted: true,
+  surface: "therapy:spoken",
+  recordedAt: NOW,
+};
+
 const CASES = [
   // --- reading a conversation -------------------------------------------
   ["a participant reads their chat", "ALLOW", PATIENT, "get", `${DOCS}/chats/${CHAT}`, chat],
@@ -279,6 +291,28 @@ const CASES = [
   ["rewriting who is in a live call", "DENY", PATIENT, "update",
     `${DOCS}/calls/bk_1`, { participants: [PATIENT, PROVIDER] },
     { participants: [PATIENT, PROVIDER, STRANGER] }],
+
+  // --- the consent ledger ------------------------------------------------
+  // A consent record is evidence. Its shape is fixed and its time is the
+  // server's, so nobody can write a consent "given" before the session it is
+  // used to justify — and nobody can write one for somebody else.
+  ["recording your own consent", "ALLOW", PATIENT, "create",
+    `${DOCS}/users/${PATIENT}/consentEvents/c1`, null, consent],
+  ["recording a guardian's consent with its evidence", "ALLOW", PATIENT, "create",
+    `${DOCS}/users/${PATIENT}/consentEvents/c2`, null,
+    { ...consent, key: "guardianConsent", detail: { relationship: "mother", signedName: "Awa Jallow" } }],
+  ["backdating a consent", "DENY", PATIENT, "create",
+    `${DOCS}/users/${PATIENT}/consentEvents/c3`, null, { ...consent, recordedAt: BACKDATED }],
+  ["slipping an extra field into the ledger", "DENY", PATIENT, "create",
+    `${DOCS}/users/${PATIENT}/consentEvents/c4`, null, { ...consent, verifiedBy: "admin" }],
+  ["a consent that is not a yes or a no", "DENY", PATIENT, "create",
+    `${DOCS}/users/${PATIENT}/consentEvents/c5`, null, { ...consent, granted: "yes" }],
+  ["recording consent for somebody else", "DENY", STRANGER, "create",
+    `${DOCS}/users/${PATIENT}/consentEvents/c6`, null, consent],
+  ["rewriting a consent already given", "DENY", PATIENT, "update",
+    `${DOCS}/users/${PATIENT}/consentEvents/c1`, consent, { ...consent, granted: false }],
+  ["erasing a consent already given", "DENY", PATIENT, "delete",
+    `${DOCS}/users/${PATIENT}/consentEvents/c1`, consent],
 ];
 
 /**
@@ -314,7 +348,7 @@ const testCase = ([, expectation, uid, method, path, existing, incoming]) => ({
     auth: uid ? { uid, token: { sub: uid, firebase: { sign_in_provider: "password" } } } : null,
     path,
     method,
-    time: "2026-10-03T12:05:00Z",
+    time: NOW,
     ...(incoming ? { resource: { data: incoming } } : {}),
   },
   ...(existing ? { resource: { data: existing } } : {}),

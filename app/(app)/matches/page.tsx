@@ -7,7 +7,8 @@ import { SPRING_SOFT } from "@/components/motion/primitives";
 import { useAuth } from "@/components/AuthProvider";
 import ProviderCard, { ProviderCardSkeleton } from "@/components/providers/ProviderCard";
 import Button from "@/components/ui/Button";
-import { EmptyState, Pill } from "@/components/ui/Feedback";
+import { Alert, EmptyState, Pill } from "@/components/ui/Feedback";
+import GuardianConsentModal from "@/components/therapy/GuardianConsentModal";
 import { IconPeople } from "@/components/ui/icons";
 import { intakeChips } from "@/lib/matching";
 import { useMatches } from "@/lib/useMatches";
@@ -28,7 +29,7 @@ export default function ProvidersForYouPage() {
   // Every provider can read itself out, in whatever language they chose when
   // they talked to Talk.
   const { read, speakingId } = useReadAloud(intake?.language);
-  const { open: openProvider } = useOpenProvider();
+  const { open: openProvider, guardian } = useOpenProvider();
   const [welcome] = useState(
     () => typeof window !== "undefined" && new URLSearchParams(window.location.search).has("welcome"),
   );
@@ -66,6 +67,24 @@ export default function ProvidersForYouPage() {
           </div>
         ) : null}
       </motion.div>
+
+      {/* Under 18: the second place somebody lands after the conversation, so
+          the guardian form is offered here too, not only on /therapy. */}
+      {guardian.needed ? (
+        <Alert
+          tone="warning"
+          title="A parent or guardian first"
+          action={
+            <Button size="sm" onClick={guardian.ask}>
+              Fill it in together
+            </Button>
+          }
+        >
+          Because you are under 18, a parent or guardian needs to fill in a short form with you before
+          your first session with a provider. You can still talk to Talk, and urgent help is always
+          open to you.
+        </Alert>
+      ) : null}
 
       {/* No intake yet (an account from before onboarding was a conversation). */}
       {!intake ? (
@@ -122,6 +141,8 @@ export default function ProvidersForYouPage() {
           ))}
         </div>
       )}
+
+      <GuardianConsentModal {...guardian.modal} />
     </div>
   );
 }

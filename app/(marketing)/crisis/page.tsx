@@ -45,6 +45,38 @@ const SERVICES = [
   },
 ];
 
+/**
+ * For somebody under 18. Named services only, exactly like SERVICES above: a
+ * number nobody has verified, on the page a frightened child opens, is worse
+ * than naming the service and no number at all.
+ *
+ * TODO(crisis-numbers): a dedicated child helpline for The Gambia must be
+ * verified by a person before launch and added here. Do not invent one, and
+ * do not let a model fill it in.
+ */
+const CHILD_SERVICES = [
+  {
+    name: "The police, on 117",
+    detail:
+      "If somebody is hurting you, or you are not safe where you are, call 117 and tell them a child is in danger. It is free from any phone.",
+  },
+  {
+    name: "Department of Social Welfare",
+    detail:
+      "The government service that protects children. It handles abuse, neglect, being forced to marry, and children who are not safe at home. A teacher, a health worker or the police can contact it with you.",
+  },
+  {
+    name: "A teacher, or the head of your school",
+    detail:
+      "You can tell a teacher you trust. Schools can bring in social welfare and keep you safe while they do.",
+  },
+  {
+    name: "Your nearest health centre",
+    detail:
+      "A nurse or doctor can help you, including if you have been hurt, and can bring in social welfare for you.",
+  },
+];
+
 export default function CrisisPage() {
   return (
     <div className="bg-[var(--background)]">
@@ -89,6 +121,39 @@ export default function CrisisPage() {
           112 also reaches the police. These numbers are free to call from any
           network in The Gambia.
         </p>
+
+        {/* ------------------------------------------------------------------ */}
+
+        {/* Where Talk sends somebody under 18 who says they are in danger. The
+            id is the link target; scroll-mt keeps the heading clear of the
+            fixed header when it is jumped to. */}
+        <section id="under-18" className="scroll-mt-28">
+          <h2 className="mt-16 md:mt-20 text-[24px] md:text-[32px] leading-tight tracking-tight font-medium">
+            If you are under 18
+          </h2>
+          <p className="mt-3 text-[14px] md:text-[15px] leading-relaxed text-[var(--muted)] max-w-[620px]">
+            Tell an adult you trust, today — a parent, a teacher, a health
+            worker. If somebody is hurting you, it is not your fault, and you do
+            not have to keep it a secret. You do not have to sort this out on
+            your own.
+          </p>
+
+          <ul className="mt-8 space-y-4">
+            {CHILD_SERVICES.map((service) => (
+              <li
+                key={service.name}
+                className="rounded-2xl bg-white shadow-[0_18px_40px_-22px_rgba(0,0,0,0.25)] px-6 py-5"
+              >
+                <p className="text-[15px] md:text-[16px] font-medium leading-snug">
+                  {service.name}
+                </p>
+                <p className="mt-2 text-[13px] leading-relaxed text-[var(--muted)]">
+                  {service.detail}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
 
         {/* ------------------------------------------------------------------ */}
 

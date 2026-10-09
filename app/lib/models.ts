@@ -100,6 +100,19 @@ export type Consents = {
   personalInsights: boolean;
   marketing: boolean;
   acceptedTermsAt: number | null;
+  /**
+   * When Talk SPOKE the consent and they said yes — out loud or by tapping.
+   * Distinct from acceptedTermsAt, which only ever meant a button press under
+   * small print: for somebody who cannot read, that was never consent.
+   */
+  spokenConsentAt: number | null;
+  /**
+   * A guardian completed the under-18 form. For onboarding, triage and
+   * flagging ONLY — never clinical consent, which the provider obtains under
+   * their own licensing before treatment begins.
+   */
+  guardianConsent: boolean;
+  guardianConsentAt: number | null;
 };
 
 export const DEFAULT_CONSENTS: Consents = {
@@ -108,6 +121,9 @@ export const DEFAULT_CONSENTS: Consents = {
   personalInsights: false,
   marketing: false,
   acceptedTermsAt: null,
+  spokenConsentAt: null,
+  guardianConsent: false,
+  guardianConsentAt: null,
 };
 
 export type UserDoc = {
@@ -196,7 +212,25 @@ export type ConsentEvent = {
   /** Where the user was when they made the choice, for auditability. */
   surface: string;
   recordedAt: number;
+  /**
+   * The evidence: what language the consent was given in, whether it was
+   * spoken or tapped, the version of the words they heard, and — for a
+   * guardian — their relationship to the patient and their typed name.
+   */
+  detail?: Record<string, unknown> | null;
 };
+
+/**
+ * The consent keys that hold a yes or no.
+ *
+ * recordConsent writes `consents.<key> = granted`, so it must only ever be
+ * given these. The timestamp keys (acceptedTermsAt, spokenConsentAt,
+ * guardianConsentAt) are numbers, and writing `true` into one would corrupt
+ * the very record that says WHEN somebody agreed.
+ */
+export type BooleanConsentKey = {
+  [K in keyof Consents]: Consents[K] extends boolean ? K : never;
+}[keyof Consents];
 
 // ----------------------------------------------------------------- providers
 
@@ -308,6 +342,12 @@ export type Booking = {
   currency: "GMD";
   transactionId: string | null;
   patientNote: string;
+  /**
+   * The patient said they are under 18. Stamped by the bookSession function
+   * from the patient's own record — the client never supplies it, and the
+   * rules refuse every client write to a booking, so it cannot be cleared.
+   */
+  patientMinor: boolean;
   /**
    * A Google Meet link the provider may attach, for anyone who would rather
    * meet there. The session itself happens inside Talk; this is the fallback
@@ -677,6 +717,14 @@ export type Chat = {
    * before this field existed, so every reader needs a fallback.
    */
   names: Record<string, string>;
+  /**
+   * The patient is under 18. Denormalised here because `users/{uid}` is
+   * refused to the provider by design and must stay that way — this is how
+   * the flag reaches the chat header without widening that rule. Written by
+   * the patient's own client, so a determined minor could clear it; the copy a
+   * provider can trust is `Booking.patientMinor`, written by the server.
+   */
+  minor: boolean;
   /** Preview line for the chat list. For media this is a label, not a caption. */
   lastMessage: string;
   lastMessageAt: number;

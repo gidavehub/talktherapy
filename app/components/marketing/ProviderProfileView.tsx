@@ -10,7 +10,9 @@ import Button from "../ui/Button";
 import { IconCalendar, IconChat, IconPeople } from "../ui/icons";
 import { useAuth } from "../AuthProvider";
 import ProviderAvatar from "../providers/ProviderAvatar";
+import GuardianConsentModal from "../therapy/GuardianConsentModal";
 import { openChat } from "../../lib/chat";
+import { useGuardianGate } from "../../lib/useGuardianGate";
 import { formatDalasi } from "../../lib/money";
 import { LOCALE_LABELS, type ProviderProfile } from "../../lib/models";
 import {
@@ -18,7 +20,7 @@ import {
   getProvider,
   type Specialization,
 } from "../../lib/providers";
-import { FORMAT_LABELS, SERVICE_LABELS } from "../../lib/matching";
+import { FORMAT_LABELS, SERVICE_LABELS, isMinor } from "../../lib/matching";
 
 /**
  * Public provider profile.
@@ -36,6 +38,7 @@ export default function ProviderProfileView({ providerId }: { providerId: string
   const router = useRouter();
   const [opening, setOpening] = useState(false);
   const [messageError, setMessageError] = useState<string | null>(null);
+  const guardian = useGuardianGate();
 
   /**
    * Open the conversation with this provider, creating it if it is their first.
@@ -48,7 +51,7 @@ export default function ProviderProfileView({ providerId }: { providerId: string
    * business opening a patient-facing thread from here, and the shape of a
    * provider-to-provider conversation is not a decision to make by accident.
    */
-  const startChat = useCallback(async () => {
+  const openThread = useCallback(async () => {
     if (!user || opening) return;
     setOpening(true);
     setMessageError(null);
@@ -64,13 +67,19 @@ export default function ProviderProfileView({ providerId }: { providerId: string
       const chatId = await openChat(user.uid, providerId, {
         ...(mine ? { [user.uid]: mine } : {}),
         ...(profile?.displayName ? { [providerId]: profile.displayName } : {}),
-      });
+      }, isMinor(account?.intake ?? null));
       router.push(`/chats/${chatId}`);
     } catch {
       setOpening(false);
       setMessageError("Could not open the conversation. Please try again.");
     }
   }, [account, opening, profile, providerId, router, user]);
+
+  // Under 18: the guardian form first, then the thread (see useGuardianGate).
+  const { guard } = guardian;
+  const startChat = useCallback(async () => {
+    guard(() => void openThread());
+  }, [guard, openThread]);
 
   const canMessage = Boolean(user) && role === "patient";
 
@@ -328,6 +337,8 @@ export default function ProviderProfileView({ providerId }: { providerId: string
           </motion.div>
         </>
       ) : null}
+
+      <GuardianConsentModal {...guardian.modal} />
     </div>
   );
 }
