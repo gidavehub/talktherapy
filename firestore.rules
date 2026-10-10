@@ -387,6 +387,56 @@ service cloud.firestore {
     // Short-lived SDP offer/answer and ICE candidates. Contents are useless
     // without also being the live peer, but they still identify who is talking
     // to whom, so they stay locked to the two participants.
+    // groupCalls/{chatId} — a group session's call. The room IS the group
+    // chat, so who may be in it is the chat's own member list, checked
+    // against the chat rather than taken from whoever opened it first (the
+    // same squatting the 1:1 room guards against).
+    match /groupCalls/{chatId} {
+      function roomMembers() {
+        return get(/databases/$(database)/documents/groupCalls/$(chatId)).data.participants;
+      }
+
+      allow get: if isSignedIn() && request.auth.uid in resource.data.participants;
+      allow create: if isSignedIn()
+        && request.auth.uid in request.resource.data.participants
+        && request.resource.data.participants ==
+             get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+      allow update: if isSignedIn()
+        && request.auth.uid in resource.data.participants
+        && request.resource.data.participants == resource.data.participants;
+      allow delete: if false;
+
+      // Who is in the call now. Everyone in the group can see it; each
+      // person writes only their own.
+      match /present/{uid} {
+        allow read: if isSignedIn() && request.auth.uid in roomMembers();
+        allow create, update: if isSelf(uid)
+          && request.auth.uid in roomMembers()
+          && request.resource.data.uid == uid;
+        allow delete: if isSelf(uid);
+      }
+
+      // One connection per pair, id = the two uids sorted. Only that pair
+      // reads or writes it: the rest of the group cannot see who is
+      // negotiating with whom, let alone inject into it.
+      match /links/{pair} {
+        function inPair() {
+          return isSignedIn()
+            && request.auth.uid in pair.split('__')
+            && pair.split('__')[0] in roomMembers()
+            && pair.split('__')[1] in roomMembers();
+        }
+        allow read, create, update: if inPair();
+        allow delete: if false;
+
+        match /candidates/{candidateId} {
+          allow read: if inPair();
+          allow create: if inPair() && request.resource.data.from == request.auth.uid;
+          allow update, delete: if false;
+        }
+      }
+    }
+
     match /calls/{sessionId} {
       // Same denormalisation as messages: ICE candidates arrive in bursts of
       // dozens, and a parent lookup per candidate is pure waste.

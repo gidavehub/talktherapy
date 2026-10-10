@@ -401,7 +401,7 @@ function PayoutRow({ payout }: { payout: Payout }) {
       initial={{ y: 10, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={SPRING_SOFT}
-      className="rounded-[18px] bg-white px-4 py-3"
+      className="rounded-[22px] bg-white px-4 py-3.5"
     >
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">

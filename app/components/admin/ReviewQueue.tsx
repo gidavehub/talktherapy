@@ -145,7 +145,7 @@ function Queue({
         {items === null ? (
           <Skeleton className="h-20" />
         ) : items.length === 0 ? (
-          <p className="rounded-[18px] bg-white px-4 py-4 text-[13px] text-[var(--muted)]">Nothing waiting.</p>
+          <p className="rounded-[22px] bg-white px-4 py-4 text-[13px] text-[var(--muted)]">Nothing waiting.</p>
         ) : (
           items.map((item) => <ReviewRow key={item.id} item={item} {...render(item)} />)
         )}
@@ -184,7 +184,7 @@ function ReviewRow({
   }
 
   return (
-    <div className="rounded-[18px] bg-white px-4 py-4">
+    <div className="rounded-[22px] bg-white px-4 py-4">
       <p className="text-[14.5px] font-medium">{heading}</p>
       <p className="mt-1 break-words text-[12.5px] leading-relaxed text-[var(--muted)]">{detail}</p>
       <input

@@ -125,6 +125,12 @@ const payoutAccount = {
   uid: PROVIDER, network: "wave", accountNumber: "7000000", beneficiaryName: "Awa Jallow", updatedAt: 1_790_000_000_000,
 };
 
+/** A provider-led group of three, and its call room. */
+const THIRD = "third-uid";
+const GROUP = "group_call_1";
+const groupRoom = { chatId: GROUP, participants: [PATIENT, PROVIDER, THIRD], status: "active" };
+const PAIR = [PATIENT, PROVIDER].sort().join("__");
+
 /** A paid consultation, as the server writes it. */
 const entitlement = {
   uid: PATIENT,
@@ -374,6 +380,25 @@ const CASES = [
   ["a session marked paid out from the browser", "DENY", PROVIDER, "update", `${DOCS}/bookings/bk_1`, booking,
     { ...booking, payoutId: "po_9" }],
 
+  // --- a group session's call ---------------------------------------------
+  ["a member opens the group's call", "ALLOW", PATIENT, "create", `${DOCS}/groupCalls/${GROUP}`, null, groupRoom],
+  ["a stranger opens it", "DENY", STRANGER, "create", `${DOCS}/groupCalls/${GROUP}`, null,
+    { ...groupRoom, participants: [STRANGER] }],
+  ["a member opens it with a different list", "DENY", PATIENT, "create", `${DOCS}/groupCalls/${GROUP}`, null,
+    { ...groupRoom, participants: [PATIENT, PROVIDER, STRANGER] }],
+  ["a member says they are here", "ALLOW", PATIENT, "create", `${DOCS}/groupCalls/${GROUP}/present/${PATIENT}`, null,
+    { uid: PATIENT, session: "s1", heartbeatAt: 1 }],
+  ["saying somebody else is here", "DENY", PATIENT, "create", `${DOCS}/groupCalls/${GROUP}/present/${PROVIDER}`, null,
+    { uid: PROVIDER, session: "s1", heartbeatAt: 1 }],
+  ["a stranger says they are here", "DENY", STRANGER, "create", `${DOCS}/groupCalls/${GROUP}/present/${STRANGER}`, null,
+    { uid: STRANGER, session: "s1", heartbeatAt: 1 }],
+  ["one of a pair opens their link", "ALLOW", PATIENT, "create", `${DOCS}/groupCalls/${GROUP}/links/${PAIR}`, null,
+    { members: [PATIENT, PROVIDER] }],
+  ["a third member reads a pair's link", "DENY", THIRD, "get", `${DOCS}/groupCalls/${GROUP}/links/${PAIR}`,
+    { members: [PATIENT, PROVIDER] }],
+  ["a candidate sent in somebody else's name", "DENY", PATIENT, "create",
+    `${DOCS}/groupCalls/${GROUP}/links/${PAIR}/candidates/c1`, null, { from: PROVIDER, session: "s1" }],
+
   // --- the staff review queues -------------------------------------------
   ["staff list payments held for review", "ALLOW", ADMIN, "list", `${DOCS}/payments/pi_1`, payment],
   ["staff list flagged payouts", "ALLOW", ADMIN, "list", `${DOCS}/payouts/po_1`, payout],
@@ -426,6 +451,15 @@ const testCase = ([, expectation, uid, method, path, existing, incoming]) => ({
     ? { functionMocks: [parentChatMock] }
     : {}),
   ...(path.includes("/providerProfiles/") ? { functionMocks: userDocMocks } : {}),
+  // The group call room checks members against the chat, then its own room.
+  ...(path.includes("/groupCalls/")
+    ? {
+        functionMocks: [
+          { function: "get", args: [{ exactValue: `${DOCS}/chats/${GROUP}` }], result: { value: { data: { participants: groupRoom.participants } } } },
+          { function: "get", args: [{ exactValue: `${DOCS}/groupCalls/${GROUP}` }], result: { value: { data: groupRoom } } },
+        ],
+      }
+    : {}),
   // The staff review queues ask whether the caller is an admin.
   ...(method === "list" && /\/(payments|payouts|bookings)\//.test(path) ? { functionMocks: userDocMocks } : {}),
   // Starting a group asks whether the caller is a provider.

@@ -30,6 +30,8 @@ export const COLLECTIONS = {
   messages: "messages",
   notes: "notes",
   calls: "calls",
+  /** `groupCalls/{chatId}` — a group session's call; the room IS the group chat. See lib/groupCall.ts. */
+  groupCalls: "groupCalls",
   callerCandidates: "callerCandidates",
   calleeCandidates: "calleeCandidates",
   transactions: "transactions",
