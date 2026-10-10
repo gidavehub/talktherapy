@@ -42,6 +42,13 @@ export const COLLECTIONS = {
    * the fulfilment it guards.
    */
   paymentEvents: "paymentEvents",
+  /**
+   * `entitlements/{uid}` — the AI consultation somebody has paid for. Server-
+   * written only, and a collection of its own rather than a field on the user
+   * document: that document is self-writable, so a field there would let
+   * anybody grant themselves the D200 consultation from the browser console.
+   */
+  entitlements: "entitlements",
   resources: "resources",
   escalations: "escalations",
   organizations: "organizations",
@@ -433,6 +440,49 @@ export const AI_TIERS = {
 } as const;
 
 export type AiTierId = keyof typeof AI_TIERS;
+
+/** What a consultation payment is FOR, as it travels in the payment's metadata. */
+export const AI_PURPOSE: Record<AiTierId, string> = {
+  initial: "ai_initial",
+  extended: "ai_extended",
+};
+
+export function tierForPurpose(purpose: string | null | undefined): AiTierId | null {
+  if (purpose === AI_PURPOSE.initial) return "initial";
+  if (purpose === AI_PURPOSE.extended) return "extended";
+  return null;
+}
+
+/**
+ * How long a paid consultation stays usable once granted.
+ *
+ * The 8 or 20 minutes are the CONVERSATION's budget, kept inside it. This is
+ * the window in which that conversation can happen — generous on purpose, so
+ * a dropped connection or a phone that died is not a second D200.
+ */
+export const AI_ENTITLEMENT_VALID_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * `entitlements/{uid}` — WRITTEN ONLY BY THE SERVER, by the same transaction
+ * that marks the payment fulfilled. This is what decides whether somebody
+ * received the consultation they paid for.
+ */
+export type Entitlement = {
+  uid: string;
+  aiTier: AiTierId;
+  durationLimitSec: number;
+  status: "granted";
+  paymentIntentId: string;
+  amountMinor: number;
+  grantedAt: number;
+  expiresAt: number;
+  updatedAt: number;
+};
+
+/** Paid for, and still inside its window. */
+export function entitlementActive(e: Pick<Entitlement, "status" | "expiresAt"> | null, now: number): boolean {
+  return Boolean(e && e.status === "granted" && e.expiresAt > now);
+}
 
 /** Concept note range for human consultations: D700–D3,000. */
 export const HUMAN_RATE_MIN_MINOR = 700_00;

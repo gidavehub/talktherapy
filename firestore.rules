@@ -478,6 +478,21 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // entitlements/{uid} — the AI consultation somebody has paid for, written
+    // by the same server transaction that marks the payment fulfilled.
+    //
+    // A collection of its own, NOT a field on users/{uid}: that document is
+    // self-writable (keepsPrivilegeFields pins only role and verified), so a
+    // flag there would let anybody grant themselves the D200 consultation
+    // from the browser console. Here nobody writes but the server.
+    match /entitlements/{uid} {
+      // The owner reads their own, so the page knows whether to show the
+      // payment sheet or start the conversation. `get` only: no listing.
+      allow get: if isSignedIn() && request.auth.uid == uid;
+      allow get, list: if isAdmin();
+      allow write: if false;
+    }
+
     // paymentEvents/{eventKey} — the webhook idempotency ledger. One document
     // per delivery acted on, keyed by the provider's event id or a hash of the
     // raw body.

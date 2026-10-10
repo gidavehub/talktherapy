@@ -113,6 +113,19 @@ const payment = {
 const NOW = "2026-10-03T12:05:00Z";
 const BACKDATED = "2026-09-26T12:05:00Z";
 
+/** A paid consultation, as the server writes it. */
+const entitlement = {
+  uid: PATIENT,
+  aiTier: "initial",
+  durationLimitSec: 480,
+  status: "granted",
+  paymentIntentId: "pi_1",
+  amountMinor: 20000,
+  grantedAt: 1_790_000_000_000,
+  expiresAt: 1_790_086_400_000,
+  updatedAt: 1_790_000_000_000,
+};
+
 /** One entry in the consent ledger, stamped by the server as it lands. */
 const consent = {
   key: "dataProcessing",
@@ -313,6 +326,23 @@ const CASES = [
     `${DOCS}/users/${PATIENT}/consentEvents/c1`, consent, { ...consent, granted: false }],
   ["erasing a consent already given", "DENY", PATIENT, "delete",
     `${DOCS}/users/${PATIENT}/consentEvents/c1`, consent],
+
+  // --- the paid consultation -------------------------------------------
+  // Written only by the server, in the transaction that marks the payment
+  // fulfilled. A client that could write here could grant itself the D200
+  // consultation without paying.
+  ["reading your own consultation", "ALLOW", PATIENT, "get",
+    `${DOCS}/entitlements/${PATIENT}`, entitlement],
+  ["reading somebody else's", "DENY", STRANGER, "get",
+    `${DOCS}/entitlements/${PATIENT}`, entitlement],
+  ["listing who has paid", "DENY", PATIENT, "list",
+    `${DOCS}/entitlements/${PATIENT}`, entitlement],
+  ["granting yourself a consultation", "DENY", PATIENT, "create",
+    `${DOCS}/entitlements/${PATIENT}`, null, entitlement],
+  ["extending your own consultation", "DENY", PATIENT, "update",
+    `${DOCS}/entitlements/${PATIENT}`, entitlement, { ...entitlement, expiresAt: 4_102_444_800_000 }],
+  ["upgrading your own consultation", "DENY", PATIENT, "update",
+    `${DOCS}/entitlements/${PATIENT}`, entitlement, { ...entitlement, aiTier: "extended" }],
 ];
 
 /**

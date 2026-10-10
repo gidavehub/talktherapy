@@ -36,7 +36,7 @@ import {
 } from "./ai/talk";
 import {
   allow,
-  callerUid,
+  callerClaims,
   cleanHistory,
   cleanSummary,
   cors,
@@ -67,12 +67,33 @@ function abortOnClose(res: Response): AbortSignal {
   return controller.signal;
 }
 
-/** Everything these endpoints share: CORS, a POST, a signed-in caller, a body. */
+/**
+ * Whether a conversation with Talk has to be paid for first.
+ *
+ * Off until the web app that takes the payment is live: switching it on
+ * before then would answer every conversation on the deployed site with
+ * "not paid for", with no way to pay. Turn it on in functions/.env
+ * (CONSULTATION_GATE=on) and redeploy these functions, in that order, after
+ * the front end ships.
+ */
+const gateOn = () => process.env.CONSULTATION_GATE === "on";
+
+/**
+ * Everything these endpoints share: CORS, a POST, a signed-in caller, a paid
+ * consultation, a body.
+ *
+ * The consultation check is HERE, once, so no endpoint can be added without
+ * it. It is the real gate — the page's own check is only so somebody is shown
+ * the payment sheet instead of an error. `paid: false` is for reading the
+ * screen aloud, which every signed-in person uses, paying or not: an
+ * accessibility feature is not part of the product being sold.
+ */
 async function entry(
   req: Request,
   res: Response,
   bucket: string,
   limit: number,
+  { paid = true }: { paid?: boolean } = {},
 ): Promise<{ uid: string; body: Record<string, unknown> } | null> {
   if (cors(req, res)) return null;
 
@@ -82,10 +103,19 @@ async function entry(
     return null;
   }
 
-  const uid = await callerUid(req);
-  if (!uid) {
+  const caller = await callerClaims(req);
+  if (!caller) {
     json(res, 401, { error: "Sign in to talk to Talk." });
     return null;
+  }
+  const { uid } = caller;
+
+  if (paid && gateOn()) {
+    const live = caller.aiTier !== null && caller.aiExpiresAt !== null && caller.aiExpiresAt > Date.now();
+    if (!live) {
+      json(res, 402, { error: "Your consultation has not been paid for yet.", code: "payment_required" });
+      return null;
+    }
   }
 
   if (!allow(uid, bucket, limit, 5 * 60_000)) {
@@ -193,7 +223,7 @@ export const companionGreet = onRequest(options(60), async (req, res) => {
  */
 export const companionSpeak = onRequest(options(60), async (req, res) => {
   // Reading a screen is cheap but not free: one TTS call each time.
-  const start = await entry(req, res, "speak", 60);
+  const start = await entry(req, res, "speak", 60, { paid: false });
   if (!start) return;
   const { body } = start;
 

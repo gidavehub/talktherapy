@@ -16,10 +16,18 @@
 
 import { getApps, initializeApp } from "firebase-admin/app";
 import { FieldValue, getFirestore, type Transaction } from "firebase-admin/firestore";
-import type {
-  FulfilmentDecision,
-  PaymentRecord,
+import {
+  amountsAgree,
+  type FulfilmentDecision,
+  type PaymentRecord,
 } from "../../app/lib/payments/modempay-protocol";
+import {
+  AI_ENTITLEMENT_VALID_MS,
+  AI_TIERS,
+  entitlementActive,
+  tierForPurpose,
+  type AiTierId,
+} from "../../app/lib/models";
 
 /**
  * The project, pinned.
@@ -47,6 +55,7 @@ const PAYMENTS = "payments";
 const PAYMENT_EVENTS = "paymentEvents";
 const BOOKINGS = "bookings";
 const USERS = "users";
+const ENTITLEMENTS = "entitlements";
 
 export const CURRENCY = "GMD";
 
@@ -286,6 +295,79 @@ export function creditSession(bookingId: string, paymentIntentId: string) {
       },
       { merge: true },
     );
+  };
+}
+
+// ------------------------------------------------------------ consultations
+
+export type ConsultationGrant = { uid: string; tier: AiTierId; grantedAt: number; expiresAt: number };
+
+/** The consultation somebody holds right now, if any. */
+export async function activeConsultation(
+  uid: string,
+): Promise<{ tier: AiTierId; expiresAt: number; paymentIntentId: string | null } | null> {
+  const snap = await db().collection(ENTITLEMENTS).doc(uid).get();
+  const data = snap.data();
+  if (!data) return null;
+  const expiresAt = typeof data.expiresAt === "number" ? data.expiresAt : 0;
+  const tier = data.aiTier === "extended" ? "extended" : data.aiTier === "initial" ? "initial" : null;
+  if (!tier || !entitlementActive({ status: data.status, expiresAt }, Date.now())) return null;
+  return {
+    tier,
+    expiresAt,
+    paymentIntentId: typeof data.paymentIntentId === "string" ? data.paymentIntentId : null,
+  };
+}
+
+/**
+ * The AI twin of sessionToCredit: check, BEFORE any transaction opens, that
+ * this payment buys a consultation — the right price for a real tier, from a
+ * known payer. A credit may only write, so everything is read here.
+ *
+ * Somebody who already holds a live consultation and pays again (two tabs, a
+ * double tap) is NOT granted a second: the payment is held for a human, who
+ * refunds it. The same payment arriving twice — webhook and reconciler — is
+ * the one exception, so the two can race without either parking the other.
+ */
+export async function consultationToCredit(input: {
+  purpose: string | null;
+  payerUid: string | null;
+  amountMinor: number | null;
+  paymentIntentId: string;
+}): Promise<ConsultationGrant | null> {
+  const tier = tierForPurpose(input.purpose);
+  if (!tier || !input.payerUid || input.amountMinor === null) return null;
+  if (!amountsAgree(AI_TIERS[tier].amountMinor, input.amountMinor)) return null;
+
+  const held = await activeConsultation(input.payerUid);
+  if (held && held.paymentIntentId !== input.paymentIntentId) return null;
+
+  const grantedAt = Date.now();
+  return { uid: input.payerUid, tier, grantedAt, expiresAt: grantedAt + AI_ENTITLEMENT_VALID_MS };
+}
+
+/**
+ * Grant the consultation. Inside the fulfilment transaction, so it shares the
+ * fate of the payment being marked fulfilled — never one without the other.
+ *
+ * `set` rather than `update`, as with creditSession: it must not throw on a
+ * document that does not exist yet, which for a first consultation it never
+ * does. Nothing is written to `bookings` — a consultation is not a session,
+ * and that collection's rules assume a provider and a slot.
+ */
+export function creditConsultation(grant: ConsultationGrant, paymentIntentId: string) {
+  return (tx: Transaction) => {
+    tx.set(db().collection(ENTITLEMENTS).doc(grant.uid), {
+      uid: grant.uid,
+      aiTier: grant.tier,
+      durationLimitSec: AI_TIERS[grant.tier].durationSec,
+      status: "granted",
+      paymentIntentId,
+      amountMinor: AI_TIERS[grant.tier].amountMinor,
+      grantedAt: grant.grantedAt,
+      expiresAt: grant.expiresAt,
+      updatedAt: grant.grantedAt,
+    });
   };
 }
 

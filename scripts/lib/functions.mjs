@@ -35,15 +35,34 @@ export const BASE = (
 const KEY = process.env.TALK_ADMIN_CREDENTIALS || env.TALK_ADMIN_CREDENTIALS || "./secrets/talk-admin-sa.json";
 initializeApp({ credential: cert(JSON.parse(readFileSync(KEY, "utf8"))) });
 
-const res = await fetch(
-  `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${env.NEXT_PUBLIC_FIREBASE_API_KEY}`,
-  {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token: await getAuth().createCustomToken("smoke-tests"), returnSecureToken: true }),
-  },
-);
-const { idToken, error } = await res.json();
-if (!idToken) throw new Error(`Could not get an ID token: ${JSON.stringify(error)}`);
+/**
+ * An ID token for `smoke-tests`, with whatever claims are given.
+ *
+ * Claims put on a custom token come back on the ID token it is exchanged for,
+ * exactly as a claim set by the payment functions does — so this is how a
+ * script holds a paid consultation (or deliberately does not) without paying.
+ */
+export async function idTokenFor(claims = {}) {
+  const res = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${env.NEXT_PUBLIC_FIREBASE_API_KEY}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: await getAuth().createCustomToken("smoke-tests", claims), returnSecureToken: true }),
+    },
+  );
+  const { idToken, error } = await res.json();
+  if (!idToken) throw new Error(`Could not get an ID token: ${JSON.stringify(error)}`);
+  return idToken;
+}
 
-export const authHeader = { Authorization: `Bearer ${idToken}` };
+/**
+ * Signed in, with a paid consultation — what every conversation needs once
+ * the consultation gate is on (CONSULTATION_GATE in functions/.env).
+ */
+export const authHeader = {
+  Authorization: `Bearer ${await idTokenFor({ aiTier: "initial", aiExpiresAt: Date.now() + 60 * 60_000 })}`,
+};
+
+/** Signed in, and nothing paid for. */
+export const unpaidAuthHeader = { Authorization: `Bearer ${await idTokenFor()}` };

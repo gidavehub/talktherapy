@@ -460,6 +460,50 @@ console.log("\nNothing is credited on an amount nobody can corroborate");
   check(recordWins.credit, "our own recorded price is preferred over the metadata's");
 }
 
+console.log("\nA payment with nothing to deliver is held, never marked fulfilled");
+{
+  // The bug this exists for: a D200 consultation payment has no booking, the
+  // only credit there was then was a booking's, and the payment was stamped
+  // fulfilled with nothing granted — after which "Already fulfilled" refused
+  // every attempt to put it right.
+  const current = {
+    paymentIntentId: "pi_ai", uid: "user_fatou", purpose: "ai_initial",
+    amountMinor: 200_00, status: "pending", fulfilled: false, needsReview: false,
+  };
+  const event = normaliseWebhookEvent({
+    event: "charge.succeeded",
+    data: { payment_intent_id: "pi_ai", status: "paid", amount: 200, metadata: { uid: "user_fatou", purpose: "ai_initial", amount_minor: "20000" } },
+  });
+
+  const nothing = decideFulfilment({ event, current, resolvedUid: "user_fatou", reportedAmountMinor: 200_00, grantable: false });
+  check(!nothing.credit, "nothing to grant → no credit");
+  check(nothing.patch.fulfilled === false && nothing.patch.needsReview === true, "held for review, NOT marked fulfilled");
+  check(nothing.patch.status === "succeeded", "still recorded as paid — the money did arrive");
+  check(/nothing to deliver/.test(nothing.patch.reviewReason), `and says why: ${nothing.patch.reviewReason}`);
+
+  // Held, not fulfilled, so a later delivery CAN still put it right.
+  const later = decideFulfilment({
+    event,
+    current: { ...current, status: "succeeded", needsReview: true },
+    resolvedUid: "user_fatou",
+    reportedAmountMinor: 200_00,
+    grantable: true,
+  });
+  check(later.credit && later.patch.fulfilled === true, "a held payment can still be granted later");
+
+  const granted = decideFulfilment({ event, current, resolvedUid: "user_fatou", reportedAmountMinor: 200_00, grantable: true });
+  check(granted.credit && granted.patch.fulfilled === true, "something to grant → credited and fulfilled");
+
+  const unsaid = decideFulfilment({ event, current, resolvedUid: "user_fatou", reportedAmountMinor: 200_00 });
+  check(unsaid.credit, "a caller that does not say is treated as before");
+
+  // Grantable never overrides the other guards.
+  const short = decideFulfilment({ event, current, resolvedUid: "user_fatou", reportedAmountMinor: 2_00, grantable: true });
+  check(!short.credit && short.patch.needsReview, "an underpayment is still held, grantable or not");
+  const done = decideFulfilment({ event, current: { ...current, fulfilled: true }, resolvedUid: "user_fatou", reportedAmountMinor: 200_00, grantable: false });
+  check(done.patch === null && !done.credit, "an already-fulfilled payment is left alone, not re-held");
+}
+
 console.log("\nPayment methods follow the card minimum");
 {
   check(paymentMethodsFor(200_00).join() === "wallet,card", "D200 offers wallet then card");

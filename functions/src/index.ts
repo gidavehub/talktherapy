@@ -28,6 +28,7 @@
 
 import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
+import { getAuth } from "firebase-admin/auth";
 import {
   MODEM_PAY_BASE_URL,
   buildCheckoutBody,
@@ -39,9 +40,13 @@ import {
   webhookEventKey,
   SIGNATURE_HEADER,
 } from "../../app/lib/payments/modempay-protocol";
+import { AI_PURPOSE, AI_TIERS, type AiTierId } from "../../app/lib/models";
 import { bookSlot, cancelBooking } from "./bookings";
 import {
+  activeConsultation,
+  consultationToCredit,
   createPendingPayment,
+  creditConsultation,
   creditSession,
   customerFor,
   readPayment,
@@ -49,6 +54,7 @@ import {
   resolvePayer,
   sessionCharge,
   sessionToCredit,
+  type ConsultationGrant,
 } from "./payments";
 
 export {
@@ -296,6 +302,130 @@ export const startSessionPayment = onCall(
   },
 );
 
+/**
+ * Start paying for a conversation with Talk — the D200 initial consultation,
+ * or the longer one.
+ *
+ * Its own function rather than a branch of startSessionPayment: that one
+ * prices from a booking, and two pricing authorities in one function is how a
+ * client ends up naming its own price. The client sends a TIER NAME and
+ * nothing else; the amount comes from AI_TIERS, here.
+ */
+export const startConsultationPayment = onCall(
+  { ...CALLABLE, secrets: [MODEM_PAY_SECRET_KEY] },
+  async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid) throw new HttpsError("unauthenticated", "Sign in to pay for your consultation.");
+
+    const tier: AiTierId = request.data?.tier === "extended" ? "extended" : "initial";
+    const { amountMinor, label, blurb } = AI_TIERS[tier];
+
+    // Already holding one: paying again would be taken and then held for a
+    // refund. Better never to take it.
+    if (await activeConsultation(uid)) {
+      throw new HttpsError("failed-precondition", "Your consultation is already paid for.");
+    }
+
+    const customer = await customerFor(uid);
+    const paymentMethods = paymentMethodsFor(amountMinor);
+    const body = buildCheckoutBody({
+      amountMajor: toMajor(amountMinor),
+      title: label,
+      description: blurb,
+      customerEmail: customer.email,
+      customerName: customer.name,
+      paymentMethods,
+      metadata: {
+        uid,
+        purpose: AI_PURPOSE[tier],
+        amount_minor: String(amountMinor),
+        tier,
+      },
+      // Back to Talk, which picks up where it left off. The intent id is not
+      // known until the gateway answers, so it cannot ride in this URL; the
+      // page keeps it in sessionStorage instead.
+      returnUrl: `${appUrl()}/therapy?paid=1`,
+      cancelUrl: `${appUrl()}/?payment=cancelled`,
+      callbackUrl: WEBHOOK_URL,
+    });
+
+    let checkout;
+    try {
+      checkout = readCheckoutResponse(
+        await modemPay("/v1/payments", { method: "POST", body: JSON.stringify(body) }),
+      );
+    } catch (error) {
+      console.error("startConsultationPayment failed", error);
+      throw new HttpsError("unavailable", "Could not start the payment. Please try again.");
+    }
+
+    await createPendingPayment({
+      paymentIntentId: checkout.paymentIntentId,
+      uid,
+      purpose: AI_PURPOSE[tier],
+      amountMinor,
+      customerEmail: customer.email,
+      paymentMethods,
+      bookingId: null,
+    });
+
+    return {
+      paymentIntentId: checkout.paymentIntentId,
+      paymentLink: checkout.paymentLink,
+      amountMinor,
+      currency: "GMD",
+      tier,
+    };
+  },
+);
+
+/**
+ * Put the consultation where the AI functions can see it.
+ *
+ * Those functions run as talk-ai, which can read NOTHING in the database — on
+ * purpose, and scripts/verify-service-accounts.mjs fails if it ever can. What
+ * they can read is the caller's ID token, so the entitlement rides there too,
+ * as a custom claim. `entitlements/{uid}` stays the source of truth; this is
+ * the copy a database-blind function can check.
+ *
+ * Set AFTER the fulfilment transaction commits, never inside it: it is not a
+ * Firestore write and cannot share the transaction's fate. A failure here is
+ * logged, and claimConsultation below repairs it from the source of truth.
+ * Existing claims are kept: setCustomUserClaims replaces the whole set.
+ */
+async function grantClaim(grant: Pick<ConsultationGrant, "uid" | "tier" | "expiresAt">): Promise<boolean> {
+  try {
+    const user = await getAuth().getUser(grant.uid);
+    await getAuth().setCustomUserClaims(grant.uid, {
+      ...(user.customClaims ?? {}),
+      aiTier: grant.tier,
+      aiExpiresAt: grant.expiresAt,
+    });
+    return true;
+  } catch (error) {
+    console.error(`grantClaim: could not set the consultation claim for ${grant.uid}`, error);
+    return false;
+  }
+}
+
+/**
+ * The repair path. A paid person whose claim did not stick is told 402 by the
+ * AI functions; the page then calls this, which reads the entitlement it CAN
+ * read and sets the claim again. One extra round trip, instead of somebody
+ * who paid being locked out.
+ */
+export const claimConsultation = onCall(CALLABLE, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+
+  const held = await activeConsultation(uid);
+  if (!held) return { ok: false as const };
+
+  const claimed = await grantClaim({ uid, tier: held.tier, expiresAt: held.expiresAt });
+  if (!claimed) throw new HttpsError("unavailable", "Could not unlock your consultation. Please try again.");
+  return { ok: true as const, tier: held.tier, expiresAt: held.expiresAt };
+});
+
 // ------------------------------------------------------------ reconciliation
 
 /**
@@ -348,8 +478,17 @@ export const checkPayment = onCall(
       payerUid: payer.uid,
       amountMinor: authoritative.amountMinor,
     });
+    // Our own record of what this was for outranks the metadata.
+    const consultation = bookingId
+      ? null
+      : await consultationToCredit({
+          purpose: record.purpose ?? authoritative.purpose,
+          payerUid: payer.uid,
+          amountMinor: authoritative.amountMinor,
+          paymentIntentId,
+        });
 
-    const { decision } = await recordAndApply({
+    const { outcome, decision } = await recordAndApply({
       // A different key from the webhook's on purpose: the two are independent
       // observations of the same payment, and `fulfilled` — not the key — is
       // what keeps the credit to exactly once.
@@ -378,9 +517,17 @@ export const checkPayment = onCall(
           expectedAmountMinor: authoritative.expectedAmountMinor,
           resolvedPurpose: authoritative.purpose,
           resolvedEmail: payer.email,
+          // Nothing to deliver is held for a human, never marked fulfilled.
+          grantable: Boolean(bookingId || consultation),
         }),
-      credit: bookingId ? creditSession(bookingId, paymentIntentId) : undefined,
+      credit: bookingId
+        ? creditSession(bookingId, paymentIntentId)
+        : consultation
+          ? creditConsultation(consultation, paymentIntentId)
+          : undefined,
     });
+
+    if (outcome === "applied" && decision.credit && consultation) await grantClaim(consultation);
 
     return {
       status: decision.patch?.status ?? record.status,
@@ -467,6 +614,19 @@ export const modemWebhook = onRequest(
       payerUid: payer.uid,
       amountMinor,
     });
+    // What the payment was for: our own record first — the server wrote it
+    // when the payment began — then the transaction's metadata, then the
+    // delivery's.
+    const recorded = bookingId ? null : await readPayment(event.paymentIntentId);
+    const consultation =
+      bookingId || event.outcome !== "succeeded"
+        ? null
+        : await consultationToCredit({
+            purpose: recorded?.purpose ?? authoritative?.purpose ?? event.purpose,
+            payerUid: payer.uid,
+            amountMinor,
+            paymentIntentId: event.paymentIntentId,
+          });
 
     try {
       const { outcome, decision } = await recordAndApply({
@@ -483,9 +643,16 @@ export const modemWebhook = onRequest(
             expectedAmountMinor: authoritative?.expectedAmountMinor ?? event.expectedAmountMinor,
             resolvedPurpose: authoritative?.purpose ?? null,
             resolvedEmail: payer.email,
+            grantable: Boolean(bookingId || consultation),
           }),
-        credit: bookingId ? creditSession(bookingId, event.paymentIntentId) : undefined,
+        credit: bookingId
+          ? creditSession(bookingId, event.paymentIntentId)
+          : consultation
+            ? creditConsultation(consultation, event.paymentIntentId)
+            : undefined,
       });
+
+      if (outcome === "applied" && decision.credit && consultation) await grantClaim(consultation);
 
       console.log(
         `modemWebhook: ${event.paymentIntentId} ${outcome} (${decision.reason}) ` +

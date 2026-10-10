@@ -146,6 +146,15 @@ async function main() {
   check(after.needsReview === false, "with nothing held for review");
   check(after.uid === UID, "credited to the uid in the metadata");
 
+  // What the D200 actually buys. Before this was checked, an ai_initial
+  // payment was marked fulfilled here while granting nothing at all.
+  const granted = (await db.collection("entitlements").doc(UID).get()).data() ?? {};
+  check(granted.status === "granted" && granted.aiTier === "initial", `the consultation is granted (got ${granted.status}/${granted.aiTier})`);
+  check(granted.paymentIntentId === INTENT, "by this payment");
+  check(granted.amountMinor === AMOUNT_MINOR && granted.durationLimitSec === 480, "at the tier's price and length, not the request's");
+  const window = (granted.expiresAt ?? 0) - (granted.grantedAt ?? 0);
+  check(window === 24 * 60 * 60 * 1000, `usable for a day (${Math.round(window / 3_600_000)}h)`);
+
   console.log("\nThe same delivery again");
   const replay = await deliver(raw);
   check(replay.status === 200, `still 200, so the provider stops retrying (got ${replay.status})`);
@@ -188,10 +197,31 @@ async function main() {
   const held = await deliver(orphanRaw);
   check(held.status === 200, `answered 200 (got ${held.status})`);
   const orphanDoc = (await db.collection("payments").doc(orphan).get()).data() ?? {};
-  // The amount still travelled in the metadata, so this one IS checkable and
-  // should be credited. The uncheckable case is covered as a unit test.
+  // The amount still travelled in the metadata, so this one IS checkable.
   check(orphanDoc.status === "succeeded", `recorded as paid (got ${orphanDoc.status})`);
   check(orphanDoc.amountMinor === AMOUNT_MINOR, `at the amount from the metadata (got ${orphanDoc.amountMinor})`);
+  // But the same person already holds a consultation from the first payment,
+  // so this one is a second purchase of the same thing: held for a refund,
+  // never a second grant, never "fulfilled" with nothing delivered.
+  check(orphanDoc.fulfilled === false && orphanDoc.needsReview === true, "a second purchase is held for review, not granted again");
+  const still = (await db.collection("entitlements").doc(UID).get()).data() ?? {};
+  check(still.paymentIntentId === INTENT, "and the consultation they have is untouched");
+
+  console.log("\nA payment for nothing we sell");
+  const mystery = `pi_smoke_${randomUUID().slice(0, 8)}`;
+  const mysteryRaw = body()
+    .replace(new RegExp(INTENT, "g"), mystery)
+    .replace('"purpose":"ai_initial"', '"purpose":"mystery"')
+    .replace(`"uid":"${UID}"`, '"uid":"smoke-payments-nothing"');
+  check(mysteryRaw.includes('"purpose":"mystery"'), "(the purpose really differs)");
+  const nothing = await deliver(mysteryRaw);
+  check(nothing.status === 200, `answered 200 (got ${nothing.status})`);
+  const mysteryDoc = (await db.collection("payments").doc(mystery).get()).data() ?? {};
+  check(mysteryDoc.status === "succeeded", `recorded as paid (got ${mysteryDoc.status})`);
+  check(
+    mysteryDoc.fulfilled === false && mysteryDoc.needsReview === true,
+    `held for a human, not marked fulfilled with nothing delivered (${mysteryDoc.reviewReason})`,
+  );
 
   // ---- a session fee, which must confirm the booking ----------------------
   console.log("\nA session fee");
@@ -260,16 +290,18 @@ async function main() {
   // ---- clean up -----------------------------------------------------------
   const events = await db
     .collection("paymentEvents")
-    .where("paymentIntentId", "in", [INTENT, orphan, sessionIntent])
+    .where("paymentIntentId", "in", [INTENT, orphan, mystery, sessionIntent])
     .get();
   await Promise.all([
     db.collection("payments").doc(INTENT).delete(),
     db.collection("payments").doc(orphan).delete(),
+    db.collection("payments").doc(mystery).delete(),
     db.collection("payments").doc(sessionIntent).delete(),
+    db.collection("entitlements").doc(UID).delete(),
     bookingRef.delete(),
     ...events.docs.map((d) => d.ref.delete()),
   ]);
-  console.log(`\nCleaned up: 3 payments, 1 booking, ${events.size} event records`);
+  console.log(`\nCleaned up: 4 payments, 1 consultation, 1 booking, ${events.size} event records`);
 
   console.log(failures ? `\n${failures} CHECK(S) FAILED` : "\nALL CHECKS PASSED");
   process.exitCode = failures ? 1 : 0;

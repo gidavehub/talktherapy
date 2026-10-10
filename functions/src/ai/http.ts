@@ -70,11 +70,30 @@ export function cors(req: Request, res: Response): boolean {
  * nothing.
  */
 export async function callerUid(req: Request): Promise<string | null> {
+  return (await callerClaims(req))?.uid ?? null;
+}
+
+/**
+ * Who is calling, and what they have paid for.
+ *
+ * The paid consultation is a custom claim on the same token (set by the
+ * payment functions — see grantClaim in ../index.ts), so it is covered by the
+ * same signature check and needs no database read. That matters here: these
+ * functions run as an identity that cannot read the database at all.
+ */
+export async function callerClaims(
+  req: Request,
+): Promise<{ uid: string; aiTier: string | null; aiExpiresAt: number | null } | null> {
   const header = req.get("authorization") ?? "";
   const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
   if (!token) return null;
   try {
-    return (await getAuth().verifyIdToken(token)).uid;
+    const decoded = await getAuth().verifyIdToken(token);
+    return {
+      uid: decoded.uid,
+      aiTier: typeof decoded.aiTier === "string" ? decoded.aiTier : null,
+      aiExpiresAt: typeof decoded.aiExpiresAt === "number" ? decoded.aiExpiresAt : null,
+    };
   } catch {
     return null;
   }

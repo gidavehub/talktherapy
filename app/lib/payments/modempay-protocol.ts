@@ -527,6 +527,14 @@ export type FulfilmentInput = {
   /** Authoritative purpose/email, when a transaction lookup supplied them. */
   resolvedPurpose?: string | null;
   resolvedEmail?: string | null;
+  /**
+   * Whether this payment has something to deliver: a session it pays for, or
+   * a consultation it buys. `false` is held for a human rather than marked
+   * fulfilled — "fulfilled" with nothing delivered is money taken for nothing,
+   * and the "Already fulfilled" check below would then refuse every later
+   * attempt to put it right. Absent means the caller did not say.
+   */
+  grantable?: boolean;
 };
 
 /**
@@ -626,6 +634,22 @@ export function decideFulfilment(input: FulfilmentInput): FulfilmentDecision {
       },
       credit: false,
       reason: "Paid a different amount than asked — held for review",
+    };
+  }
+
+  if (input.grantable === false) {
+    return {
+      patch: {
+        ...base,
+        status: "succeeded",
+        fulfilled: false,
+        needsReview: true,
+        reviewReason:
+          "Paid in full, but there was nothing to deliver for it — no matching session or consultation",
+        amountMinor: reportedAmountMinor,
+      },
+      credit: false,
+      reason: "Paid, but there is nothing to grant — held for review",
     };
   }
 
