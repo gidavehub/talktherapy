@@ -26,6 +26,7 @@ import {
   type Language,
 } from "../../app/lib/ai/protocol";
 import { cleanIntake } from "../../app/lib/matching";
+import { tierCovers, type AiTierId } from "../../app/lib/models";
 import {
   presentProviders,
   renderInLanguage,
@@ -79,6 +80,38 @@ function abortOnClose(res: Response): AbortSignal {
 const gateOn = () => process.env.CONSULTATION_GATE === "on";
 
 /**
+ * Why this caller may not have this conversation — or null if they may.
+ *
+ * Read from the token alone (these functions cannot read the database):
+ *  - a consultation is held (aiTier),
+ *  - it has STARTED and its window has not run out (aiEndsAt, set by
+ *    claimConsultation when the conversation began — "up to 8 minutes" is
+ *    held to 12 wall-clock, the longer one to 30),
+ *  - it covers this kind of conversation: the D200 one is the intake, and
+ *    talking to Talk afterwards is the longer one.
+ * The page reads `code` to know what to do: start the clock and retry, or
+ * show the payment sheet.
+ */
+function consultationRefusal(
+  caller: { aiTier: string | null; aiEndsAt: number | null },
+  body: Record<string, unknown>,
+): { error: string; code: string } | null {
+  const tier: AiTierId | null =
+    caller.aiTier === "initial" || caller.aiTier === "extended" ? caller.aiTier : null;
+  if (!tier) return { error: "Your consultation has not been paid for yet.", code: "payment_required" };
+  if (caller.aiEndsAt === null) return { error: "Your consultation has not started yet.", code: "not_started" };
+  if (caller.aiEndsAt <= Date.now()) return { error: "Your consultation time is up.", code: "time_up" };
+  // Only turns and greetings say which kind of conversation they are; the
+  // rest belong to whichever one is running.
+  if (body.mode === "intake" || body.mode === "companion") {
+    if (!tierCovers(tier, body.mode)) {
+      return { error: "Talking with Talk again is the longer conversation.", code: "payment_required" };
+    }
+  }
+  return null;
+}
+
+/**
  * Everything these endpoints share: CORS, a POST, a signed-in caller, a paid
  * consultation, a body.
  *
@@ -110,10 +143,14 @@ async function entry(
   }
   const { uid } = caller;
 
+  // Cloud Functions parses JSON for us; a malformed body arrives as something
+  // that is not an object.
+  const body = (req.body ?? {}) as Record<string, unknown>;
+
   if (paid && gateOn()) {
-    const live = caller.aiTier !== null && caller.aiExpiresAt !== null && caller.aiExpiresAt > Date.now();
-    if (!live) {
-      json(res, 402, { error: "Your consultation has not been paid for yet.", code: "payment_required" });
+    const refusal = consultationRefusal(caller, body);
+    if (refusal) {
+      json(res, 402, refusal);
       return null;
     }
   }
@@ -125,9 +162,6 @@ async function entry(
     return null;
   }
 
-  // Cloud Functions parses JSON for us; a malformed body arrives as something
-  // that is not an object.
-  const body = (req.body ?? {}) as Record<string, unknown>;
   if (typeof body !== "object" || Array.isArray(body)) {
     json(res, 400, { error: "Invalid request body." });
     return null;

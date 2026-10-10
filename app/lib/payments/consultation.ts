@@ -1,13 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { useAuth } from "../../components/AuthProvider";
 import { firebaseConfigured, firebaseFunctions, firestore } from "../firebase";
 import { checkPayment } from "../booking";
 import { useNow } from "../useNow";
-import { COLLECTIONS, entitlementActive, type AiTierId, type Entitlement } from "../models";
+import {
+  COLLECTIONS,
+  entitlementActive,
+  tierCovers,
+  type AiTierId,
+  type Entitlement,
+} from "../models";
 
 /**
  * Paying for a conversation with Talk — the D200 initial consultation, or the
@@ -60,7 +66,10 @@ export async function startConsultationPayment(
   }
 }
 
-/** Put the paid consultation back on the account when it did not stick. */
+/**
+ * Begin (or carry on) the paid conversation: starts its clock on the server
+ * and puts it on the account. False when there is nothing paid to begin.
+ */
 export async function claimConsultation(): Promise<boolean> {
   try {
     const call = httpsCallable<Record<string, never>, { ok: boolean }>(firebaseFunctions(), "claimConsultation");
@@ -68,6 +77,20 @@ export async function claimConsultation(): Promise<boolean> {
     return Boolean(data?.ok);
   } catch {
     return false;
+  }
+}
+
+/** "Has my payment arrived?" — for a tab that does not know which payment. */
+async function reconcileConsultation(): Promise<{ paid: boolean; needsReview: boolean } | null> {
+  try {
+    const call = httpsCallable<Record<string, never>, { paid: boolean; needsReview: boolean }>(
+      firebaseFunctions(),
+      "reconcileConsultation",
+    );
+    const { data } = await call({});
+    return { paid: Boolean(data?.paid), needsReview: Boolean(data?.needsReview) };
+  } catch {
+    return null;
   }
 }
 
@@ -102,23 +125,29 @@ export type PaymentPhase =
 
 /**
  * Everything about paying for a consultation: whether it is paid, starting a
- * payment, and noticing when it settles.
+ * payment, noticing when it settles, and beginning the paid conversation.
  *
  * `paid` is `null` while it is still being looked up — the page shows neither
- * the payment sheet nor the conversation until it knows which.
+ * the payment sheet nor the conversation until it knows which. It is true
+ * only for a consultation that covers THIS kind of conversation: the D200 one
+ * is the intake; talking to Talk afterwards is the longer one.
+ *
+ * `expecting`: this page was opened by a checkout coming back, so a payment
+ * is on its way even if this tab never learned its id.
  */
-export function useConsultation(tier: AiTierId) {
+export function useConsultation(tier: AiTierId, { expecting = false }: { expecting?: boolean } = {}) {
   const { user } = useAuth();
   const uid = user?.uid ?? null;
   const now = useNow(15_000);
   const [entitlement, setEntitlement] = useState<{ uid: string; value: Entitlement | null } | null>(null);
   const [intentId, setIntentId] = useState<string | null>(() => (typeof window === "undefined" ? null : readPending()));
   const [phase, setPhase] = useState<PaymentPhase>(() =>
-    typeof window !== "undefined" && readPending() ? "waiting" : "idle",
+    typeof window !== "undefined" && (readPending() || expecting) ? "waiting" : "idle",
   );
+  /** When this tab started waiting — so a late arrival is not mistaken for a fresh one. */
+  const [waitingSince, setWaitingSince] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [slow, setSlow] = useState(false);
-  const refreshedFor = useRef<string | null>(null);
 
   useEffect(() => {
     if (!uid || !firebaseConfigured()) return;
@@ -126,7 +155,17 @@ export function useConsultation(tier: AiTierId) {
   }, [uid]);
 
   const known = entitlement && entitlement.uid === uid ? entitlement.value : undefined;
-  const paid = !uid ? false : known === undefined ? null : entitlementActive(known, now);
+  const covers = tier === "initial" ? "intake" : "companion";
+  const paid = !uid
+    ? false
+    : known === undefined
+      ? null
+      : Boolean(known && entitlementActive(known, now) && tierCovers(known.aiTier, covers));
+
+  // Paid: the payment in flight is settled; nothing left to remember.
+  useEffect(() => {
+    if (paid) writePending(null);
+  }, [paid]);
 
   // The payment in flight: held for review is said plainly, not left spinning.
   useEffect(() => {
@@ -136,32 +175,38 @@ export function useConsultation(tier: AiTierId) {
     });
   }, [intentId, phase]);
 
+  /** Ask the gateway now — about this tab's payment, or any recent one. */
+  const ask = useCallback(async () => {
+    const result = intentId ? await checkPayment(intentId) : await reconcileConsultation();
+    if (!result) return null;
+    const settled = "fulfilled" in result ? result.fulfilled : result.paid;
+    if (result.needsReview && !settled) setPhase("held");
+    return { settled, needsReview: result.needsReview };
+  }, [intentId]);
+
   // A lost or slow webhook must not leave somebody who paid looking at a
-  // spinner: ask the gateway directly, every few seconds, for a while.
+  // spinner. Ask the gateway every few seconds, then every half minute — for
+  // as long as they wait — and straight away whenever they look at the tab.
   useEffect(() => {
-    if (!intentId || phase !== "waiting" || paid) return;
+    if (phase !== "waiting" || paid || !uid) return;
     let tries = 0;
-    const timer = setInterval(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
       tries += 1;
       if (tries === 12) setSlow(true);
-      if (tries > 30) {
-        clearInterval(timer);
-        return;
-      }
-      void checkPayment(intentId);
-    }, 6_000);
-    return () => clearInterval(timer);
-  }, [intentId, paid, phase]);
-
-  // Paid. The token the browser holds was minted before the paid claim was
-  // set, so the AI functions would still refuse it: mint a fresh one, once.
-  useEffect(() => {
-    if (!paid || !user || !known) return;
-    if (refreshedFor.current === known.paymentIntentId) return;
-    refreshedFor.current = known.paymentIntentId;
-    writePending(null);
-    void user.getIdToken(true).catch(() => {});
-  }, [known, paid, user]);
+      void ask();
+      timer = setTimeout(tick, tries < 30 ? 6_000 : 30_000);
+    };
+    timer = setTimeout(tick, 4_000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void ask();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [ask, paid, phase, uid]);
 
   /**
    * Start paying. MUST run inside the tap: the checkout opens in a new tab so
@@ -184,26 +229,56 @@ export function useConsultation(tier: AiTierId) {
     }
     writePending(result.paymentIntentId);
     setIntentId(result.paymentIntentId);
+    setWaitingSince(Date.now());
     setPhase("waiting");
     if (tab && !tab.closed) tab.location.href = result.paymentLink;
     else window.location.assign(result.paymentLink);
   }, [phase, tier, uid]);
 
-  /** "I've paid" — ask the gateway now rather than waiting for the next tick. */
+  /** "I've paid" — ask now rather than waiting for the next tick. */
   const checkNow = useCallback(async () => {
-    if (!intentId) return;
-    const result = await checkPayment(intentId);
-    if (result?.needsReview && !result.fulfilled) setPhase("held");
-  }, [intentId]);
+    await ask();
+  }, [ask]);
 
-  /** Give up on this payment and offer the button again. */
-  const reset = useCallback(() => {
+  /**
+   * Give up on this payment and offer the button again — but only after
+   * asking whether it went through. Abandoning a payment that DID go through
+   * is how somebody ends up paying twice.
+   */
+  const startAgain = useCallback(async () => {
+    const result = await ask();
+    if (result?.settled || result?.needsReview) return;
     writePending(null);
     setIntentId(null);
+    setWaitingSince(null);
     setPhase("idle");
     setSlow(false);
     setError(null);
-  }, []);
+  }, [ask]);
 
-  return { paid, entitlement: known ?? null, phase, error, slow, intentId, pay, checkNow, reset };
+  /**
+   * Right before a conversation: start the paid clock (or pick it up again)
+   * and mint a fresh token that carries it. The token the conversation uses
+   * is then never older than the claim it needs. False: nothing to begin.
+   */
+  const prepare = useCallback(async () => {
+    if (!user) return false;
+    const ok = await claimConsultation();
+    if (ok) await user.getIdToken(true).catch(() => null);
+    return ok;
+  }, [user]);
+
+  return {
+    paid,
+    entitlement: known ?? null,
+    phase,
+    error,
+    slow,
+    intentId,
+    waitingSince,
+    pay,
+    checkNow,
+    startAgain,
+    prepare,
+  };
 }

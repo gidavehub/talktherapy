@@ -57,11 +57,17 @@ export async function idTokenFor(claims = {}) {
 }
 
 /**
- * Signed in, with a paid consultation — what every conversation needs once
- * the consultation gate is on (CONSULTATION_GATE in functions/.env).
+ * Signed in, with a paid conversation already started — what every
+ * conversation needs once the consultation gate is on (CONSULTATION_GATE in
+ * functions/.env). The longer one, because it covers both the intake and
+ * talking afterwards, which these suites both do.
  */
 export const authHeader = {
-  Authorization: `Bearer ${await idTokenFor({ aiTier: "initial", aiExpiresAt: Date.now() + 60 * 60_000 })}`,
+  Authorization: `Bearer ${await idTokenFor({
+    aiTier: "extended",
+    aiExpiresAt: Date.now() + 24 * 60 * 60_000,
+    aiEndsAt: Date.now() + 60 * 60_000,
+  })}`,
 };
 
 /** Signed in, and nothing paid for. */

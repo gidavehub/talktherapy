@@ -53,7 +53,7 @@ export default function HeroSequence({ fallback }: { fallback: ReactNode }) {
         whileHover={{ scale: 1.04 }}
         whileTap={{ scale: 0.97 }}
         transition={SPRING_SNAP}
-        aria-label="Begin — Talk will speak to you"
+        aria-label="Begin with Talk — she will speak to you"
         className="inline-flex h-14 items-center gap-3 rounded-full bg-[var(--accent)] pl-7 pr-2 text-[13px] font-medium uppercase tracking-[0.12em] text-white shadow-[0_10px_30px_-10px_rgba(255,90,31,0.6)] transition-colors hover:bg-[var(--accent-soft)]"
       >
         Begin with Talk

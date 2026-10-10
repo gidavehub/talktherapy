@@ -51,8 +51,8 @@ export type Line = {
 
 export type ConversationError =
   | { kind: "auth"; message: string }
-  /** The consultation is not paid for — or the browser's token predates the payment. */
-  | { kind: "payment"; message: string }
+  /** The consultation is not paid for, not started, or used up — see `code`. */
+  | { kind: "payment"; message: string; code: string }
   | { kind: "busy"; message: string }
   | { kind: "failed"; message: string }
   | { kind: "voice"; message: string };
@@ -296,7 +296,12 @@ export function useConversation({
           if (res.status === 402) {
             // Ends the session too: nothing will succeed until it is paid for,
             // and the page knows how to sort that out.
-            setError({ kind: "payment", message: payload.error ?? "Your consultation has not been paid for yet." });
+            const { code } = payload as { code?: string };
+            setError({
+              kind: "payment",
+              message: payload.error ?? "Your consultation has not been paid for yet.",
+              code: code ?? "payment_required",
+            });
             return;
           }
           setError({
@@ -606,8 +611,26 @@ export function useConversation({
    * begun inside a tap, and Talk speaking into a silent context would leave
    * her stuck mid-sentence with nothing to hear.)
    */
-  const start = useCallback(async ({ fromTap = true }: { fromTap?: boolean } = {}): Promise<boolean> => {
+  const start = useCallback(async ({
+    fromTap = true,
+    beforeFirstRequest,
+  }: {
+    fromTap?: boolean;
+    /**
+     * Runs once the microphone and audio are ready and before Talk's first
+     * request — starting the paid conversation's clock, say. False backs out.
+     * Here rather than before start() because start() must begin inside the
+     * tap (audio refuses to start otherwise), and this is a network call.
+     */
+    beforeFirstRequest?: () => Promise<boolean>;
+  } = {}): Promise<boolean> => {
     if (activeRef.current) return true;
+    // Decided BEFORE the microphone: a page nobody has touched cannot start
+    // audio, and asking for the microphone first would leave it open.
+    if (!fromTap) {
+      const activation = (navigator as Navigator & { userActivation?: { hasBeenActive: boolean } }).userActivation;
+      if (activation && !activation.hasBeenActive) return false;
+    }
     activeRef.current = true;
     doneRef.current = false;
     startedAtRef.current = Date.now();
@@ -629,6 +652,15 @@ export function useConversation({
       await Promise.race([graph.ctx.resume().catch(() => {}), new Promise((r) => setTimeout(r, 400))]);
       // Read again: resume() may have changed it, which TypeScript cannot see.
       if ((graph.ctx.state as AudioContextState) !== "running") {
+        activeRef.current = false;
+        micStop();
+        go("idle");
+        return false;
+      }
+    }
+    if (beforeFirstRequest) {
+      const proceed = await beforeFirstRequest().catch(() => false);
+      if (!proceed || !activeRef.current) {
         activeRef.current = false;
         micStop();
         go("idle");

@@ -33,7 +33,8 @@ import SpokenCaption from "@/components/onboarding/SpokenCaption";
 import AuthCard from "@/components/AuthCard";
 import Modal from "@/components/ui/Modal";
 import { useVoice, voice } from "@/lib/audio/lines";
-import { claimConsultation, useConsultation } from "@/lib/payments/consultation";
+import { useConsultation } from "@/lib/payments/consultation";
+import { afterSignIn, homeFor, isSettled } from "@/lib/routing";
 import { AI_TIERS } from "@/lib/models";
 
 /**
@@ -84,7 +85,10 @@ export default function TherapyPage() {
   const [params] = useState(() =>
     typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams(),
   );
-  const intakeMode = params.has("intake") || Boolean(profile && !profile.onboarded);
+  // Never for a provider: being asked "what brings you here today?" on your
+  // first day at work is a bug, and the answer would be filed as their notes.
+  const intakeMode =
+    profile?.role !== "provider" && (params.has("intake") || Boolean(profile && !profile.onboarded));
   const showDebug = params.has("debug");
   const [showEnglish, setShowEnglish] = useState(true);
   const [typing, setTyping] = useState(false);
@@ -249,14 +253,23 @@ export default function TherapyPage() {
 
   // ---- paid for? -----------------------------------------------------------
   // A conversation with Talk is paid for first: the D200 initial consultation
-  // for somebody new, the longer one for anybody coming back after it. The
-  // AI functions refuse an unpaid one (a 402) whatever this page does — this
-  // is so the person sees the payment sheet rather than an error.
+  // is the intake; talking to Talk again afterwards is the longer one. The AI
+  // functions refuse an unpaid one (a 402) whatever this page does — this is
+  // so the person sees the payment sheet rather than an error.
   const tier = intakeMode ? "initial" : "extended";
-  const consultation = useConsultation(tier);
-  const { paid } = consultation;
+  // ?paid: a checkout brought them back to this tab, which may never have
+  // learned the payment's id — it is on its way all the same.
+  const consultation = useConsultation(tier, { expecting: params.has("paid") });
+  const { paid, prepare } = consultation;
   const price = formatDalasi(AI_TIERS[tier].amountMinor);
   const { start } = talk;
+
+  // Providers are never put through the door: back to their own home.
+  useEffect(() => {
+    if (profile?.role !== "provider") return;
+    voice.forget();
+    router.replace(homeFor(profile));
+  }, [profile, router]);
 
   // ---- the doorway --------------------------------------------------------
   // Talk runs the way in, from this screen, in her recorded voice (English,
@@ -273,7 +286,8 @@ export default function TherapyPage() {
   // It usually begins on the landing page — that tap unlocks sound and starts
   // her speaking, then brings them here mid-sentence (lib/audio/lines keeps
   // her voice going across the move). Arriving here any other way, the first
-  // tap on Start or the blob begins it.
+  // tap on Start or the blob begins it. Somebody already set up who signs in
+  // here is taken home: the door is for people arriving.
   const heard = useVoice();
   const doorway = heard.spoken.length > 0;
   const recorded = Boolean(heard.saying) && !talk.active;
@@ -283,7 +297,8 @@ export default function TherapyPage() {
   const signInOpen = ready && !user && !signInClosed && heard.spoken.includes("sign-in");
 
   // Payment: up once she has said the price, or when Start is pressed unpaid,
-  // or by itself when a checkout brings them back to this tab.
+  // or by itself while a payment is on its way. Closing it only hides it —
+  // the payment it was waiting for is still being watched.
   const [payOpen, setPayOpen] = useState(false);
   const [payClosed, setPayClosed] = useState(false);
   const sheetOpen =
@@ -300,60 +315,105 @@ export default function TherapyPage() {
     here.current = true;
     return () => {
       here.current = false;
-      // Stop her only if the screen has really gone: React remounts once on
-      // the way in (in development, and on some navigations), and stopping on
-      // that would cut her off mid-welcome. A real exit stays unmounted.
+      // Only if the screen has really gone: React remounts once on the way in
+      // (in development, and on some navigations), and stopping on that would
+      // cut her off mid-welcome. A real exit stays unmounted — and forgets
+      // what she said, so the next visit is a new visit.
       setTimeout(() => {
-        if (!here.current) voice.stop();
+        if (!here.current) voice.forget();
       }, 0);
     };
   }, []);
 
-  /** Into the conversation, without a fresh tap if the browser allows it. */
-  const startTalk = useCallback(async () => {
+  // Once a conversation has begun — on this screen, or in another tab of
+  // Talk — the doorway is over, and nothing here may start one by itself.
+  const concluded = useRef(false);
+  const channel = useRef<BroadcastChannel | null>(null);
+  useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return;
+    const ch = new BroadcastChannel("talk:conversation");
+    ch.onmessage = () => {
+      concluded.current = true;
+    };
+    channel.current = ch;
+    return () => ch.close();
+  }, []);
+  useEffect(() => {
+    if (!talk.active) return;
+    concluded.current = true;
+    channel.current?.postMessage("started");
+  }, [talk.active]);
+
+  /**
+   * Into the conversation. The paid clock is started just before Talk's first
+   * request — never before the microphone and her voice are actually ready —
+   * and the token it uses is minted after, so it carries the claim. With
+   * `fromTap` false it only goes ahead where the browser allows sound without
+   * a fresh tap; otherwise the Start button is there.
+   */
+  const beginTalk = (fromTap: boolean) => {
     voice.stop();
-    if (!here.current || document.visibilityState !== "visible") return;
-    await start({ fromTap: false });
-  }, [start]);
+    if (!here.current) return;
+    if (!fromTap && (concluded.current || document.visibilityState !== "visible")) return;
+    concluded.current = true;
+    let prepared: boolean | null = null;
+    void start({
+      fromTap,
+      beforeFirstRequest: async () => (prepared = await prepare()),
+    }).then((ok) => {
+      if (ok) return;
+      if (prepared === false) {
+        // Nothing paid to begin (or its time is up): the sheet, not an error.
+        setPayClosed(false);
+        setPayOpen(true);
+      }
+      // Backed out for want of sound: a tap will do it.
+      if (!fromTap) concluded.current = false;
+    });
+  };
 
   // Signed in (on this screen, or before): what next? Once whatever she is
-  // saying has finished — the welcome, say — she says the price, or, for
-  // somebody who has already paid, welcomes them back and begins.
+  // saying has finished, she says the price — the D200 line only to somebody
+  // buying the D200 — or, for somebody who has already paid, welcomes them
+  // back and begins.
   const decided = useRef(false);
   useEffect(() => {
-    if (!doorway || decided.current || !ready || !user || !profile || heard.saying || paid === null || talk.active) {
-      return;
-    }
+    if (!doorway || decided.current || concluded.current || !ready || !user || !profile) return;
+    if (heard.saying || paid === null || talk.active || isSettled(profile)) return;
     decided.current = true;
-    if (paid) voice.say(["welcome-back"], { onDone: () => void startTalk() });
-    else voice.say(["price"]);
-  }, [doorway, heard.saying, paid, profile, ready, startTalk, talk.active, user]);
+    if (paid) voice.say(["welcome-back"], { onDone: () => beginTalk(false) });
+    else if (tier === "initial") voice.say(["price"]);
+  });
 
   // Paid, in this visit. The checkout is in another tab; the moment the
   // consultation is written she thanks them and begins — once somebody is
-  // looking at this tab, so she does not start talking to nobody.
+  // looking at this tab, so she does not start talking to nobody, and never
+  // for a payment that settled long after they left it.
   const thanked = useRef(false);
+  const { waitingSince } = consultation;
   useEffect(() => {
-    if (!paid || thanked.current || talk.active || consultation.phase !== "waiting") return;
+    if (!paid || thanked.current || concluded.current || talk.active || consultation.phase !== "waiting") return;
     const go = () => {
-      if (document.visibilityState !== "visible" || thanked.current) return;
+      if (document.visibilityState !== "visible" || thanked.current || concluded.current) return;
+      if (waitingSince !== null && Date.now() - waitingSince > 30 * 60_000) return;
       thanked.current = true;
+      decided.current = true;
       setPayOpen(false);
-      voice.say(["paid"], { onDone: () => void startTalk() });
+      voice.say(["paid"], { onDone: () => beginTalk(false) });
     };
     go();
     document.addEventListener("visibilitychange", go);
     return () => document.removeEventListener("visibilitychange", go);
-  }, [consultation.phase, paid, startTalk, talk.active]);
+  });
 
   // Start, or a tap on the blob. Pressing Start is not consent: Talk asks for
   // that out loud once the conversation begins — see onConsent.
   const begin = () => {
     if (!user) {
       setSignInClosed(false);
-      // Already asked: just bring sign-in back. Otherwise she starts the way
-      // in — inside this tap, which is what lets her be heard.
-      if (heard.spoken.includes("sign-in")) return;
+      // Already speaking, or already asked: never start her over. Otherwise
+      // she begins the way in — inside this tap, which lets her be heard.
+      if (heard.saying || heard.spoken.includes("sign-in")) return;
       voice.unlock();
       voice.say(["welcome", "sign-in", "how"]);
       return;
@@ -363,13 +423,22 @@ export default function TherapyPage() {
       setPayOpen(true);
       return;
     }
-    voice.stop();
-    void start();
+    decided.current = true;
+    beginTalk(true);
   };
 
-  // Refused for payment although this account HAS paid: the paid claim did
-  // not reach the token. Put it back and mint a fresh token — one round trip —
-  // instead of asking somebody to pay twice.
+  /** Signed in on this screen. Somebody already set up is taken home. */
+  const onSignedIn = (signedIn: Parameters<typeof isSettled>[0]) => {
+    voice.stop();
+    if (isSettled(signedIn)) {
+      voice.forget();
+      router.replace(afterSignIn(signedIn, null));
+    }
+  };
+
+  // Refused for payment mid-conversation (a claim that did not stick, or the
+  // time ran out): try to pick the paid conversation up again — one round
+  // trip — and show the payment sheet only if there is nothing to pick up.
   const repairing = useRef(false);
   const [repaired, setRepaired] = useState(false);
   const paymentRefused = talk.error?.kind === "payment";
@@ -377,16 +446,15 @@ export default function TherapyPage() {
     if (!paymentRefused || repairing.current) return;
     repairing.current = true;
     void (async () => {
-      const ok = paid ? await claimConsultation() : false;
-      if (ok) {
-        await user?.getIdToken(true).catch(() => null);
-        setRepaired(true);
-      } else {
+      const ok = await prepare();
+      if (ok) setRepaired(true);
+      else {
+        setPayClosed(false);
         setPayOpen(true);
       }
       repairing.current = false;
     })();
-  }, [paid, paymentRefused, user]);
+  }, [paymentRefused, prepare]);
 
   const denied = mic.status === "denied" || mic.status === "unsupported" || mic.status === "error";
   // Without a microphone the keyboard is the only way to answer, so it is open.
@@ -457,7 +525,7 @@ export default function TherapyPage() {
         {/* Mid-onboarding, "home" is the only way out: the dashboard would
             send them straight back here. */}
         <Link
-          href={intakeMode && !profile?.onboarded ? "/" : "/dashboard"}
+          href={!user || (intakeMode && !profile?.onboarded) ? "/" : "/dashboard"}
           onClick={() => {
             voice.stop();
             talk.stop();
@@ -539,7 +607,11 @@ export default function TherapyPage() {
         {/* What was said, both ways. The newest exchange only: this is a
             conversation, not a chat log, and the words are there to confirm
             Talk heard you right — and for when her voice cannot be heard. */}
-        <div className="relative z-10 mt-5 w-full max-w-[560px] min-h-[96px] text-center" aria-live="polite">
+        <div
+          className="relative z-10 mt-5 w-full max-w-[560px] min-h-[96px] text-center"
+          // Silent while a sheet carries the same caption: twice is noise.
+          aria-live={signInOpen || sheetOpen ? "off" : "polite"}
+        >
           {recorded ? (
             <SpokenCaption saying={heard.saying} tone="dark" className="mx-auto max-w-[460px]" />
           ) : (
@@ -856,10 +928,10 @@ export default function TherapyPage() {
           has not paid, and by itself when a checkout brings them back here. */}
       {/* Sign-in, brought up by Talk as she says "please sign in". Embedded:
           nothing navigates, so she keeps speaking and the next step follows. */}
-      <Modal open={signInOpen} onClose={() => setSignInClosed(true)} variant="responsive">
+      <Modal open={signInOpen} onClose={() => setSignInClosed(true)} variant="responsive" label="Sign in to begin">
         <div className="space-y-5">
           <SpokenCaption saying={heard.saying} tone="light" />
-          <AuthCard mode="sign-up" onSignedIn={() => voice.stop()} />
+          <AuthCard mode="sign-up" onSignedIn={onSignedIn} />
         </div>
       </Modal>
 
@@ -867,10 +939,10 @@ export default function TherapyPage() {
       <PaymentSheet
         open={sheetOpen}
         onClose={() => {
+          // Hide it — never abandon a payment that may be on its way.
           setPayOpen(false);
           setPayClosed(true);
           voice.stop();
-          if (consultation.phase !== "idle") consultation.reset();
         }}
         tier={tier}
         consultation={consultation}

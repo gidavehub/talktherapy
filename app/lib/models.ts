@@ -454,13 +454,37 @@ export function tierForPurpose(purpose: string | null | undefined): AiTierId | n
 }
 
 /**
- * How long a paid consultation stays usable once granted.
- *
- * The 8 or 20 minutes are the CONVERSATION's budget, kept inside it. This is
- * the window in which that conversation can happen — generous on purpose, so
- * a dropped connection or a phone that died is not a second D200.
+ * How long after paying somebody has to START the conversation they bought.
+ * Generous, so a phone that died or a bad connection is not a lost D200.
  */
-export const AI_ENTITLEMENT_VALID_MS = 24 * 60 * 60 * 1000;
+export const AI_ENTITLEMENT_VALID_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Once started, a conversation may run to this multiple of its paid length,
+ * wall-clock, from its first word — 8 minutes becomes 12, 20 becomes 30. The
+ * slack is for pauses and a dropped line; the limit is what makes "up to 8
+ * minutes" true. Enforced by the server from the token, not by the page.
+ */
+export const AI_WINDOW_GRACE = 1.5;
+
+/** When a conversation that started at `startedAt` must end. */
+export function consultationEndsAt(tier: AiTierId, startedAt: number, expiresAt: number): number {
+  return Math.min(startedAt + AI_TIERS[tier].durationSec * 1000 * AI_WINDOW_GRACE, expiresAt);
+}
+
+/**
+ * What a held consultation pays for. The initial one is the intake — the
+ * conversation that ends with matched providers. Talking to Talk after that
+ * is the longer one. The longer one covers an intake too.
+ */
+export function tierCovers(held: AiTierId, mode: "intake" | "companion"): boolean {
+  return mode === "intake" ? true : held === "extended";
+}
+
+/** Holding `held`, would buying `wanted` be paying twice for the same thing? */
+export function tierAlreadyHeld(held: AiTierId, wanted: AiTierId): boolean {
+  return held === "extended" || held === wanted;
+}
 
 /**
  * `entitlements/{uid}` — WRITTEN ONLY BY THE SERVER, by the same transaction
@@ -475,13 +499,22 @@ export type Entitlement = {
   paymentIntentId: string;
   amountMinor: number;
   grantedAt: number;
+  /** Start by this, or it lapses. */
   expiresAt: number;
+  /** When the conversation began — set by the server the first time it starts. */
+  startedAt: number | null;
+  /** When it must end. Null until it starts. */
+  endsAt: number | null;
   updatedAt: number;
 };
 
-/** Paid for, and still inside its window. */
-export function entitlementActive(e: Pick<Entitlement, "status" | "expiresAt"> | null, now: number): boolean {
-  return Boolean(e && e.status === "granted" && e.expiresAt > now);
+/** Paid for, not lapsed, and — once started — not yet run out. */
+export function entitlementActive(
+  e: Pick<Entitlement, "status" | "expiresAt"> & { endsAt?: number | null } | null,
+  now: number,
+): boolean {
+  if (!e || e.status !== "granted" || e.expiresAt <= now) return false;
+  return e.endsAt == null || e.endsAt > now;
 }
 
 /** Concept note range for human consultations: D700–D3,000. */

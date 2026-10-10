@@ -83,7 +83,7 @@ export async function callerUid(req: Request): Promise<string | null> {
  */
 export async function callerClaims(
   req: Request,
-): Promise<{ uid: string; aiTier: string | null; aiExpiresAt: number | null } | null> {
+): Promise<{ uid: string; aiTier: string | null; aiExpiresAt: number | null; aiEndsAt: number | null } | null> {
   const header = req.get("authorization") ?? "";
   const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
   if (!token) return null;
@@ -93,6 +93,7 @@ export async function callerClaims(
       uid: decoded.uid,
       aiTier: typeof decoded.aiTier === "string" ? decoded.aiTier : null,
       aiExpiresAt: typeof decoded.aiExpiresAt === "number" ? decoded.aiExpiresAt : null,
+      aiEndsAt: typeof decoded.aiEndsAt === "number" ? decoded.aiEndsAt : null,
     };
   } catch {
     return null;

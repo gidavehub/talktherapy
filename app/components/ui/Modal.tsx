@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { SPRING_SOFT, SPRING_SNAP } from "../motion/primitives";
@@ -49,10 +49,13 @@ export default function Modal({
   footer,
   variant = "responsive",
   className = "",
+  label,
 }: {
   open: boolean;
   onClose: () => void;
   title?: string;
+  /** The dialog's name for assistive technology when it has no visible title. */
+  label?: string;
   description?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
@@ -62,6 +65,20 @@ export default function Modal({
 }) {
   useScrollLock(open);
   const hasDocument = useHasDocument();
+
+  // Focus moves into the dialog when it opens — it may open by itself, while
+  // Talk is speaking — and back to where it was when it closes, so neither a
+  // keyboard nor a screen reader is left behind on the page underneath.
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const before = document.activeElement as HTMLElement | null;
+    const frame = requestAnimationFrame(() => dialogRef.current?.focus());
+    return () => {
+      cancelAnimationFrame(frame);
+      if (before && document.contains(before)) before.focus();
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -91,9 +108,11 @@ export default function Modal({
           />
 
           <motion.div
+            ref={dialogRef}
+            tabIndex={-1}
             role="dialog"
             aria-modal="true"
-            aria-label={title}
+            aria-label={title ?? label}
             initial={{ y: asSheet || responsive ? 80 : 30, opacity: 0, scale: 0.98 }}
             animate={{ y: 0, opacity: 1, scale: 1 }}
             exit={{ y: asSheet || responsive ? 60 : 20, opacity: 0, scale: 0.98 }}
@@ -106,7 +125,7 @@ export default function Modal({
                     ? "rounded-t-[28px] md:rounded-3xl max-w-[560px] md:max-h-[85vh]"
                     : "rounded-3xl max-w-[560px] mx-4"
               }
-              p-6 sm:p-8 ${className}`}
+              p-6 sm:p-8 outline-none ${className}`}
           >
             {/* Drag affordance — only meaningful in the sheet presentation. */}
             {asSheet || responsive ? (

@@ -55,6 +55,13 @@ let queue: { id: string; locale: LineLocale }[] = [];
 let fallback: ReturnType<typeof setTimeout> | null = null;
 let onLine: ((id: string, locale: LineLocale) => void) | null = null;
 let onDone: (() => void) | null = null;
+/**
+ * Which clip is current. Every callback a clip leaves behind — its ended,
+ * error and fallback handlers, its play() rejection — checks it first, so a
+ * clip that was superseded (a slow download overtaken, a stop, a new say())
+ * can never cut short the one that replaced it.
+ */
+let token = 0;
 
 let state: VoiceState = { saying: null, spoken: [], muted: false };
 const SERVER_STATE: VoiceState = { saying: null, spoken: [], muted: false };
@@ -90,6 +97,7 @@ function animate() {
 
 function playNext(): void {
   clearFallback();
+  const mine = ++token;
   const audio = element();
   const item = queue.shift();
   if (!item) {
@@ -115,12 +123,14 @@ function playNext(): void {
 
   // Whatever happens to the sound, the line ends on time.
   const advance = () => {
+    if (mine !== token) return;
     clearFallback();
     audio.onended = null;
     audio.onerror = null;
     playNext();
   };
   const after = (ms: number) => {
+    if (mine !== token) return;
     clearFallback();
     fallback = setTimeout(advance, ms);
   };
@@ -183,6 +193,7 @@ export const voice = {
 
   /** Stop, and forget what was queued — nothing fires afterwards. */
   stop() {
+    token += 1;
     clearFallback();
     queue = [];
     onLine = null;
@@ -193,6 +204,15 @@ export const voice = {
       el.pause();
     }
     if (state.saying) set({ saying: null });
+  },
+
+  /**
+   * Stop, and forget what has been said. For leaving the screen for good: the
+   * next visit is a new visit, not the end of this one.
+   */
+  forget() {
+    voice.stop();
+    if (state.spoken.length) set({ spoken: [] });
   },
 
   /** Silence her without stopping the sequence — the captions carry on. */

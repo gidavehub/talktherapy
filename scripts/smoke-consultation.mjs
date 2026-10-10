@@ -80,6 +80,7 @@ async function gateAnswer(token) {
 }
 
 const created = { payments: [], events: [] };
+const racers = [];
 
 async function main() {
   if (!SECRET) {
@@ -116,14 +117,90 @@ async function main() {
   }
 
   console.log("\nA paid consultation arrives (signed, as Modem Pay would)");
-  const paidIntent = `pi_smoke_${randomUUID().slice(0, 8)}`;
-  created.payments.push(paidIntent);
-  await db.collection("payments").doc(paidIntent).set({
-    paymentIntentId: paidIntent,
+  const paidIntent = await seedPayment(UID, "ai_initial", 200_00);
+  const delivered = await deliver(paymentBody(paidIntent, UID, "ai_initial", 200));
+  check(delivered.status === 200 && delivered.json.acted === true, `the webhook acted on it: ${delivered.json.reason}`);
+
+  const granted = (await db.collection("entitlements").doc(UID).get()).data() ?? {};
+  check(granted.status === "granted" && granted.aiTier === "initial", "the consultation is granted");
+  check(granted.startedAt === null, "its clock has not started — nothing has been said yet");
+  const user = await getAuth().getUser(UID);
+  check(user.customClaims?.aiTier === "initial", `the paid claim is on the account (${JSON.stringify(user.customClaims)})`);
+  check(user.customClaims?.aiEndsAt === undefined, "with no end time until the conversation begins");
+
+  const notStarted = await idTokenFor();
+  const before = await gateAnswer(notStarted);
+  check(
+    GATE_ON ? before === 402 : before !== 402,
+    GATE_ON ? `paid but not begun: 402 until the clock starts (got ${before})` : `gate off: let in (got ${before})`,
+  );
+
+  console.log("\nBeginning the conversation starts the clock — once");
+  const begun = await callable("claimConsultation", {}, notStarted);
+  check(begun.result?.ok === true, `claimConsultation begins it (got ${JSON.stringify(begun.result ?? begun.error)})`);
+  const running = (await db.collection("entitlements").doc(UID).get()).data() ?? {};
+  const span = (running.endsAt ?? 0) - (running.startedAt ?? 0);
+  check(span === 8 * 60 * 1000 * 1.5, `8 minutes is held to a 12-minute window (${span / 60_000} min)`);
+  const claims = (await getAuth().getUser(UID)).customClaims ?? {};
+  check(claims.aiEndsAt === running.endsAt, "and the end is on the account");
+  await new Promise((r) => setTimeout(r, 1200));
+  const again = await callable("claimConsultation", {}, notStarted);
+  check(again.result?.endsAt === running.endsAt, "beginning again cannot stretch it — the same end comes back");
+
+  const paid = await idTokenFor();
+  check((await getAuth().verifyIdToken(paid)).aiEndsAt === running.endsAt, "a fresh ID token carries the end");
+  const open = await gateAnswer(paid);
+  check(open !== 402, `the AI functions let a payer in (got ${open})`);
+
+  console.log("\nPaying twice");
+  const twice = await callable("startConsultationPayment", { tier: "initial" }, paid);
+  check(
+    twice.error?.status === "FAILED_PRECONDITION",
+    `the same consultation again is refused before any money moves: ${twice.error?.message ?? JSON.stringify(twice.result)}`,
+  );
+
+  console.log("\nThe longer one, while holding the first — an upgrade, granted");
+  const upgrade = await seedPayment(UID, "ai_extended", 500_00);
+  const upgraded = await deliver(paymentBody(upgrade, UID, "ai_extended", 500));
+  check(upgraded.json.acted === true, `acted on: ${upgraded.json.reason}`);
+  const longer = (await db.collection("entitlements").doc(UID).get()).data() ?? {};
+  check(longer.aiTier === "extended" && longer.paymentIntentId === upgrade, `now holds the longer one (${longer.aiTier})`);
+  const upgradeDoc = (await db.collection("payments").doc(upgrade).get()).data() ?? {};
+  check(upgradeDoc.fulfilled === true && upgradeDoc.needsReview === false, "and that payment is fulfilled, not held");
+
+  console.log("\nTwo payments settling at the same instant — one granted, one held");
+  const RACER = `smoke-race-${randomUUID().slice(0, 6)}`;
+  racers.push(RACER);
+  const [a, b] = await Promise.all([seedPayment(RACER, "ai_initial", 200_00), seedPayment(RACER, "ai_initial", 200_00)]);
+  await Promise.all([deliver(paymentBody(a, RACER, "ai_initial", 200)), deliver(paymentBody(b, RACER, "ai_initial", 200))]);
+  const [da, dbb] = await Promise.all([a, b].map(async (id) => (await db.collection("payments").doc(id).get()).data() ?? {}));
+  const fulfilled = [da, dbb].filter((d) => d.fulfilled === true).length;
+  const heldForReview = [da, dbb].filter((d) => d.fulfilled === false && d.needsReview === true).length;
+  check(fulfilled === 1 && heldForReview === 1, `exactly one granted, the other held for a refund (${fulfilled} granted, ${heldForReview} held)`);
+  const raced = (await db.collection("entitlements").doc(RACER).get()).data() ?? {};
+  check([a, b].includes(raced.paymentIntentId), "the consultation belongs to the one that was granted");
+
+  console.log("\nA tab that never learned the payment's id");
+  const asked = await callable("reconcileConsultation", {}, paid);
+  check(asked.result?.paid === true, `reconcileConsultation says it is paid (got ${JSON.stringify(asked.result ?? asked.error)})`);
+
+  console.log("\nRepairing a claim that did not stick");
+  await getAuth().setCustomUserClaims(UID, null);
+  const repaired = await callable("claimConsultation", {}, unpaid);
+  check(repaired.result?.ok === true && repaired.result?.tier === "extended", `claimConsultation puts it back (got ${JSON.stringify(repaired.result ?? repaired.error)})`);
+  check((await getAuth().getUser(UID)).customClaims?.aiEndsAt !== undefined, "end time and all");
+}
+
+/** A pending consultation payment, as startConsultationPayment would have recorded it. */
+async function seedPayment(uid, purpose, amountMinor) {
+  const id = `pi_smoke_${randomUUID().slice(0, 8)}`;
+  created.payments.push(id);
+  await db.collection("payments").doc(id).set({
+    paymentIntentId: id,
     provider: "modempay",
-    uid: UID,
-    purpose: "ai_initial",
-    amountMinor: 200_00,
+    uid,
+    purpose,
+    amountMinor,
     currency: "GMD",
     paymentMethods: ["wallet", "card"],
     status: "pending",
@@ -136,46 +213,21 @@ async function main() {
     createdAt: Date.now(),
     updatedAt: Date.now(),
   });
-  const delivered = await deliver(
-    JSON.stringify({
-      event: "charge.succeeded",
-      event_id: `evt_smoke_${randomUUID().slice(0, 8)}`,
-      data: {
-        payment_intent_id: paidIntent,
-        status: "paid",
-        amount: 200,
-        metadata: { uid: UID, purpose: "ai_initial", amount_minor: "20000", tier: "initial" },
-      },
-    }),
-  );
-  check(delivered.status === 200 && delivered.json.acted === true, `the webhook acted on it: ${delivered.json.reason}`);
+  return id;
+}
 
-  const granted = (await db.collection("entitlements").doc(UID).get()).data() ?? {};
-  check(granted.status === "granted" && granted.aiTier === "initial", "the consultation is granted");
-  const user = await getAuth().getUser(UID);
-  check(user.customClaims?.aiTier === "initial", `the paid claim is on the account (${JSON.stringify(user.customClaims)})`);
-  check(user.customClaims?.aiExpiresAt === granted.expiresAt, "expiring when the consultation does");
-
-  // A token minted now carries the claim — which is why the page asks for a
-  // fresh one after paying: the one it already held was minted without it.
-  const paid = await idTokenFor();
-  const decoded = await getAuth().verifyIdToken(paid);
-  check(decoded.aiTier === "initial", "a fresh ID token carries it");
-  const open = await gateAnswer(paid);
-  check(open !== 402, `the AI functions let a payer in (got ${open})`);
-
-  console.log("\nPaying twice");
-  const twice = await callable("startConsultationPayment", { tier: "initial" }, paid);
-  check(
-    twice.error?.status === "FAILED_PRECONDITION",
-    `refused before any money moves: ${twice.error?.message ?? JSON.stringify(twice.result)}`,
-  );
-
-  console.log("\nRepairing a claim that did not stick");
-  await getAuth().setCustomUserClaims(UID, null);
-  const repaired = await callable("claimConsultation", {}, unpaid);
-  check(repaired.result?.ok === true && repaired.result?.tier === "initial", `claimConsultation puts it back (got ${JSON.stringify(repaired.result ?? repaired.error)})`);
-  check((await getAuth().getUser(UID)).customClaims?.aiTier === "initial", "the claim is on the account again");
+/** Exactly what Modem Pay would deliver for a successful payment. */
+function paymentBody(intent, uid, purpose, amountMajor) {
+  return JSON.stringify({
+    event: "charge.succeeded",
+    event_id: `evt_smoke_${randomUUID().slice(0, 8)}`,
+    data: {
+      payment_intent_id: intent,
+      status: "paid",
+      amount: amountMajor,
+      metadata: { uid, purpose, amount_minor: String(amountMajor * 100), tier: purpose.slice(3) },
+    },
+  });
 }
 
 try {
@@ -189,6 +241,7 @@ try {
     ...created.payments.map((id) => db.collection("payments").doc(id).delete()),
     ...events.docs.map((d) => d.ref.delete()),
     db.collection("entitlements").doc(UID).delete(),
+    ...racers.map((uid) => db.collection("entitlements").doc(uid).delete()),
     getAuth().setCustomUserClaims(UID, null),
   ]);
   console.log(`\nCleaned up: ${created.payments.length} payments, ${events.size} event records, the consultation and the claim`);

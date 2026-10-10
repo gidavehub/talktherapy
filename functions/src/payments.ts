@@ -15,7 +15,13 @@
  */
 
 import { getApps, initializeApp } from "firebase-admin/app";
-import { FieldValue, getFirestore, type Transaction } from "firebase-admin/firestore";
+import {
+  FieldValue,
+  getFirestore,
+  type DocumentReference,
+  type DocumentSnapshot,
+  type Transaction,
+} from "firebase-admin/firestore";
 import {
   amountsAgree,
   type FulfilmentDecision,
@@ -24,7 +30,9 @@ import {
 import {
   AI_ENTITLEMENT_VALID_MS,
   AI_TIERS,
+  consultationEndsAt,
   entitlementActive,
+  tierAlreadyHeld,
   tierForPurpose,
   type AiTierId,
 } from "../../app/lib/models";
@@ -141,7 +149,14 @@ export async function recordAndApply(input: {
   paymentIntentId: string;
   eventName: string;
   signatureRouting: string | null;
-  decide: (current: PaymentRecord | null) => FulfilmentDecision;
+  /**
+   * Anything else the decision must see as it is INSIDE the transaction —
+   * read before any write, and handed to `decide` in the same order. Reading
+   * it beforehand instead lets two payments that settle at the same instant
+   * both see "nothing held yet", and both be granted.
+   */
+  reads?: DocumentReference[];
+  decide: (current: PaymentRecord | null, reads: DocumentSnapshot[]) => FulfilmentDecision;
   credit?: (tx: Transaction) => void;
 }): Promise<RecordAndApplyResult> {
   const store = db();
@@ -158,10 +173,11 @@ export async function recordAndApply(input: {
     }
 
     const paymentSnap = await tx.get(paymentRef);
+    const extra = await Promise.all((input.reads ?? []).map((ref) => tx.get(ref)));
     const current = paymentSnap.exists
       ? toRecord(input.paymentIntentId, paymentSnap.data() ?? {})
       : null;
-    const decision = input.decide(current);
+    const decision = input.decide(current, extra);
     const now = Date.now();
 
     // Recorded even when the decision writes nothing, so an unknown or
@@ -302,32 +318,42 @@ export function creditSession(bookingId: string, paymentIntentId: string) {
 
 export type ConsultationGrant = { uid: string; tier: AiTierId; grantedAt: number; expiresAt: number };
 
-/** The consultation somebody holds right now, if any. */
-export async function activeConsultation(
-  uid: string,
-): Promise<{ tier: AiTierId; expiresAt: number; paymentIntentId: string | null } | null> {
-  const snap = await db().collection(ENTITLEMENTS).doc(uid).get();
-  const data = snap.data();
+export type HeldConsultation = {
+  tier: AiTierId;
+  expiresAt: number;
+  paymentIntentId: string | null;
+  startedAt: number | null;
+  endsAt: number | null;
+};
+
+export const entitlementRef = (uid: string) => db().collection(ENTITLEMENTS).doc(uid);
+
+/** A held consultation, from its document — or null if lapsed, used up or not one. */
+export function heldFrom(data: FirebaseFirestore.DocumentData | undefined, now: number): HeldConsultation | null {
   if (!data) return null;
-  const expiresAt = typeof data.expiresAt === "number" ? data.expiresAt : 0;
   const tier = data.aiTier === "extended" ? "extended" : data.aiTier === "initial" ? "initial" : null;
-  if (!tier || !entitlementActive({ status: data.status, expiresAt }, Date.now())) return null;
+  const expiresAt = typeof data.expiresAt === "number" ? data.expiresAt : 0;
+  const endsAt = typeof data.endsAt === "number" ? data.endsAt : null;
+  if (!tier || !entitlementActive({ status: data.status, expiresAt, endsAt }, now)) return null;
   return {
     tier,
     expiresAt,
     paymentIntentId: typeof data.paymentIntentId === "string" ? data.paymentIntentId : null,
+    startedAt: typeof data.startedAt === "number" ? data.startedAt : null,
+    endsAt,
   };
+}
+
+/** The consultation somebody holds right now, if any. */
+export async function activeConsultation(uid: string): Promise<HeldConsultation | null> {
+  return heldFrom((await entitlementRef(uid).get()).data(), Date.now());
 }
 
 /**
  * The AI twin of sessionToCredit: check, BEFORE any transaction opens, that
  * this payment buys a consultation — the right price for a real tier, from a
- * known payer. A credit may only write, so everything is read here.
- *
- * Somebody who already holds a live consultation and pays again (two tabs, a
- * double tap) is NOT granted a second: the payment is held for a human, who
- * refunds it. The same payment arriving twice — webhook and reconciler — is
- * the one exception, so the two can race without either parking the other.
+ * known payer. The duplicate check is repeated INSIDE the transaction (see
+ * consultationStillGrantable), where it cannot race.
  */
 export async function consultationToCredit(input: {
   purpose: string | null;
@@ -339,25 +365,43 @@ export async function consultationToCredit(input: {
   if (!tier || !input.payerUid || input.amountMinor === null) return null;
   if (!amountsAgree(AI_TIERS[tier].amountMinor, input.amountMinor)) return null;
 
-  const held = await activeConsultation(input.payerUid);
-  if (held && held.paymentIntentId !== input.paymentIntentId) return null;
-
   const grantedAt = Date.now();
-  return { uid: input.payerUid, tier, grantedAt, expiresAt: grantedAt + AI_ENTITLEMENT_VALID_MS };
+  const grant = { uid: input.payerUid, tier, grantedAt, expiresAt: grantedAt + AI_ENTITLEMENT_VALID_MS };
+  const snap = await entitlementRef(input.payerUid).get();
+  return consultationStillGrantable(snap, grant, input.paymentIntentId) ? grant : null;
+}
+
+/**
+ * Would granting this payment's consultation be paying twice?
+ *
+ * Somebody who already holds a live consultation that covers this one (two
+ * tabs, a double tap) is NOT granted a second: the payment is held for a
+ * human, who refunds it. Buying the longer one while holding the first is an
+ * upgrade, and is granted. The same payment arriving twice — webhook and
+ * reconciler — is never a duplicate of itself.
+ */
+export function consultationStillGrantable(
+  snap: DocumentSnapshot,
+  grant: Pick<ConsultationGrant, "tier">,
+  paymentIntentId: string,
+): boolean {
+  const held = heldFrom(snap.data(), Date.now());
+  if (!held || held.paymentIntentId === paymentIntentId) return true;
+  return !tierAlreadyHeld(held.tier, grant.tier);
 }
 
 /**
  * Grant the consultation. Inside the fulfilment transaction, so it shares the
  * fate of the payment being marked fulfilled — never one without the other.
+ * Not started: the clock starts with the conversation (startConsultation).
  *
  * `set` rather than `update`, as with creditSession: it must not throw on a
- * document that does not exist yet, which for a first consultation it never
- * does. Nothing is written to `bookings` — a consultation is not a session,
- * and that collection's rules assume a provider and a slot.
+ * document that does not exist yet. Nothing is written to `bookings` — a
+ * consultation is not a session.
  */
 export function creditConsultation(grant: ConsultationGrant, paymentIntentId: string) {
   return (tx: Transaction) => {
-    tx.set(db().collection(ENTITLEMENTS).doc(grant.uid), {
+    tx.set(entitlementRef(grant.uid), {
       uid: grant.uid,
       aiTier: grant.tier,
       durationLimitSec: AI_TIERS[grant.tier].durationSec,
@@ -366,9 +410,30 @@ export function creditConsultation(grant: ConsultationGrant, paymentIntentId: st
       amountMinor: AI_TIERS[grant.tier].amountMinor,
       grantedAt: grant.grantedAt,
       expiresAt: grant.expiresAt,
+      startedAt: null,
+      endsAt: null,
       updatedAt: grant.grantedAt,
     });
   };
+}
+
+/**
+ * Start the paid conversation's clock — once. Called when the conversation
+ * begins; every later call (a reload, a dropped line) gets the same end time
+ * back, so stopping and starting again cannot stretch eight minutes into a
+ * day. Null when there is nothing live to start.
+ */
+export async function startConsultation(uid: string): Promise<HeldConsultation | null> {
+  const ref = entitlementRef(uid);
+  return db().runTransaction(async (tx) => {
+    const now = Date.now();
+    const held = heldFrom((await tx.get(ref)).data(), now);
+    if (!held) return null;
+    if (held.startedAt !== null && held.endsAt !== null) return held;
+    const endsAt = consultationEndsAt(held.tier, now, held.expiresAt);
+    tx.update(ref, { startedAt: now, endsAt, updatedAt: now });
+    return { ...held, startedAt: now, endsAt };
+  });
 }
 
 /** What a session costs, read from the booking. Never from the request. */

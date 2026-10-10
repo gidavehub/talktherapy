@@ -39,6 +39,16 @@ function Splash({ label }: { label: string }) {
   );
 }
 
+/**
+ * What somebody can reach before Talk has got to know them. Paying gates the
+ * conversation with Talk — never the free tools, and never their own account:
+ * somebody who made an account and chose not to pay must still be able to
+ * export or delete it.
+ */
+function openBeforeOnboarding(pathname: string): boolean {
+  return ["/settings", "/mood", "/journal"].some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
 export default function AppGate({ children }: { children: React.ReactNode }) {
   const { user, profile, ready } = useAuth();
   const unread = useUnreadCount();
@@ -62,7 +72,7 @@ export default function AppGate({ children }: { children: React.ReactNode }) {
     // she has learned what they need. A provider has no intake to do — sending
     // them to /therapy would ask a clinician what brings them here today, and
     // then file the answer as their own case notes.
-    if (profile.role !== "provider" && !profile.onboarded) {
+    if (profile.role !== "provider" && !profile.onboarded && !openBeforeOnboarding(pathname)) {
       router.replace("/therapy");
     }
   }, [ready, user, profile, router, pathname]);
@@ -72,7 +82,9 @@ export default function AppGate({ children }: { children: React.ReactNode }) {
   if (!profile) return <Splash label="Loading your profile" />;
 
   const isProvider = profile.role === "provider";
-  if (!isProvider && !profile.onboarded) return <Splash label="Taking you to Talk" />;
+  if (!isProvider && !profile.onboarded && !openBeforeOnboarding(pathname)) {
+    return <Splash label="Taking you to Talk" />;
+  }
 
   // Messages carries the count of what is waiting, on both sides of the app.
   const nav = (isProvider ? PROVIDER_NAV : PATIENT_NAV).map((item) =>

@@ -172,7 +172,10 @@ export function useAudioLevel(): AudioLevel {
           autoGainControl: true,
         },
       });
-      await resumed.catch(() => {});
+      // Bounded: a context the page is not yet allowed to start never
+      // settles its resume(), and waiting on it would leave the microphone
+      // open with nothing listening. The caller checks the state afterwards.
+      await Promise.race([resumed.catch(() => {}), new Promise((r) => setTimeout(r, 1500))]);
 
       // stop() may have run while the permission prompt was open.
       if (ctxRef.current !== ctx) {

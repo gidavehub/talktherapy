@@ -29,7 +29,7 @@ const tiers: Tier[] = [
   {
     name: "First conversation",
     price: formatDalasi(AI_TIERS.initial.amountMinor),
-    cadence: "once",
+    cadence: `up to ${Math.round(AI_TIERS.initial.durationSec / 60)} minutes`,
     blurb: "Up to eight minutes with Talk, in your own language. She gets to know what you need, then introduces you to providers who fit.",
     features: [
       "English, Wolof, Mandinka or Pulaar",
@@ -54,7 +54,7 @@ const tiers: Tier[] = [
   {
     name: "A longer talk",
     price: formatDalasi(AI_TIERS.extended.amountMinor),
-    cadence: "per conversation",
+    cadence: `up to ${Math.round(AI_TIERS.extended.durationSec / 60)} minutes`,
     blurb: "Twenty minutes with Talk, for when you are not ready to speak to a person yet.",
     features: [
       "Everything in the first conversation",

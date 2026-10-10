@@ -153,7 +153,8 @@ async function main() {
   check(granted.paymentIntentId === INTENT, "by this payment");
   check(granted.amountMinor === AMOUNT_MINOR && granted.durationLimitSec === 480, "at the tier's price and length, not the request's");
   const window = (granted.expiresAt ?? 0) - (granted.grantedAt ?? 0);
-  check(window === 24 * 60 * 60 * 1000, `usable for a day (${Math.round(window / 3_600_000)}h)`);
+  check(window === 7 * 24 * 60 * 60 * 1000, `a week to start it (${Math.round(window / 86_400_000)} days)`);
+  check(granted.startedAt === null && granted.endsAt === null, "and its clock not started until the conversation is");
 
   console.log("\nThe same delivery again");
   const replay = await deliver(raw);

@@ -38,7 +38,7 @@ export default function PaymentSheet({
   saying?: Saying | null;
 }) {
   const { amountMinor, label, blurb } = AI_TIERS[tier];
-  const { phase, error, slow, pay, checkNow, reset } = consultation;
+  const { phase, error, slow, pay, checkNow, startAgain } = consultation;
   const price = formatDalasi(amountMinor);
 
   return (
@@ -77,7 +77,8 @@ export default function PaymentSheet({
             </p>
             {slow ? (
               <p className="mt-2 text-[13px] leading-relaxed text-[var(--muted)]">
-                Taking longer than usual. If you have paid, it will still come through.
+                Taking longer than usual. If you have paid, it will still come through — this
+                page keeps checking, and you can close this and come back.
               </p>
             ) : null}
           </div>
@@ -99,7 +100,7 @@ export default function PaymentSheet({
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
           {phase === "waiting" ? (
             <>
-              <Button variant="ghost" withArrow={false} onClick={reset}>
+              <Button variant="ghost" withArrow={false} onClick={() => void startAgain()}>
                 Start again
               </Button>
               <Button variant="secondary" onClick={() => void checkNow()}>

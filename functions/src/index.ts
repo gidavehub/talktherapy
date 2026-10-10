@@ -40,22 +40,27 @@ import {
   webhookEventKey,
   SIGNATURE_HEADER,
 } from "../../app/lib/payments/modempay-protocol";
-import { AI_PURPOSE, AI_TIERS, type AiTierId } from "../../app/lib/models";
+import { AI_PURPOSE, AI_TIERS, tierAlreadyHeld, tierForPurpose, type AiTierId } from "../../app/lib/models";
 import { bookSlot, cancelBooking } from "./bookings";
 import {
   activeConsultation,
+  consultationStillGrantable,
   consultationToCredit,
   createPendingPayment,
   creditConsultation,
   creditSession,
   customerFor,
+  db,
+  entitlementRef,
   readPayment,
   recordAndApply,
   resolvePayer,
   sessionCharge,
   sessionToCredit,
+  startConsultation,
   type ConsultationGrant,
 } from "./payments";
+import type { PaymentRecord } from "../../app/lib/payments/modempay-protocol";
 
 export {
   companionTurn,
@@ -320,9 +325,17 @@ export const startConsultationPayment = onCall(
     const tier: AiTierId = request.data?.tier === "extended" ? "extended" : "initial";
     const { amountMinor, label, blurb } = AI_TIERS[tier];
 
-    // Already holding one: paying again would be taken and then held for a
-    // refund. Better never to take it.
-    if (await activeConsultation(uid)) {
+    // A payment from a few minutes ago may have gone through without anybody
+    // hearing about it yet — a lost webhook, a checkout finished in another
+    // tab. Settle those FIRST, so somebody who has paid is never asked to pay
+    // again because the news was late.
+    await reconcilePendingConsultations(uid);
+
+    // Already holding one that covers this: paying again would be taken and
+    // then held for a refund. Better never to take it. (Holding the first and
+    // buying the longer one is an upgrade, and goes ahead.)
+    const held = await activeConsultation(uid);
+    if (held && tierAlreadyHeld(held.tier, tier)) {
       throw new HttpsError("failed-precondition", "Your consultation is already paid for.");
     }
 
@@ -344,7 +357,9 @@ export const startConsultationPayment = onCall(
       // Back to Talk, which picks up where it left off. The intent id is not
       // known until the gateway answers, so it cannot ride in this URL; the
       // page keeps it in sessionStorage instead.
-      returnUrl: `${appUrl()}/therapy?paid=1`,
+      // A small page that closes itself if the checkout was opened as a tab
+      // of Talk (which is still waiting there), and otherwise takes them back.
+      returnUrl: `${appUrl()}/paid`,
       cancelUrl: `${appUrl()}/?payment=cancelled`,
       callbackUrl: WEBHOOK_URL,
     });
@@ -393,13 +408,21 @@ export const startConsultationPayment = onCall(
  * logged, and claimConsultation below repairs it from the source of truth.
  * Existing claims are kept: setCustomUserClaims replaces the whole set.
  */
-async function grantClaim(grant: Pick<ConsultationGrant, "uid" | "tier" | "expiresAt">): Promise<boolean> {
+async function grantClaim(
+  grant: Pick<ConsultationGrant, "uid" | "tier" | "expiresAt"> & { endsAt?: number | null },
+): Promise<boolean> {
   try {
     const user = await getAuth().getUser(grant.uid);
+    const { aiEndsAt: _previous, ...others } = (user.customClaims ?? {}) as Record<string, unknown>;
+    void _previous;
     await getAuth().setCustomUserClaims(grant.uid, {
-      ...(user.customClaims ?? {}),
+      ...others,
       aiTier: grant.tier,
       aiExpiresAt: grant.expiresAt,
+      // Only once the conversation has started. Without it the AI functions
+      // refuse, which is what makes the page call claimConsultation — the
+      // one place the clock is started.
+      ...(grant.endsAt ? { aiEndsAt: grant.endsAt } : {}),
     });
     return true;
   } catch (error) {
@@ -409,22 +432,68 @@ async function grantClaim(grant: Pick<ConsultationGrant, "uid" | "tier" | "expir
 }
 
 /**
- * The repair path. A paid person whose claim did not stick is told 402 by the
- * AI functions; the page then calls this, which reads the entitlement it CAN
- * read and sets the claim again. One extra round trip, instead of somebody
- * who paid being locked out.
+ * Begin — or carry on — the conversation somebody has paid for.
+ *
+ * The page calls this right before every conversation. The first call starts
+ * the clock (startConsultation: 8 minutes becomes a window of 12, wall-clock);
+ * every later one returns the same end, so a reload cannot stretch it. It
+ * then puts that end on the account as a claim and returns, and the page
+ * mints a fresh token — so the token the conversation uses is never older
+ * than the claim it needs. It is also the repair for a claim that did not
+ * stick: one extra round trip instead of somebody who paid being locked out.
  */
 export const claimConsultation = onCall(CALLABLE, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
 
-  const held = await activeConsultation(uid);
+  const held = await startConsultation(uid);
   if (!held) return { ok: false as const };
 
-  const claimed = await grantClaim({ uid, tier: held.tier, expiresAt: held.expiresAt });
+  const claimed = await grantClaim({ uid, tier: held.tier, expiresAt: held.expiresAt, endsAt: held.endsAt });
   if (!claimed) throw new HttpsError("unavailable", "Could not unlock your consultation. Please try again.");
-  return { ok: true as const, tier: held.tier, expiresAt: held.expiresAt };
+  return { ok: true as const, tier: held.tier, endsAt: held.endsAt };
 });
+
+/**
+ * "I have paid — has it arrived?" without knowing which payment.
+ *
+ * For the tab the checkout sends people back to, which never learned the
+ * payment's id: it settles any recent consultation payment of theirs that
+ * the gateway says succeeded, and says whether a consultation is now held.
+ */
+export const reconcileConsultation = onCall(
+  { ...CALLABLE, secrets: [MODEM_PAY_SECRET_KEY] },
+  async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+    const { held: needsReview } = await reconcilePendingConsultations(uid);
+    const held = await activeConsultation(uid);
+    return { paid: Boolean(held), tier: held?.tier ?? null, needsReview };
+  },
+);
+
+/**
+ * Settle this person's recent, unsettled consultation payments against what
+ * the gateway says. Each goes through the same reconcile as checkPayment, so
+ * none can be credited twice.
+ */
+async function reconcilePendingConsultations(uid: string): Promise<{ held: boolean }> {
+  const since = Date.now() - 2 * 60 * 60 * 1000;
+  const snap = await db().collection("payments").where("uid", "==", uid).where("fulfilled", "==", false).limit(20).get();
+  let held = false;
+  for (const doc of snap.docs) {
+    const data = doc.data();
+    if (data.needsReview === true) held = true;
+    if (!tierForPurpose(typeof data.purpose === "string" ? data.purpose : null)) continue;
+    if (data.status !== "pending" || typeof data.createdAt !== "number" || data.createdAt < since) continue;
+    const record = await readPayment(doc.id);
+    if (record) {
+      const result = await reconcile(doc.id, record);
+      if (result.needsReview) held = true;
+    }
+  }
+  return { held };
+}
 
 // ------------------------------------------------------------ reconciliation
 
@@ -456,88 +525,102 @@ export const checkPayment = onCall(
       return { status: record.status, fulfilled: true, needsReview: record.needsReview };
     }
 
-    const authoritative = await fetchTransaction(paymentIntentId);
-    if (!authoritative) {
-      return { status: record.status, fulfilled: false, needsReview: record.needsReview, reconciled: false };
-    }
-
-    const succeeded = ["completed", "successful", "success", "succeeded", "paid"].includes(
-      authoritative.status,
-    );
-    if (!succeeded) {
-      return { status: record.status, fulfilled: false, needsReview: record.needsReview, reconciled: true };
-    }
-
-    const payer = await resolvePayer({
-      metadataUid: authoritative.uid,
-      authoritativeUid: authoritative.uid,
-      email: authoritative.customerEmail,
-    });
-    const bookingId = await sessionToCredit({
-      bookingId: authoritative.bookingId,
-      payerUid: payer.uid,
-      amountMinor: authoritative.amountMinor,
-    });
-    // Our own record of what this was for outranks the metadata.
-    const consultation = bookingId
-      ? null
-      : await consultationToCredit({
-          purpose: record.purpose ?? authoritative.purpose,
-          payerUid: payer.uid,
-          amountMinor: authoritative.amountMinor,
-          paymentIntentId,
-        });
-
-    const { outcome, decision } = await recordAndApply({
-      // A different key from the webhook's on purpose: the two are independent
-      // observations of the same payment, and `fulfilled` — not the key — is
-      // what keeps the credit to exactly once.
-      eventKey: `verify_${paymentIntentId}`,
-      paymentIntentId,
-      eventName: "verify.reconciled",
-      signatureRouting: null,
-      decide: (current) =>
-        decideFulfilment({
-          event: {
-            eventId: null,
-            eventName: "verify.reconciled",
-            statusText: "succeeded",
-            outcome: "succeeded",
-            paymentIntentId,
-            amountMajor: null,
-            expectedAmountMinor: authoritative.expectedAmountMinor,
-            uid: authoritative.uid,
-            bookingId: authoritative.bookingId,
-            purpose: authoritative.purpose,
-            customerEmail: authoritative.customerEmail,
-          },
-          current,
-          resolvedUid: payer.uid,
-          reportedAmountMinor: authoritative.amountMinor,
-          expectedAmountMinor: authoritative.expectedAmountMinor,
-          resolvedPurpose: authoritative.purpose,
-          resolvedEmail: payer.email,
-          // Nothing to deliver is held for a human, never marked fulfilled.
-          grantable: Boolean(bookingId || consultation),
-        }),
-      credit: bookingId
-        ? creditSession(bookingId, paymentIntentId)
-        : consultation
-          ? creditConsultation(consultation, paymentIntentId)
-          : undefined,
-    });
-
-    if (outcome === "applied" && decision.credit && consultation) await grantClaim(consultation);
-
-    return {
-      status: decision.patch?.status ?? record.status,
-      fulfilled: decision.patch?.fulfilled ?? record.fulfilled,
-      needsReview: decision.patch?.needsReview ?? record.needsReview,
-      reconciled: true,
-      reason: decision.reason,
-    };
+    return reconcile(paymentIntentId, record);
   },
 );
+
+/**
+ * Ask the gateway about one of our payments and, if it succeeded, record and
+ * fulfil it — through the same single transaction as the webhook, so either
+ * may arrive first and the credit still happens once.
+ */
+async function reconcile(paymentIntentId: string, record: PaymentRecord) {
+  const authoritative = await fetchTransaction(paymentIntentId);
+  if (!authoritative) {
+    return { status: record.status, fulfilled: false, needsReview: record.needsReview, reconciled: false };
+  }
+
+  const succeeded = ["completed", "successful", "success", "succeeded", "paid"].includes(
+    authoritative.status,
+  );
+  if (!succeeded) {
+    return { status: record.status, fulfilled: false, needsReview: record.needsReview, reconciled: true };
+  }
+
+  const payer = await resolvePayer({
+    metadataUid: authoritative.uid,
+    authoritativeUid: authoritative.uid,
+    email: authoritative.customerEmail,
+  });
+  const bookingId = await sessionToCredit({
+    bookingId: authoritative.bookingId,
+    payerUid: payer.uid,
+    amountMinor: authoritative.amountMinor,
+  });
+  // Our own record of what this was for outranks the metadata.
+  const consultation = bookingId
+    ? null
+    : await consultationToCredit({
+        purpose: record.purpose ?? authoritative.purpose,
+        payerUid: payer.uid,
+        amountMinor: authoritative.amountMinor,
+        paymentIntentId,
+      });
+
+  const { outcome, decision } = await recordAndApply({
+    // A different key from the webhook's on purpose: the two are independent
+    // observations of the same payment, and `fulfilled` — not the key — is
+    // what keeps the credit to exactly once.
+    eventKey: `verify_${paymentIntentId}`,
+    paymentIntentId,
+    eventName: "verify.reconciled",
+    signatureRouting: null,
+    reads: consultation ? [entitlementRef(consultation.uid)] : [],
+    decide: (current, [held]) =>
+      decideFulfilment({
+        event: {
+          eventId: null,
+          eventName: "verify.reconciled",
+          statusText: "succeeded",
+          outcome: "succeeded",
+          paymentIntentId,
+          amountMajor: null,
+          expectedAmountMinor: authoritative.expectedAmountMinor,
+          uid: authoritative.uid,
+          bookingId: authoritative.bookingId,
+          purpose: authoritative.purpose,
+          customerEmail: authoritative.customerEmail,
+        },
+        current,
+        resolvedUid: payer.uid,
+        reportedAmountMinor: authoritative.amountMinor,
+        expectedAmountMinor: authoritative.expectedAmountMinor,
+        resolvedPurpose: authoritative.purpose,
+        resolvedEmail: payer.email,
+        // Nothing to deliver is held for a human, never marked fulfilled —
+        // and nor is a second payment for a consultation already held,
+        // judged inside the transaction where two cannot race.
+        grantable: Boolean(
+          bookingId || (consultation && (!held || consultationStillGrantable(held, consultation, paymentIntentId))),
+        ),
+      }),
+    credit: bookingId
+      ? creditSession(bookingId, paymentIntentId)
+      : consultation
+        ? creditConsultation(consultation, paymentIntentId)
+        : undefined,
+  });
+
+  if (outcome === "applied" && decision.credit && consultation) await grantClaim(consultation);
+
+  return {
+    status: decision.patch?.status ?? record.status,
+    fulfilled: decision.patch?.fulfilled ?? record.fulfilled,
+    needsReview: decision.patch?.needsReview ?? record.needsReview,
+    reconciled: true,
+    reason: decision.reason,
+  };
+}
 
 // ------------------------------------------------------------------ webhook
 
@@ -634,7 +717,8 @@ export const modemWebhook = onRequest(
         paymentIntentId: event.paymentIntentId,
         eventName: event.eventName || event.statusText || "unknown",
         signatureRouting: verdict.routing,
-        decide: (current) =>
+        reads: consultation ? [entitlementRef(consultation.uid)] : [],
+        decide: (current, [held]) =>
           decideFulfilment({
             event,
             current,
@@ -643,7 +727,11 @@ export const modemWebhook = onRequest(
             expectedAmountMinor: authoritative?.expectedAmountMinor ?? event.expectedAmountMinor,
             resolvedPurpose: authoritative?.purpose ?? null,
             resolvedEmail: payer.email,
-            grantable: Boolean(bookingId || consultation),
+            grantable: Boolean(
+              bookingId ||
+                (consultation &&
+                  (!held || consultationStillGrantable(held, consultation, event.paymentIntentId ?? ""))),
+            ),
           }),
         credit: bookingId
           ? creditSession(bookingId, event.paymentIntentId)
