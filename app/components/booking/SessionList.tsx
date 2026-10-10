@@ -18,6 +18,8 @@ import { formatDalasi } from "../../lib/money";
 import { cancelBooking, spokenSlot, startSessionPayment, watchMyBookings } from "../../lib/booking";
 import { useNow } from "../../lib/useNow";
 import { joinWindow } from "../../lib/call";
+import { reportMissedSession } from "../../lib/payouts-client";
+import { PAYOUT_HOLD_MS } from "../../lib/payouts";
 import type { Booking } from "../../lib/models";
 
 /**
@@ -160,15 +162,27 @@ function SessionRow({
             meetUrl={booking.meetUrl}
             canEdit={booking.providerId === selfUid}
           />
-          <button
-            type="button"
-            onClick={() => onCancel(booking.id)}
-            disabled={cancelling}
-            className="rounded-full px-4 py-2 text-[12.5px] text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-black/5 transition-colors disabled:opacity-50"
-          >
-            {cancelling ? "Cancelling…" : "Cancel"}
-          </button>
+          {/* Not once a paid session has begun: that is the provider's work,
+              and the server refuses it. If it did not happen, the patient
+              says so afterwards (below). */}
+          {booking.paymentStatus === "paid" && booking.startsAt <= now ? null : (
+            <button
+              type="button"
+              onClick={() => onCancel(booking.id)}
+              disabled={cancelling}
+              className="rounded-full px-4 py-2 text-[12.5px] text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-black/5 transition-colors disabled:opacity-50"
+            >
+              {cancelling ? "Cancelling…" : "Cancel"}
+            </button>
+          )}
         </div>
+      ) : null}
+
+      {/* A paid session that did not happen. For a day after it ends — the
+          time the provider's fee is held — the patient can say so, and the
+          fee waits for a person instead of being paid out. */}
+      {!cancelled && past && booking.patientId === selfUid && booking.paymentStatus === "paid" ? (
+        <MissedSession booking={booking} now={now} />
       ) : null}
 
       {/*
@@ -183,6 +197,59 @@ function SessionRow({
         </p>
       ) : null}
     </motion.div>
+  );
+}
+
+function MissedSession({ booking, now }: { booking: Booking; now: number }) {
+  const [asking, setAsking] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (booking.disputed || sent) {
+    return (
+      <p className="mt-2.5 text-[12px] leading-relaxed text-[var(--muted)]">
+        You told us this session did not happen. A person from Talk is looking into it.
+      </p>
+    );
+  }
+  if (booking.payoutId || booking.endsAt + PAYOUT_HOLD_MS <= now) return null;
+
+  return (
+    <div className="mt-2.5 text-[12.5px]">
+      {asking ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[var(--muted)]">Did the session not happen?</span>
+          <button
+            type="button"
+            disabled={sending}
+            onClick={async () => {
+              setSending(true);
+              setError(null);
+              const result = await reportMissedSession(booking.id);
+              setSending(false);
+              if (result.ok) setSent(true);
+              else setError(result.error);
+            }}
+            className="rounded-full bg-[var(--dark)] px-4 py-2 text-white disabled:opacity-60"
+          >
+            {sending ? "Sending…" : "Yes, tell Talk"}
+          </button>
+          <button type="button" onClick={() => setAsking(false)} className="rounded-full px-3 py-2 text-[var(--muted)]">
+            No
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setAsking(true)}
+          className="rounded-full px-4 py-2 text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-black/5 transition-colors"
+        >
+          They didn&apos;t come
+        </button>
+      )}
+      {error ? <p className="mt-1.5 text-[var(--accent)]">{error}</p> : null}
+    </div>
   );
 }
 

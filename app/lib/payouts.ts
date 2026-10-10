@@ -37,6 +37,8 @@ export type EarnableBooking = {
   status: string;
   endsAt: number;
   payoutId?: string | null;
+  /** The patient said the session did not happen. A person decides. */
+  disputed?: boolean;
 };
 
 export type EarningState =
@@ -46,6 +48,8 @@ export type EarningState =
   | "held"
   /** Already claimed by a payout. */
   | "withdrawn"
+  /** The patient said it did not happen: waiting for a person, not paid out. */
+  | "disputed"
   /** Not money the provider is owed: unpaid, cancelled, a no-show. */
   | "none";
 
@@ -53,6 +57,7 @@ export function earningState(b: EarnableBooking, now: number): EarningState {
   if (b.paymentStatus !== "paid" || b.amountMinor <= 0) return "none";
   if (b.status === "cancelled" || b.status === "no_show") return "none";
   if (b.payoutId) return "withdrawn";
+  if (b.disputed) return "disputed";
   return b.endsAt + PAYOUT_HOLD_MS <= now ? "available" : "held";
 }
 
@@ -61,10 +66,21 @@ export function sessionShareMinor(b: Pick<EarnableBooking, "amountMinor">): numb
   return providerPayoutMinor(b.amountMinor);
 }
 
-export function summariseEarnings(bookings: EarnableBooking[], now: number) {
+/**
+ * Where a provider's money is. `statusOf` tells withdrawn sessions apart:
+ * only a COMPLETED payout is "paid out" — one still sending, on its way or
+ * unconfirmed is "on its way", never counted as money that has arrived.
+ */
+export function summariseEarnings(
+  bookings: EarnableBooking[],
+  now: number,
+  statusOf?: (payoutId: string) => PayoutStatus | undefined,
+) {
   let availableMinor = 0;
   let heldMinor = 0;
-  let withdrawnMinor = 0;
+  let disputedMinor = 0;
+  let paidOutMinor = 0;
+  let onItsWayMinor = 0;
   const available: EarnableBooking[] = [];
   for (const b of bookings) {
     const state = earningState(b, now);
@@ -73,9 +89,13 @@ export function summariseEarnings(bookings: EarnableBooking[], now: number) {
       availableMinor += share;
       available.push(b);
     } else if (state === "held") heldMinor += share;
-    else if (state === "withdrawn") withdrawnMinor += share;
+    else if (state === "disputed") disputedMinor += share;
+    else if (state === "withdrawn") {
+      if (statusOf?.(b.payoutId as string) === "completed") paidOutMinor += share;
+      else onItsWayMinor += share;
+    }
   }
-  return { availableMinor, heldMinor, withdrawnMinor, available };
+  return { availableMinor, heldMinor, disputedMinor, paidOutMinor, onItsWayMinor, available };
 }
 
 /**
@@ -105,7 +125,9 @@ export type PayoutStatus =
   /** The money arrived. */
   | "completed"
   /** It did not go; the sessions are back in the balance. */
-  | "failed";
+  | "failed"
+  /** It went, then came back to Talk; the sessions are back in the balance. */
+  | "reversed";
 
 /** `payouts/{id}` — WRITTEN ONLY BY THE SERVER. */
 export type Payout = {
@@ -118,6 +140,8 @@ export type Payout = {
   accountHint: string;
   beneficiaryName: string;
   status: PayoutStatus;
+  /** Modem Pay's id for the transfer — what it is looked up by. */
+  transferId: string | null;
   transferReference: string | null;
   failureReason: string | null;
   createdAt: number;

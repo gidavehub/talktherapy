@@ -151,6 +151,35 @@ export type CancelOutcome = { ok: true } | { ok: false; reason: string };
  * provider has since deleted or reused that time, leaving it alone is right:
  * handing a stranger's slot back to the pool would be worse than losing one.
  */
+/**
+ * "They did not come." A patient says a paid session did not happen.
+ *
+ * Within the hold after it ends — the window the hold exists for — and before
+ * it has been paid out. It does not refund or punish anybody: it holds the
+ * provider's fee for that session (earningState: "disputed") until a person
+ * has looked. Saying it again changes nothing.
+ */
+export async function reportMissedSession(
+  uid: string,
+  bookingId: string,
+  holdMs: number,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const ref = db().collection(COLLECTIONS.bookings).doc(bookingId);
+  return db().runTransaction(async (tx) => {
+    const data = (await tx.get(ref)).data();
+    if (!data || data.patientId !== uid) return { ok: false as const, reason: "No such session." };
+    if (data.disputed === true) return { ok: true as const };
+    if (data.paymentStatus !== "paid") return { ok: false as const, reason: "That session was not paid for." };
+    const endsAt = typeof data.endsAt === "number" ? data.endsAt : 0;
+    if (endsAt > Date.now()) return { ok: false as const, reason: "That session has not finished yet." };
+    if (data.payoutId || endsAt + holdMs <= Date.now()) {
+      return { ok: false as const, reason: "It is too late to raise this here — please contact support." };
+    }
+    tx.update(ref, { disputed: true, disputedAt: Date.now(), updatedAt: Date.now() });
+    return { ok: true as const };
+  });
+}
+
 export async function cancelBooking(uid: string, bookingId: string): Promise<CancelOutcome> {
   const store = db();
   const booking = store.collection(COLLECTIONS.bookings).doc(bookingId);
@@ -168,6 +197,20 @@ export async function cancelBooking(uid: string, bookingId: string): Promise<Can
     if (data.status === "cancelled") return { ok: true as const };
     if (data.status === "completed") {
       return { ok: false as const, reason: "That session has already happened." };
+    }
+    // A paid session that has begun is the provider's work. Cancelling it
+    // here would silently take their fee away — and once it has been paid
+    // out, would leave money sent for a session the records say never was.
+    // If it did not happen, the patient says so (reportMissedSession) and a
+    // person decides.
+    if (data.payoutId) {
+      return { ok: false as const, reason: "That session has already been paid for and paid out." };
+    }
+    if (data.paymentStatus === "paid" && typeof data.startsAt === "number" && data.startsAt <= Date.now()) {
+      return {
+        ok: false as const,
+        reason: "That session has already started. If it did not happen, you can tell us from your sessions.",
+      };
     }
 
     // Every read first: Firestore refuses a transaction that reads after it

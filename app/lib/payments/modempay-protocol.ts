@@ -745,11 +745,18 @@ function transferState(status: string | null): TransferState {
  * the body being the transfer or wrapping it in `data`, as the payment reply
  * is read.
  */
-export function readTransferResponse(body: unknown): { reference: string | null; state: TransferState } {
+export function readTransferResponse(body: unknown): {
+  reference: string | null;
+  transferId: string | null;
+  state: TransferState;
+} {
   const envelope = asRecord(body) ?? {};
   const transfer = asRecord(envelope.data) ?? envelope;
   return {
     reference: asString(transfer.transfer_reference) ?? asString(transfer.reference) ?? asString(transfer.id),
+    // Kept apart: the SDK's retrieve(id) looks a transfer up by its `id`,
+    // which is not its `transfer_reference`.
+    transferId: asString(transfer.id),
     state: transferState(asString(transfer.status)),
   };
 }

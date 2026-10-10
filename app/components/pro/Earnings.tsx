@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { SPRING_SOFT } from "../motion/primitives";
 import { useAuth } from "../AuthProvider";
@@ -10,8 +10,8 @@ import Modal from "../ui/Modal";
 import { Alert, EmptyState, Skeleton } from "../ui/Feedback";
 import { Input, Select } from "../ui/Input";
 import { IconWallet } from "../ui/icons";
-import { formatDalasi } from "../../lib/money";
-import { PLATFORM_FEE_RATE } from "../../lib/money";
+import { formatDalasi, PLATFORM_FEE_RATE } from "../../lib/money";
+import { useNow } from "../../lib/useNow";
 import {
   PAYOUT_HOLD_MS,
   PAYOUT_NETWORK_LABELS,
@@ -35,18 +35,40 @@ import { PAYOUT_NETWORKS, type PayoutNetwork } from "../../lib/payments/modempay
  * A provider's money: what they have earned, where it goes, and sending it.
  *
  * The numbers come from the server — the same count the payout itself uses —
- * so what this screen says is ready is exactly what is sent. Sending goes to
- * the provider's own wallet on Modem Pay (Wave, Afrimoney, QMoney or APS), the
- * way the owner's connekteasy pays out.
+ * so what this screen says is ready is exactly what is sent, and the amount
+ * the provider confirms is the amount sent (the server refuses otherwise).
+ * "Paid out" is only money that arrived; anything still travelling is shown
+ * as on its way. Sending goes to the provider's own wallet on Modem Pay (Wave,
+ * Afrimoney, QMoney or APS), the way the owner's connekteasy pays out.
  */
 
 const STATUS_COPY: Record<PayoutStatus, { label: string; tone: string }> = {
   initiating: { label: "Sending", tone: "text-[var(--muted)]" },
   pending: { label: "On its way", tone: "text-amber-700" },
-  uncertain: { label: "Checking", tone: "text-amber-700" },
+  uncertain: { label: "Not confirmed yet", tone: "text-amber-700" },
   completed: { label: "Sent", tone: "text-emerald-700" },
   failed: { label: "Did not go through", tone: "text-[var(--accent)]" },
+  reversed: { label: "Came back", tone: "text-[var(--accent)]" },
 };
+
+/** What to tell the provider straight after sending, by what actually happened. */
+function noticeFor(status: PayoutStatus, amountMinor: number): { tone: "success" | "warning" | "crisis"; text: string } {
+  const amount = formatDalasi(amountMinor);
+  switch (status) {
+    case "completed":
+      return { tone: "success", text: `${amount} has been sent to your wallet.` };
+    case "pending":
+      return { tone: "success", text: `${amount} is on its way to your wallet.` };
+    case "initiating":
+    case "uncertain":
+      return {
+        tone: "warning",
+        text: `${amount} was sent, but the network has not confirmed it yet. It is checked again automatically — your sessions stay safe until it is settled.`,
+      };
+    default:
+      return { tone: "crisis", text: `${amount} did not go through. Your sessions are back in what is ready to send.` };
+  }
+}
 
 const HOLD_HOURS = Math.round(PAYOUT_HOLD_MS / 3_600_000);
 const SHARE = Math.round((1 - PLATFORM_FEE_RATE) * 100);
@@ -55,51 +77,80 @@ export default function Earnings() {
   const { user } = useAuth();
   const uid = user?.uid ?? null;
   const [earnings, setEarnings] = useState<Earnings | null | undefined>(undefined);
+  /** A refresh failed: the last good figures stay up, with a quiet warning. */
+  const [stale, setStale] = useState(false);
   const [account, setAccount] = useState<PayoutAccount | null | undefined>(undefined);
   const [payouts, setPayouts] = useState<Payout[] | null>(null);
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [sending, setSending] = useState(false);
-  const [notice, setNotice] = useState<{ tone: "success" | "crisis"; text: string } | null>(null);
+  const [notice, setNotice] = useState<{ tone: "success" | "warning" | "crisis"; text: string } | null>(null);
 
-  const refresh = useCallback(async () => setEarnings(await fetchEarnings()), []);
+  /** Fetch, keeping what is on screen if the fetch fails. */
+  function refresh() {
+    void fetchEarnings().then((next) => {
+      if (next) {
+        setEarnings(next);
+        setStale(false);
+      } else {
+        setEarnings((current) => (current === undefined ? null : current));
+        setStale(true);
+      }
+    });
+  }
 
   useEffect(() => {
     if (!uid) return;
     let live = true;
-    void fetchEarnings().then((e) => live && setEarnings(e));
+    const load = () =>
+      void fetchEarnings().then((next) => {
+        if (!live) return;
+        if (next) {
+          setEarnings(next);
+          setStale(false);
+        } else {
+          setEarnings((current) => (current === undefined ? null : current));
+          setStale(true);
+        }
+      });
+    load();
+    // Sessions come out of their hold while the page sits open: look again
+    // whenever it is looked at again.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     const stopAccount = watchPayoutAccount(uid, setAccount);
     const stopPayouts = watchPayouts(uid, setPayouts);
     return () => {
       live = false;
+      document.removeEventListener("visibilitychange", onVisible);
       stopAccount();
       stopPayouts();
     };
   }, [uid]);
 
-  // A payout that settles changes what is available.
+  // A payout that settles changes what is ready and what is paid out.
   const settledKey = (payouts ?? []).map((p) => `${p.id}:${p.status}`).join("|");
   useEffect(() => {
     if (!settledKey) return;
     let live = true;
-    void fetchEarnings().then((e) => live && setEarnings(e));
+    void fetchEarnings().then((next) => live && next && setEarnings(next));
     return () => {
       live = false;
     };
   }, [settledKey]);
 
   async function send() {
+    if (!earnings) return;
     setSending(true);
     setNotice(null);
-    const result = await requestPayout();
+    const result = await requestPayout(earnings.availableMinor);
     setSending(false);
     setConfirming(false);
-    setNotice(
-      result.ok
-        ? { tone: "success", text: `${formatDalasi(result.amountMinor)} is on its way to your wallet.` }
-        : { tone: "crisis", text: result.error },
-    );
-    void refresh();
+    if (result.ok) setNotice(noticeFor(result.status, result.amountMinor));
+    else setNotice({ tone: "crisis", text: result.error });
+    refresh();
   }
 
   if (earnings === undefined || account === undefined) {
@@ -115,29 +166,59 @@ export default function Earnings() {
     );
   }
 
-  if (earnings === null) {
-    return (
-      <Alert tone="warning" title="Your earnings could not be loaded">
-        Check the connection and try again in a moment.
-      </Alert>
-    );
-  }
-
-  const available = earnings.availableMinor;
-  const canSend = Boolean(account) && available > 0;
+  const available = earnings?.availableMinor ?? 0;
+  const canSend = Boolean(account) && Boolean(earnings) && available > 0;
   const showForm = editing || !account;
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatTile
-          label="Ready to send"
-          value={formatDalasi(available)}
-          caption={`${earnings.availableSessions} session${earnings.availableSessions === 1 ? "" : "s"}`}
-        />
-        <StatTile label="On hold" value={formatDalasi(earnings.heldMinor)} caption={`Ready ${HOLD_HOURS} hours after a session`} delay={0.05} />
-        <StatTile label="Paid out" value={formatDalasi(earnings.withdrawnMinor)} caption="All time" delay={0.1} />
-      </div>
+      {earnings === null ? (
+        <Alert
+          tone="warning"
+          title="Your earnings could not be loaded"
+          action={
+            <Button size="sm" variant="secondary" onClick={refresh}>
+              Try again
+            </Button>
+          }
+        >
+          Check the connection. Your payouts below are still shown as they stand.
+        </Alert>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <StatTile
+              label="Ready to send"
+              value={formatDalasi(available)}
+              caption={`${earnings.availableSessions} session${earnings.availableSessions === 1 ? "" : "s"}`}
+            />
+            <StatTile
+              label="On hold"
+              value={formatDalasi(earnings.heldMinor + earnings.disputedMinor)}
+              caption={
+                earnings.disputedMinor > 0
+                  ? `Includes ${formatDalasi(earnings.disputedMinor)} a patient asked us to look at`
+                  : `Ready ${HOLD_HOURS} hours after a session`
+              }
+              delay={0.05}
+            />
+            <StatTile
+              label="Paid out"
+              value={formatDalasi(earnings.paidOutMinor)}
+              caption={earnings.onItsWayMinor > 0 ? `${formatDalasi(earnings.onItsWayMinor)} more on its way` : "All time"}
+              delay={0.1}
+            />
+          </div>
+          {stale ? (
+            <p className="text-[12px] text-[var(--muted)]">
+              Could not refresh just now — these are the last figures.{" "}
+              <button type="button" onClick={refresh} className="underline underline-offset-2">
+                Try again
+              </button>
+            </p>
+          ) : null}
+        </>
+      )}
 
       {notice ? <Alert tone={notice.tone}>{notice.text}</Alert> : null}
 
@@ -150,7 +231,7 @@ export default function Earnings() {
             <p className="text-[15px] font-medium leading-snug">Where your money goes</p>
             <p className="mt-1 text-[13px] leading-relaxed text-[var(--muted)]">
               Your share is {SHARE}% of each session&apos;s fee. A session can be sent {HOLD_HOURS} hours after it
-              ends, so there is time to sort out one that did not happen.
+              ends — the time a patient has to tell us if it did not happen.
             </p>
           </div>
         </div>
@@ -179,7 +260,15 @@ export default function Earnings() {
         ) : null}
 
         {account && !editing ? (
-          <Button onClick={() => setConfirming(true)} disabled={!canSend}>
+          <Button
+            onClick={() => {
+              // The figure is checked again as the dialog opens, so the
+              // amount confirmed is the amount on the server now.
+              refresh();
+              setConfirming(true);
+            }}
+            disabled={!canSend}
+          >
             {available > 0 ? `Send ${formatDalasi(available)}` : "Nothing ready to send yet"}
           </Button>
         ) : null}
@@ -201,8 +290,10 @@ export default function Earnings() {
       </section>
 
       <Modal
-        open={confirming}
-        onClose={() => setConfirming(false)}
+        open={confirming && canSend}
+        onClose={() => {
+          if (!sending) setConfirming(false);
+        }}
         variant="dialog"
         title={`Send ${formatDalasi(available)}?`}
         description={
@@ -212,7 +303,7 @@ export default function Earnings() {
         }
         footer={
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
-            <Button variant="ghost" withArrow={false} onClick={() => setConfirming(false)}>
+            <Button variant="ghost" withArrow={false} onClick={() => setConfirming(false)} disabled={sending}>
               Not now
             </Button>
             <Button onClick={() => void send()} loading={sending}>
@@ -222,7 +313,8 @@ export default function Earnings() {
         }
       >
         <p className="text-[13px] leading-relaxed text-[var(--muted)]">
-          It usually arrives within minutes. If the network is slow, it shows here as on its way until it lands.
+          It usually arrives within minutes. If the network is slow it shows below as on its way, and is checked
+          again automatically until it lands.
         </p>
       </Modal>
     </div>
@@ -295,9 +387,15 @@ function AccountForm({
 }
 
 function PayoutRow({ payout }: { payout: Payout }) {
+  const now = useNow(15_000);
   const status = STATUS_COPY[payout.status];
   const [checking, setChecking] = useState(false);
-  const unsettled = payout.status === "initiating" || payout.status === "pending" || payout.status === "uncertain";
+  const [checked, setChecked] = useState<string | null>(null);
+  // A send that started under a minute ago may still be running: asking
+  // again now would race it.
+  const fresh = payout.status === "initiating" && now - payout.updatedAt < 60_000;
+  const unsettled =
+    !fresh && (payout.status === "initiating" || payout.status === "pending" || payout.status === "uncertain");
   return (
     <motion.li
       initial={{ y: 10, opacity: 0 }}
@@ -324,8 +422,15 @@ function PayoutRow({ payout }: { payout: Payout }) {
               loading={checking}
               onClick={async () => {
                 setChecking(true);
-                await checkPayout(payout.id);
+                const result = await checkPayout(payout.id);
                 setChecking(false);
+                setChecked(
+                  result === null
+                    ? "Could not reach the network just now. It is checked again automatically."
+                    : result === payout.status
+                      ? "No change yet. It is checked again automatically."
+                      : null,
+                );
               }}
             >
               Check
@@ -333,10 +438,9 @@ function PayoutRow({ payout }: { payout: Payout }) {
           ) : null}
         </div>
       </div>
-      {payout.status === "failed" && payout.failureReason ? (
-        <p className="mt-2 text-[12.5px] leading-relaxed text-[var(--muted)]">
-          {payout.failureReason} The sessions are back in what is ready to send.
-        </p>
+      {checked ? <p className="mt-2 text-[12.5px] text-[var(--muted)]">{checked}</p> : null}
+      {(payout.status === "failed" || payout.status === "reversed") && payout.failureReason ? (
+        <p className="mt-2 text-[12.5px] leading-relaxed text-[var(--muted)]">{payout.failureReason}</p>
       ) : null}
     </motion.li>
   );

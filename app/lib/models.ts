@@ -368,6 +368,8 @@ export type Booking = {
    * provider twice. Server-written.
    */
   payoutId: string | null;
+  /** The patient said it did not happen; its fee is held for a person. */
+  disputed: boolean;
   /**
    * A Google Meet link the provider may attach, for anyone who would rather
    * meet there. The session itself happens inside Talk; this is the fallback

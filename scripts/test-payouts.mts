@@ -68,7 +68,12 @@ const summary = summariseEarnings(
   NOW,
 );
 check(summary.availableMinor === 680_00 + 1_020_00, `available is the two finished sessions (${summary.availableMinor})`);
-check(summary.heldMinor === 680_00 && summary.withdrawnMinor === 680_00, "held and withdrawn counted apart");
+check(summary.heldMinor === 680_00 && summary.onItsWayMinor === 680_00, "held and withdrawn counted apart");
+check(summary.paidOutMinor === 0, "a payout not known to have arrived is never counted as paid out");
+const arrived = summariseEarnings([session({ id: "d", payoutId: "po_1" })], NOW, () => "completed");
+check(arrived.paidOutMinor === 680_00 && arrived.onItsWayMinor === 0, "one that arrived is paid out");
+const disputed = summariseEarnings([session({ id: "z", disputed: true })], NOW);
+check(disputed.availableMinor === 0 && disputed.disputedMinor === 680_00, "a session the patient disputed is held for a person, not sent");
 check(summary.available.map((b) => b.id).join() === "a,b", "and exactly those two are the ones a payout would claim");
 
 console.log("\nGambian wallet numbers");

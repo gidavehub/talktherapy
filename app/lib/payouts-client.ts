@@ -4,7 +4,7 @@ import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { firebaseConfigured, firebaseFunctions, firestore } from "./firebase";
 import { COLLECTIONS } from "./models";
-import type { Payout, PayoutAccount } from "./payouts";
+import type { Payout, PayoutAccount, PayoutStatus } from "./payouts";
 import type { PayoutNetwork } from "./payments/modempay-protocol";
 
 /**
@@ -18,7 +18,12 @@ import type { PayoutNetwork } from "./payments/modempay-protocol";
 export type Earnings = {
   availableMinor: number;
   heldMinor: number;
-  withdrawnMinor: number;
+  /** Sessions a patient said did not happen — held for a person. */
+  disputedMinor: number;
+  /** In payouts still sending, on their way, or not yet confirmed. */
+  onItsWayMinor: number;
+  /** In payouts that arrived. */
+  paidOutMinor: number;
   availableSessions: number;
 };
 
@@ -48,20 +53,51 @@ export async function savePayoutAccount(input: {
   }
 }
 
-export async function requestPayout(): Promise<{ ok: true; amountMinor: number } | { ok: false; error: string }> {
+/**
+ * Send what is ready — exactly `expectedAmountMinor`, the figure the provider
+ * confirmed. If more has come out of its hold since, nothing is sent and the
+ * new figure comes back to be confirmed instead.
+ */
+export async function requestPayout(
+  expectedAmountMinor: number,
+): Promise<
+  | { ok: true; amountMinor: number; status: PayoutStatus }
+  | { ok: false; error: string; amountMinor: number | null }
+> {
   try {
-    const call = httpsCallable<Record<string, never>, { amountMinor: number }>(firebaseFunctions(), "requestPayout");
-    return { ok: true, amountMinor: (await call({})).data.amountMinor };
+    const call = httpsCallable<{ expectedAmountMinor: number }, { amountMinor: number; status: PayoutStatus }>(
+      firebaseFunctions(),
+      "requestPayout",
+    );
+    const { data } = await call({ expectedAmountMinor });
+    return { ok: true, amountMinor: data.amountMinor, status: data.status };
   } catch (error) {
-    return { ok: false, error: message(error, "Could not send it. Please try again.") };
+    const details = (error as { details?: { amountMinor?: number | null } }).details;
+    return {
+      ok: false,
+      error: message(error, "Could not send it. Please try again."),
+      amountMinor: details?.amountMinor ?? null,
+    };
   }
 }
 
-export async function checkPayout(payoutId: string): Promise<void> {
+/** Ask where a payout stands; null when the question could not be asked. */
+export async function checkPayout(payoutId: string): Promise<PayoutStatus | null> {
   try {
-    await httpsCallable(firebaseFunctions(), "checkPayout")({ payoutId });
+    const call = httpsCallable<{ payoutId: string }, { status: PayoutStatus }>(firebaseFunctions(), "checkPayout");
+    return (await call({ payoutId })).data.status;
   } catch {
-    // The list below is live; a failed check just leaves it as it was.
+    return null;
+  }
+}
+
+/** "They did not come" — from the patient's side of a paid session. */
+export async function reportMissedSession(bookingId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await httpsCallable(firebaseFunctions(), "reportMissedSession")({ bookingId });
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: message(error, "Could not send that. Please try again.") };
   }
 }
 

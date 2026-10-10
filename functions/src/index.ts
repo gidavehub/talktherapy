@@ -44,7 +44,9 @@ import {
   SIGNATURE_HEADER,
 } from "../../app/lib/payments/modempay-protocol";
 import { AI_PURPOSE, AI_TIERS, tierAlreadyHeld, tierForPurpose, type AiTierId } from "../../app/lib/models";
-import { bookSlot, cancelBooking } from "./bookings";
+import { onSchedule } from "firebase-functions/v2/scheduler";
+import { bookSlot, cancelBooking, reportMissedSession as reportMissed } from "./bookings";
+import { PAYOUT_HOLD_MS } from "../../app/lib/payouts";
 import {
   activeConsultation,
   consultationStillGrantable,
@@ -68,6 +70,7 @@ import {
   applyTransferEvent,
   checkPayout as checkPayoutStatus,
   earningsFor,
+  settleStalePayouts,
   requestPayout as reservePayout,
   savePayoutAccount as savePayoutAccountFor,
   type TransferClient,
@@ -647,7 +650,7 @@ async function reconcile(paymentIntentId: string, record: PaymentRecord) {
  */
 const modemTransfer: TransferClient = async (body, idempotencyKey) => {
   const key = MODEM_PAY_SECRET_KEY.value().trim();
-  if (!key) return { kind: "refused", message: "Payments are not configured." };
+  if (!key) return { kind: "refused", message: "Payments are not configured.", cause: "platform" };
   let res: Response;
   try {
     res = await fetch(`${MODEM_PAY_BASE_URL}/v1/transfers`, {
@@ -676,7 +679,10 @@ const modemTransfer: TransferClient = async (body, idempotencyKey) => {
   if (res.status >= 500 || [408, 409, 425, 429].includes(res.status)) {
     return { kind: "unknown", message: `gateway ${res.status}` };
   }
-  return { kind: "refused", message: `gateway ${res.status}` };
+  // Whose problem: Talk's key, Talk's balance or limits — or the details the
+  // provider gave. Only the last is theirs to fix, and only it says so.
+  const platform = [401, 402, 403].includes(res.status) || /balance|insufficient|limit|fund|unauthori[sz]ed|forbidden/i.test(text);
+  return { kind: "refused", message: `gateway ${res.status}`, cause: platform ? "platform" : "account" };
 };
 
 const modemTransferLookup: TransferLookup = async (reference) => {
@@ -718,9 +724,42 @@ export const requestPayout = onCall({ ...CALLABLE, secrets: [MODEM_PAY_SECRET_KE
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
   await requireProvider(uid);
-  const result = await reservePayout(uid, modemTransfer, { callbackUrl: WEBHOOK_URL });
-  if (!result.ok) throw new HttpsError("failed-precondition", result.reason);
+  // The amount they confirmed. If more came out of its hold since, nothing is
+  // sent and they are shown the new figure.
+  const expected = Number(request.data?.expectedAmountMinor);
+  const result = await reservePayout(uid, modemTransfer, {
+    callbackUrl: WEBHOOK_URL,
+    expectedAmountMinor: Number.isInteger(expected) && expected > 0 ? expected : undefined,
+  });
+  if (!result.ok) {
+    throw new HttpsError("failed-precondition", result.reason, { amountMinor: result.amountMinor ?? null });
+  }
   return result;
+});
+
+/**
+ * Every quarter of an hour, settle the payouts nobody heard back about — a
+ * timeout, a lost webhook — so none sits "unconfirmed" until somebody
+ * happens to tap Check. Asking again uses each payout's own key, so it can
+ * never send twice.
+ */
+export const settlePayouts = onSchedule(
+  { schedule: "every 15 minutes", region: REGION, secrets: [MODEM_PAY_SECRET_KEY] },
+  async () => {
+    const settled = await settleStalePayouts(modemTransfer, modemTransferLookup, WEBHOOK_URL);
+    if (settled) console.log(`settlePayouts: ${settled} payout(s) moved on`);
+  },
+);
+
+/** "They did not come" — a patient holds a session's fee for a person to look at. */
+export const reportMissedSession = onCall(CALLABLE, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+  const bookingId = String(request.data?.bookingId ?? "").trim();
+  if (!bookingId) throw new HttpsError("invalid-argument", "Missing session.");
+  const result = await reportMissed(uid, bookingId, PAYOUT_HOLD_MS);
+  if (!result.ok) throw new HttpsError("failed-precondition", result.reason);
+  return { reported: true };
 });
 
 /** What a provider has earned — counted exactly as a withdrawal would count it. */

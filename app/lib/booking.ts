@@ -71,6 +71,7 @@ function toBooking(id: string, data: DocumentData): Booking {
     patientNote: typeof data.patientNote === "string" ? data.patientNote : "",
     patientMinor: data.patientMinor === true,
     payoutId: typeof data.payoutId === "string" ? data.payoutId : null,
+    disputed: data.disputed === true,
     meetUrl: typeof data.meetUrl === "string" && isMeetUrl(data.meetUrl) ? data.meetUrl : null,
     createdAt: typeof data.createdAt === "number" ? data.createdAt : 0,
     updatedAt: typeof data.updatedAt === "number" ? data.updatedAt : 0,
