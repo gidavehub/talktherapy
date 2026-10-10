@@ -66,7 +66,13 @@ export type CaptureEvents = {
   /** Speech detected — the user has started talking. */
   onSpeechStart?: () => void;
   /** A finished utterance, as base64 WAV (16kHz mono 16-bit). */
-  onUtterance: (wavBase64: string, seconds: number) => void;
+  /**
+   * `seconds` is the clip's length; `voicedSeconds` only the part that was
+   * speech. Pace is measured from the second — counting the pauses in "um…
+   * I… I lost my job" as speaking time made a hesitant speaker look slow, and
+   * Talk slowed to match a pace that was really just thinking.
+   */
+  onUtterance: (wavBase64: string, seconds: number, voicedSeconds: number) => void;
 };
 
 export class UtteranceCapture {
@@ -223,7 +229,7 @@ export class UtteranceCapture {
       pcm.set(c.subarray(0, n), offset);
       offset += n;
     }
-    this.events.onUtterance(encodeWav(downsample(pcm, rate, TARGET_RATE), TARGET_RATE), length / rate);
+    this.events.onUtterance(encodeWav(downsample(pcm, rate, TARGET_RATE), TARGET_RATE), length / rate, speech / rate);
   }
 }
 

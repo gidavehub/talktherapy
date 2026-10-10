@@ -131,6 +131,8 @@ export function useConversation({
   const awaitingLanguageRef = useRef(false);
   /** Talk has spoken the consent and is waiting for a yes. */
   const [awaitingConsent, setAwaitingConsent] = useState(false);
+  /** When this conversation began — for the clock on screen. Null when idle. */
+  const [startedAt, setStartedAt] = useState<number | null>(null);
   const awaitingConsentRef = useRef(false);
   /** Agreed this session — so a later greeting does not ask again. */
   const consentedRef = useRef(false);
@@ -554,6 +556,7 @@ export function useConversation({
         intake: next,
         displayName: opts.current.displayName,
         consented: hasConsent(),
+        paceWpm: paceRef.current ?? undefined,
       });
     },
     [hasConsent, speakRequest],
@@ -599,6 +602,7 @@ export function useConversation({
     playerRef.current?.dispose();
     playerRef.current = null;
     setTalkFeed(null);
+    setStartedAt(null);
     micStop();
     go("idle");
   }, [go, micStop]);
@@ -634,6 +638,7 @@ export function useConversation({
     activeRef.current = true;
     doneRef.current = false;
     startedAtRef.current = Date.now();
+    setStartedAt(startedAtRef.current);
     consentedRef.current = false;
     // Resume from whatever is known: the saved intake, or this session's.
     intakeRef.current = opts.current.intake;
@@ -681,8 +686,10 @@ export function useConversation({
           onSpeechStart: () => {
             if (phaseRef.current === "listening") go("hearing");
           },
-          onUtterance: (audio, seconds) => {
-            lastUtteranceSec.current = seconds;
+          onUtterance: (audio, seconds, voicedSeconds) => {
+            // Speech plus a fifth for the gaps between words — the rate people
+            // actually talk at — but never more than the clip itself.
+            lastUtteranceSec.current = Math.min(seconds, voicedSeconds * 1.2);
             void speakRequest(COMPANION.turn, turnBody({ audio })).then(afterTurn);
           },
         });
@@ -725,6 +732,9 @@ export function useConversation({
         abortRef.current?.abort();
         playerRef.current?.stop();
       }
+      // A typed message has no speaking time: without this it would be
+      // measured against the LAST thing they said aloud.
+      lastUtteranceSec.current = 0;
       void speakRequest(COMPANION.turn, turnBody({ text: clean }), { answered }).then(afterTurn);
     },
     [afterTurn, speakRequest, turnBody],
@@ -738,7 +748,7 @@ export function useConversation({
   const present = useCallback(
     (providers: unknown[], intake: Intake) => {
       doneRef.current = false;
-      void speakRequest(COMPANION.present, { providers, intake });
+      void speakRequest(COMPANION.present, { providers, intake, paceWpm: paceRef.current ?? undefined });
     },
     [speakRequest],
   );
@@ -822,6 +832,7 @@ export function useConversation({
     choices,
     awaitingLanguage,
     awaitingConsent,
+    startedAt,
     choose,
     present,
     start,

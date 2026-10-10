@@ -239,7 +239,9 @@ export const companionGreet = onRequest(options(60), async (req, res) => {
     consented: body.consented === false ? false : undefined,
   };
 
-  await speakingResponse(res, "companion/greet", () => runGreeting(input, signal));
+  // The greeting is said at their pace too, once there is one to match.
+  const paceWpm = num(body.paceWpm, 400);
+  await speakingResponse(res, "companion/greet", () => runGreeting(input, signal), paceWpm);
 });
 
 // ------------------------------------------------------------ read it aloud

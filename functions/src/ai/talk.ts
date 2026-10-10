@@ -319,12 +319,16 @@ function intakeSection(intake: Intake, remainingSec = INTAKE_BUDGET_SEC): string
   // her the time left is what keeps a warm conversation from becoming a long
   // one; the server stops asking entirely when it runs out.
   const minutes = Math.max(0, Math.round(remainingSec / 60));
+  // Told the WHOLE time, not only at the end: a conversation that learns in
+  // the last two minutes that it has two minutes left has already spent six
+  // on small talk.
+  const total = Math.round(INTAKE_BUDGET_SEC / 60);
   const clock =
     remainingSec <= 0
       ? "\nTIME IS UP. Ask nothing more: thank them, and say you will show them some providers now."
       : remainingSec <= 120
-        ? `\nABOUT ${minutes} MINUTE(S) LEFT. Keep it brief and move to the next thing still to learn; do not open new topics.`
-        : "";
+        ? `\nABOUT ${minutes} MINUTE(S) LEFT of ${total}. Keep it brief and move to the next thing still to learn; do not open new topics.`
+        : `\nTime: about ${minutes} of ${total} minutes left. Unhurried, but every question should move towards the providers; save tangents for them.`;
   const todo = missing.length
     ? missing.map((f, i) => `${i + 1}. ${FIELD_GUIDE[f]}`).join("\n")
     : "(nothing — close the conversation now)";
@@ -613,7 +617,8 @@ export async function runTurn(input: TurnInput, signal?: AbortSignal): Promise<T
     str(parsed.helpLine),
     isMinor(input.intake),
   );
-  if (!intakeMode || !transcript) return result;
+  // At their pace in every conversation, not only the intake.
+  if (!intakeMode || !transcript) return { ...result, speechRate: speechRate(input.paceWpm) };
 
   // Merge what this message told Talk into what was already known. The
   // conversation language counts as a preference once it is not English,

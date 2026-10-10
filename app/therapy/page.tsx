@@ -10,7 +10,8 @@ import { useAuth } from "@/components/AuthProvider";
 import { updateUserProfile } from "@/lib/auth";
 import { recordConsent } from "@/lib/wellbeing";
 import { useConversation, type Line, type Phase } from "@/lib/ai/useConversation";
-import { LANGUAGE_LABEL, type Language } from "@/lib/ai/protocol";
+import { INTAKE_BUDGET_SEC, LANGUAGE_LABEL, type Language } from "@/lib/ai/protocol";
+import ConversationClock from "@/components/therapy/ConversationClock";
 import {
   REQUIRED_FIELDS,
   SERVICE_LABELS,
@@ -560,6 +561,18 @@ export default function TherapyPage() {
                 transition={SPRING_SOFT}
               />
             ))}
+          </div>
+        ) : null}
+
+        {/* How long is left — the intake's eight minutes, or the paid window,
+            whichever ends first. Only while the conversation is running. */}
+        {talk.active ? (
+          <div className="relative z-10 mt-3">
+            <ConversationClock
+              startedAt={talk.startedAt}
+              budgetMs={intakeMode ? INTAKE_BUDGET_SEC * 1000 : null}
+              endsAt={consultation.entitlement?.endsAt ?? null}
+            />
           </div>
         ) : null}
 
