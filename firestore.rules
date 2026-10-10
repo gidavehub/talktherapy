@@ -384,9 +384,6 @@ service cloud.firestore {
 
     // ------------------------------------------------- WebRTC call signaling
 
-    // Short-lived SDP offer/answer and ICE candidates. Contents are useless
-    // without also being the live peer, but they still identify who is talking
-    // to whom, so they stay locked to the two participants.
     // groupCalls/{chatId} — a group session's call. The room IS the group
     // chat, so who may be in it is the chat's own member list, checked
     // against the chat rather than taken from whoever opened it first (the
@@ -406,10 +403,13 @@ service cloud.firestore {
         && request.resource.data.participants == resource.data.participants;
       allow delete: if false;
 
-      // Who is in the call now. Everyone in the group can see it; each
-      // person writes only their own.
+      // Who is in the call now. Everyone in the group can see it — checked
+      // against the chat, not the room, so the group can see a call is on
+      // before they have joined it (or before anybody has opened the room).
+      // Each person writes only their own.
       match /present/{uid} {
-        allow read: if isSignedIn() && request.auth.uid in roomMembers();
+        allow read: if isSignedIn()
+          && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
         allow create, update: if isSelf(uid)
           && request.auth.uid in roomMembers()
           && request.resource.data.uid == uid;
@@ -437,6 +437,9 @@ service cloud.firestore {
       }
     }
 
+    // Short-lived SDP offer/answer and ICE candidates. Contents are useless
+    // without also being the live peer, but they still identify who is talking
+    // to whom, so they stay locked to the two participants.
     match /calls/{sessionId} {
       // Same denormalisation as messages: ICE candidates arrive in bursts of
       // dozens, and a parent lookup per candidate is pure waste.

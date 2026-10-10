@@ -15,6 +15,7 @@ import TypingIndicator from "./TypingIndicator";
 import { useChatPeer } from "./useChatPeer";
 import ProviderAvatar from "../providers/ProviderAvatar";
 import CallButton from "./CallButton";
+import GroupCallButton from "./GroupCallButton";
 import type { VoiceRecording } from "./useVoiceRecorder";
 import { useReadAloud } from "../../lib/useReadAloud";
 import {
@@ -221,6 +222,7 @@ export default function ChatThread({ chatId }: { chatId: string }) {
         {uid && peerUid && !isGroup ? (
           <CallButton selfUid={uid} peerUid={peerUid} canBook={!isProvider} />
         ) : null}
+        {uid && isGroup && chat ? <GroupCallButton chatId={chatId} leading={chat.createdBy === uid} /> : null}
       </div>
 
       {/* Thread */}

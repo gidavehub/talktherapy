@@ -12,8 +12,9 @@
  * Signalling, all under `groupCalls/{chatId}` (the room is the group chat, so
  * the rules check members against the chat's own list):
  *
- *   present/{uid}      who is in the call now: a fresh `session` id per join
- *                      and a heartbeat. Gone or stale (no heartbeat) = left.
+ *   present/{uid}      who is in the call now: a fresh `session` id per join,
+ *                      whether their camera is on, and a heartbeat. Gone, or
+ *                      a heartbeat that has stopped changing, = left.
  *   links/{a__b}       one per pair, uids sorted. The FIRST uid makes the
  *                      offer — no negotiation, the same trick as the 1:1 call.
  *                      Offer and answer carry both sides' session ids, so a
@@ -38,19 +39,23 @@ import {
   type DocumentData,
   type Unsubscribe,
 } from "firebase/firestore";
-import { firestore } from "./firebase";
+import { firebaseConfigured, firestore } from "./firebase";
 import { COLLECTIONS } from "./models";
 import { hasRelay } from "./call";
+import { asPresence, joinedAfter, liveness, type Presence } from "./groupCallPresence";
 
 /** Everybody in the call, you included. A mesh past this hurts on mobile data. */
 export const MAX_IN_CALL = 5;
-/** Seconds between "still here" signals, and how long silence means gone. */
+/** Between "still here" signals. */
 const HEARTBEAT_MS = 10_000;
-const STALE_MS = 35_000;
+/** How often the people in the call are re-checked when nothing else has changed. */
+const SWEEP_MS = 5_000;
 
 export type Peer = {
   uid: string;
+  /** Their voice, and their picture when there is one. Always play it. */
   stream: MediaStream;
+  /** A picture to show: their camera is on AND it is arriving. */
   hasVideo: boolean;
   state: "connecting" | "connected" | "reconnecting" | "failed";
 };
@@ -58,8 +63,8 @@ export type Peer = {
 export type GroupCallHandlers = {
   /** The other people in the call, every time anything about them changes. */
   onPeers: (peers: Peer[]) => void;
-  /** Too many people already: this join was refused before anything was sent. */
-  onFull?: () => void;
+  /** You joined from another tab or phone; this one has left the call to it. */
+  onReplaced?: () => void;
 };
 
 export type GroupCallController = {
@@ -104,12 +109,51 @@ async function localMedia(wantVideo: boolean): Promise<{ stream: MediaStream; au
 const pairId = (a: string, b: string) => [a, b].sort().join("__");
 const newSession = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
+/**
+ * Who is in a group's call right now, live — for the chat header and the
+ * screen before joining, so a member can see a call is on and walk into it.
+ * Readable by every member of the group, joined or not.
+ */
+export function watchGroupCall(chatId: string, cb: (uids: string[]) => void): Unsubscribe {
+  if (!firebaseConfigured()) {
+    cb([]);
+    return () => {};
+  }
+  const alive = liveness();
+  let all: Presence[] = [];
+  let last = "";
+  const report = () => {
+    const uids = alive(all, Date.now()).map((p) => p.uid).sort();
+    const key = uids.join(",");
+    if (key === last) return;
+    last = key;
+    cb(uids);
+  };
+  const off = onSnapshot(
+    collection(firestore(), COLLECTIONS.groupCalls, chatId, "present"),
+    (snap) => {
+      all = snap.docs.map((d) => asPresence(d.data())).filter((p): p is Presence => p !== null);
+      report();
+    },
+    () => cb([]),
+  );
+  // Nobody writes when somebody's tab dies: the clock has to notice.
+  const sweep = setInterval(report, SWEEP_MS);
+  return () => {
+    clearInterval(sweep);
+    off();
+  };
+}
+
 type Link = {
   peerUid: string;
   peerSession: string;
   pc: RTCPeerConnection;
   stream: MediaStream;
-  hasVideo: boolean;
+  /** Frames are arriving. */
+  receiving: boolean;
+  /** Their camera is on, by their own presence — a camera switched off still sends black. */
+  cameraOn: boolean;
   state: Peer["state"];
   unsubs: Unsubscribe[];
 };
@@ -117,6 +161,9 @@ type Link = {
 /**
  * Join the group's call. The room is the group chat: only its members can
  * open it, and the rules check that against the chat itself.
+ *
+ * Resolves to null when the call is already full — nothing has been sent, and
+ * the microphone and camera are off again.
  */
 export async function joinGroupCall(
   chatId: string,
@@ -128,19 +175,35 @@ export async function joinGroupCall(
   const db = firestore();
   const room = doc(db, COLLECTIONS.groupCalls, chatId);
   const presence = collection(room, "present");
+  const me = doc(presence, selfUid);
   const mySession = newSession();
+  const joinedAt = Date.now();
   const links = new Map<string, Link>();
   let ended = false;
+  let admitted = false;
 
   const { stream: localStream, audioOnly } = await localMedia(options.video !== false);
+  let cameraOn = !audioOnly;
+  const stopMedia = () => localStream.getTracks().forEach((t) => t.stop());
+
+  // The room — created by whoever is first, with the chat's own members. If
+  // that is refused, the camera must not stay on behind the error.
+  try {
+    await setDoc(room, { chatId, participants, status: "active", updatedAt: serverTimestamp() }, { merge: true });
+  } catch (e) {
+    stopMedia();
+    throw e;
+  }
 
   const emit = () =>
     handlers.onPeers(
-      [...links.values()].map((l) => ({ uid: l.peerUid, stream: l.stream, hasVideo: l.hasVideo, state: l.state })),
+      [...links.values()].map((l) => ({
+        uid: l.peerUid,
+        stream: l.stream,
+        hasVideo: l.receiving && l.cameraOn,
+        state: l.state,
+      })),
     );
-
-  // The room — created by whoever is first, with the chat's own members.
-  await setDoc(room, { chatId, participants, status: "active", startedAt: serverTimestamp() }, { merge: true });
 
   const close = (peerUid: string) => {
     const link = links.get(peerUid);
@@ -155,22 +218,33 @@ export async function joinGroupCall(
   };
 
   /** Connect to one other person. Whoever's uid sorts first makes the offer. */
-  const open = (peerUid: string, peerSession: string) => {
+  const open = (peer: Presence) => {
     const pc = new RTCPeerConnection({ iceServers: iceServers() });
     for (const track of localStream.getTracks()) pc.addTrack(track, localStream);
+    // Without this, an offer from somebody with no camera has no video
+    // section at all, and the others' pictures have nowhere to arrive.
     if (audioOnly) pc.addTransceiver("video", { direction: "recvonly" });
 
-    const link: Link = { peerUid, peerSession, pc, stream: new MediaStream(), hasVideo: false, state: "connecting", unsubs: [] };
-    links.set(peerUid, link);
+    const link: Link = {
+      peerUid: peer.uid,
+      peerSession: peer.session,
+      pc,
+      stream: new MediaStream(),
+      receiving: false,
+      cameraOn: peer.video,
+      state: "connecting",
+      unsubs: [],
+    };
+    links.set(peer.uid, link);
 
     pc.ontrack = (event) => {
       const tracks = event.streams[0]?.getTracks() ?? [event.track];
       for (const track of tracks) {
         if (!link.stream.getTracks().includes(track)) link.stream.addTrack(track);
         if (track.kind === "video") {
-          link.hasVideo = true;
+          link.receiving = !track.muted;
           const set = (on: boolean) => () => {
-            link.hasVideo = on;
+            link.receiving = on;
             emit();
           };
           track.onmute = set(false);
@@ -192,7 +266,28 @@ export async function joinGroupCall(
       emit();
     };
 
-    const pairRef = doc(room, "links", pairId(selfUid, peerUid));
+    // Candidates can arrive before the offer or answer they belong to has
+    // been applied — adding one then fails, and a lost candidate can be the
+    // one route that would have worked. Hold them until there is somewhere
+    // to put them.
+    const held: RTCIceCandidateInit[] = [];
+    const addCandidate = (init: RTCIceCandidateInit) => {
+      if (!pc.remoteDescription) {
+        held.push(init);
+        return;
+      }
+      void pc.addIceCandidate(new RTCIceCandidate(init)).catch(() => {});
+    };
+    const applyRemote = async (description: RTCSessionDescriptionInit) => {
+      await pc.setRemoteDescription(new RTCSessionDescription(description));
+      for (const init of held.splice(0)) void pc.addIceCandidate(new RTCIceCandidate(init)).catch(() => {});
+    };
+    const fail = () => {
+      link.state = "failed";
+      emit();
+    };
+
+    const pairRef = doc(room, "links", pairId(selfUid, peer.uid));
     const candidates = collection(pairRef, "candidates");
     pc.onicecandidate = (event) => {
       if (!event.candidate || ended) return;
@@ -204,39 +299,42 @@ export async function joinGroupCall(
           if (change.type !== "added") continue;
           const c = change.doc.data();
           // Theirs, from THIS join of theirs — never an earlier one's.
-          if (c.from !== peerUid || c.session !== link.peerSession) continue;
+          if (c.from !== peer.uid || c.session !== link.peerSession) continue;
           const { from: _from, session: _session, ...init } = c;
           void _from;
           void _session;
-          void pc.addIceCandidate(new RTCIceCandidate(init as RTCIceCandidateInit)).catch(() => {});
+          addCandidate(init as RTCIceCandidateInit);
         }
       }),
     );
 
-    const iOffer = [selfUid, peerUid].sort()[0] === selfUid;
+    // The pair document fires more than once for one write (the server's
+    // timestamp lands as a second snapshot). Each side acts exactly once:
+    // applying an answer twice, or answering one offer twice, breaks the
+    // connection in ways that look like a bad network.
+    let handled = false;
+    const iOffer = [selfUid, peer.uid].sort()[0] === selfUid;
     if (iOffer) {
       void (async () => {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         await setDoc(pairRef, {
-          members: [selfUid, peerUid].sort(),
+          members: [selfUid, peer.uid].sort(),
           offer: { type: offer.type, sdp: offer.sdp },
           offerSession: mySession,
-          answerSession: peerSession,
+          answerSession: peer.session,
           answer: null,
           updatedAt: serverTimestamp(),
         });
-      })().catch(() => {
-        link.state = "failed";
-        emit();
-      });
+      })().catch(fail);
       link.unsubs.push(
         onSnapshot(pairRef, (snap) => {
           const data = snap.data() as DocumentData | undefined;
           // Only the answer to THIS offer, from THIS join of theirs.
-          if (!data?.answer || pc.currentRemoteDescription) return;
+          if (handled || !data?.answer) return;
           if (data.offerSession !== mySession || data.answerSession !== link.peerSession) return;
-          void pc.setRemoteDescription(new RTCSessionDescription(data.answer)).catch(() => {});
+          handled = true;
+          applyRemote(data.answer).catch(fail);
         }),
       );
     } else {
@@ -244,80 +342,120 @@ export async function joinGroupCall(
         onSnapshot(pairRef, (snap) => {
           const data = snap.data() as DocumentData | undefined;
           // An offer meant for this join of mine, from their current join.
-          if (!data?.offer || pc.currentRemoteDescription) return;
+          if (handled || !data?.offer) return;
           if (data.answerSession !== mySession || data.offerSession !== link.peerSession) return;
+          handled = true;
           void (async () => {
-            await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+            await applyRemote(data.offer);
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
             await updateDoc(pairRef, { answer: { type: answer.type, sdp: answer.sdp }, updatedAt: serverTimestamp() });
-          })().catch(() => {
-            link.state = "failed";
-            emit();
-          });
+          })().catch(fail);
         }),
       );
     }
     emit();
   };
 
+  const announce = () =>
+    setDoc(me, {
+      uid: selfUid,
+      session: mySession,
+      video: cameraOn,
+      joinedAt,
+      heartbeatAt: Date.now(),
+    }).catch(() => {});
+
   // Who is here — and whether there is room for one more.
-  let admitted = false;
-  let refused = false;
-  const presenceUnsub = onSnapshot(presence, (snap) => {
+  const alive = liveness();
+  let all: Presence[] = [];
+  let full = false;
+
+  const stop = async (removePresence: boolean) => {
     if (ended) return;
-    const now = Date.now();
-    const here = snap.docs
-      .map((d) => d.data())
-      .filter((p) => typeof p.uid === "string" && typeof p.session === "string" && now - Number(p.heartbeatAt ?? 0) < STALE_MS);
+    ended = true;
+    clearInterval(heartbeat);
+    clearInterval(sweep);
+    window.removeEventListener("pagehide", onPageHide);
+    presenceUnsub();
+    for (const uid of [...links.keys()]) close(uid);
+    stopMedia();
+    if (removePresence) await deleteDoc(me).catch(() => {});
+  };
+
+  const evaluate = () => {
+    if (ended) return;
+    const here = alive(all, Date.now());
+    const others = here.filter((p) => p.uid !== selfUid && participants.includes(p.uid));
 
     if (!admitted) {
-      const others = here.filter((p) => p.uid !== selfUid);
-      if (others.length >= MAX_IN_CALL) {
-        refused = true;
+      full = others.length >= MAX_IN_CALL;
+      return;
+    }
+
+    // You, from another tab or phone. Whichever joined LAST keeps the call;
+    // both sides compare the same two values, so exactly one of them leaves.
+    const mine = all.find((p) => p.uid === selfUid);
+    if (mine && mine.session !== mySession) {
+      if (joinedAfter(mine, { joinedAt, session: mySession })) {
+        // Leave their presence where it is: it is theirs now.
+        void stop(false);
+        handlers.onReplaced?.();
         return;
       }
+      // An older join's last beat landed after ours. Say we are here again
+      // straight away, before the others reconnect to the wrong one.
+      void announce();
     }
 
-    for (const p of here) {
-      if (p.uid === selfUid || !participants.includes(p.uid)) continue;
+    let changed = false;
+    for (const p of others) {
       const existing = links.get(p.uid);
-      if (existing && existing.peerSession === p.session) continue;
+      if (existing && existing.peerSession === p.session) {
+        if (existing.cameraOn !== p.video) {
+          existing.cameraOn = p.video;
+          changed = true;
+        }
+        continue;
+      }
       if (existing) close(p.uid); // they rejoined: a new connection for the new join
-      open(p.uid, p.session);
+      open(p);
     }
     for (const uid of [...links.keys()]) {
-      if (!here.some((p) => p.uid === uid)) close(uid);
+      if (!others.some((p) => p.uid === uid)) close(uid);
     }
-  });
+    if (changed) emit();
+  };
 
-  // Give the first snapshot a moment to say whether the call is full.
-  await new Promise((r) => setTimeout(r, 600));
-  if (refused) {
-    presenceUnsub();
-    localStream.getTracks().forEach((t) => t.stop());
-    handlers.onFull?.();
+  let firstLook: () => void = () => {};
+  const looked = new Promise<void>((resolve) => (firstLook = resolve));
+  const presenceUnsub = onSnapshot(
+    presence,
+    (snap) => {
+      all = snap.docs.map((d) => asPresence(d.data())).filter((p): p is Presence => p !== null);
+      evaluate();
+      firstLook();
+    },
+    () => firstLook(),
+  );
+  const sweep = setInterval(evaluate, SWEEP_MS);
+  let heartbeat: ReturnType<typeof setInterval> | undefined = undefined;
+  // A closed tab never runs React's cleanup. This is the last chance to say so.
+  const onPageHide = () => void stop(true);
+
+  // Whether the call is full is decided on what is actually there, not on a
+  // guess at how long the first look takes.
+  await Promise.race([looked, new Promise((r) => setTimeout(r, 8_000))]);
+  if (full) {
+    await stop(false);
     return null;
   }
   admitted = true;
 
-  const me = doc(presence, selfUid);
-  const announce = () =>
-    setDoc(me, { uid: selfUid, session: mySession, video: !audioOnly, heartbeatAt: Date.now() }).catch(() => {});
   await announce();
-  // Each beat is also what drops the dead: writing our own presence fires our
-  // presence listener, which re-checks everybody's last beat against the clock.
-  const heartbeat = setInterval(() => void announce(), HEARTBEAT_MS);
-
-  const leave = async () => {
-    if (ended) return;
-    ended = true;
-    clearInterval(heartbeat);
-    presenceUnsub();
-    for (const uid of [...links.keys()]) close(uid);
-    localStream.getTracks().forEach((t) => t.stop());
-    await deleteDoc(me).catch(() => {});
-  };
+  heartbeat = setInterval(() => void announce(), HEARTBEAT_MS);
+  window.addEventListener("pagehide", onPageHide);
+  evaluate();
 
   return {
     localStream,
@@ -327,8 +465,11 @@ export async function joinGroupCall(
     },
     setCameraEnabled: (on) => {
       for (const t of localStream.getVideoTracks()) t.enabled = on;
+      // Said out loud, so the others show your face instead of a black square.
+      cameraOn = on && !audioOnly;
+      void announce();
     },
-    leave,
+    leave: () => stop(true),
   };
 }
 
