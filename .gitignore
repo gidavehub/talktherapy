@@ -51,3 +51,7 @@ next-env.d.ts
 
 # Agent worktrees (local scratch, never part of the repo)
 .claude/worktrees/
+
+# Written by the Firebase emulators and CLI on every run.
+firebase-debug.log
+firebase-debug.*.log
