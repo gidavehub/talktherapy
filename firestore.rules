@@ -303,7 +303,11 @@ service cloud.firestore {
         && (
           // A two-person chat lives at the id derived from the pair.
           (request.resource.data.participants.size() == 2
-            && chatId == request.resource.data.participants.join('__'))
+            && chatId == request.resource.data.participants.join('__')
+            // Not a group in disguise: one whose "creator" could later take
+            // the other person out of their own conversation.
+            && request.resource.data.get('createdBy', null) == null
+            && request.resource.data.get('group', null) == null)
           ||
           // A group session is PROVIDER-LED: only a provider may start one,
           // and must record themselves as the one who did. A client cannot
@@ -312,7 +316,14 @@ service cloud.firestore {
           (request.resource.data.participants.size() > 2
             && hasRole('provider')
             && request.resource.data.createdBy == request.auth.uid
-            && request.resource.data.get('group', 'led') in ['led', 'peer'])
+            && request.resource.data.get('group', 'led') in ['led', 'peer']
+            // Never at a pair-shaped id: a group made at the id two other
+            // people's conversation WOULD have would be walked into by them,
+            // with its creator reading along. Generated ids never hold '__'.
+            && chatId.split('__').size() == 1
+            // Nobody listed twice: a member listed twice could never leave.
+            && request.resource.data.participants.toSet().size()
+                 == request.resource.data.participants.size())
         );
 
       // One person out of a group, nobody in: yourself — anybody may leave,

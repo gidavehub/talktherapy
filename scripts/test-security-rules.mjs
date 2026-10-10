@@ -201,6 +201,12 @@ const CASES = [
     { ...peerGroup }],
   ["a group of a made-up kind", "DENY", PROVIDER, "create", `${DOCS}/chats/group_6`, null,
     { ...peerGroup, group: "anything" }],
+  ["a group at the id of two other people's future chat", "DENY", PROVIDER, "create",
+    `${DOCS}/chats/${[PATIENT, THIRD].sort().join("__")}`, null, { ...peerGroup }],
+  ["a group listing somebody twice", "DENY", PROVIDER, "create", `${DOCS}/chats/group_7`, null,
+    { ...peerGroup, participants: [PATIENT, PROVIDER, THIRD, THIRD] }],
+  ["a two-person chat dressed up as a group", "DENY", PATIENT, "create", `${DOCS}/chats/${CHAT}`, null,
+    { ...chat, createdBy: PATIENT, group: "led" }],
 
   // --- leaving, and being taken out --------------------------------------
   ["a member leaves a group", "ALLOW", PATIENT, "update", `${DOCS}/chats/${GROUP}`, peerGroup,

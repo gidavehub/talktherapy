@@ -153,8 +153,8 @@ export default function GroupInfo({
           {confirmLeave ? (
             <div className="space-y-3">
               <p className="text-[13px] leading-relaxed">
-                Leave {groupTitle(chat) ?? "this group"}? You keep what was said while you were in it, and
-                see nothing new.{" "}
+                Leave {groupTitle(chat) ?? "this group"}? It will leave your conversations, and nothing
+                said in it after you go will reach you.{" "}
                 {setUp ? "Nobody else can take people out once you have gone." : "You cannot rejoin by yourself."}
               </p>
               <div className="flex items-center gap-2">

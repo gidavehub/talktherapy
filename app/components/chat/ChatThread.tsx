@@ -62,7 +62,8 @@ export default function ChatThread({ chatId }: { chatId: string }) {
   const isProvider = role === "provider";
   const uid = user?.uid ?? null;
 
-  const [chat, setChat] = useState<Chat | null>(null);
+  /** Undefined while loading; null when it is not yours to read (left, taken out, or never in it). */
+  const [chat, setChat] = useState<Chat | null | undefined>(undefined);
   const [messages, setMessages] = useState<ChatMessage[] | null>(null);
   const [typingUids, setTypingUids] = useState<string[]>([]);
   const [groupInfoOpen, setGroupInfoOpen] = useState(false);
@@ -178,10 +179,32 @@ export default function ChatThread({ chatId }: { chatId: string }) {
     };
   }, [chatId, uid]);
 
-  const loading = messages === null || chat === null;
+  const loading = messages === null || chat === undefined;
   // By the group having been set up as one, not by head count: a group
   // somebody has left can be down to two and is still a group.
   const isGroup = chat ? isGroupChat(chat) : false;
+
+  // Refused, not loading: somebody who has left a group, been taken out of
+  // one while reading it, or followed a link to a conversation that is not
+  // theirs. Say so — an endless skeleton under a header pretending to be a
+  // two-person chat is the worst possible answer to "where did my group go".
+  if (chat === null) {
+    return (
+      <EmptyState
+        icon={<IconChat />}
+        title="You are not in this conversation any more"
+        description="You may have left this group, or been taken out of it. Nothing said in it from now on will reach you."
+        action={
+          <Link
+            href="/chats"
+            className="inline-flex h-10 items-center rounded-full bg-[var(--dark)] px-5 text-[12.5px] text-white"
+          >
+            Your conversations
+          </Link>
+        }
+      />
+    );
+  }
 
   return (
     <motion.div

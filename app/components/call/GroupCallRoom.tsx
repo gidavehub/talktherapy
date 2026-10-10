@@ -231,9 +231,16 @@ export default function GroupCallRoom({ chatId }: { chatId: string }) {
     () =>
       watchChat(chatId, (next) => {
         setChat(next);
+        const out = !next || !uid || !next.participants.includes(uid);
+        // Taken out while a join is still under way: stop it, before it can
+        // start a call behind a screen with no way to hang up.
+        if (out && joiningRef.current) {
+          joiningRef.current.abort();
+          setLeft("removed");
+        }
         const call = callRef.current;
         if (!call) return;
-        if (!next || !uid || !next.participants.includes(uid)) {
+        if (out) {
           callRef.current = null;
           setJoined(false);
           setPeers([]);
@@ -301,7 +308,8 @@ export default function GroupCallRoom({ chatId }: { chatId: string }) {
         if (hereRef.current) setLeft((l) => l ?? "full");
         return;
       }
-      if (!hereRef.current) {
+      // Gone from the page, or taken out of the group, while it finished.
+      if (!hereRef.current || cancel.signal.aborted) {
         void call.leave();
         return;
       }
@@ -343,7 +351,11 @@ export default function GroupCallRoom({ chatId }: { chatId: string }) {
   }
 
   if (chat === null || !uid) {
-    return (
+    return left === "removed" ? (
+      <Alert tone="info" title="You have left the call">
+        {LEFT_TEXT.removed}
+      </Alert>
+    ) : (
       <Alert tone="warning" title="No such group">
         This group does not exist, or you are not in it.
       </Alert>
@@ -494,7 +506,10 @@ export default function GroupCallRoom({ chatId }: { chatId: string }) {
       ) : null}
 
       {left ? (
-        <Alert tone="info" title={left === "full" ? "The call is full" : "The call moved"}>
+        <Alert
+          tone="info"
+          title={left === "full" ? "The call is full" : left === "replaced" ? "The call moved" : "You have left the call"}
+        >
           {LEFT_TEXT[left]}
         </Alert>
       ) : null}

@@ -225,6 +225,16 @@ export async function openChat(
   try {
     const existing = await getDoc(ref);
     if (existing.exists()) {
+      // Only ever this pair's own conversation. A document at this id that is
+      // a group, or holds anybody else, is not something to walk into — it is
+      // somebody squatting the id. firestore.rules refuses creating one now;
+      // this refuses to trust one made before that.
+      const data = existing.data();
+      const pair = [patientId, providerId].sort();
+      const people = Array.isArray(data.participants) ? [...data.participants].sort() : [];
+      if (typeof data.createdBy === "string" || people.join("__") !== pair.join("__")) {
+        throw new Error("This conversation could not be opened.");
+      }
       // A chat opened before the age question was answered. The flag only
       // ever goes ON from here; nothing on this path turns it off.
       if (minor && existing.data().minor !== true) await updateDoc(ref, { minor: true });
@@ -716,9 +726,10 @@ export function isGroupChat(chat: Chat): boolean {
 }
 
 /**
- * Leave a group. Anybody may, always — nobody is kept in a room. What was
- * said while you were there stays readable to you (each message carries its
- * own copy of who was in the room); nothing said after reaches you.
+ * Leave a group. Anybody may, always — nobody is kept in a room. Nothing said
+ * after reaches you. (Each message carries its own copy of who was in the
+ * room, so the rules would still let you read what was said while you were
+ * there; no screen offers that yet, and the leave dialog does not promise it.)
  */
 export async function leaveGroup(chatId: string, uid: string): Promise<void> {
   await updateDoc(chatRef(chatId), {

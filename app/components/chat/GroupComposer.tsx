@@ -60,7 +60,7 @@ function Person({
   chat: Chat;
   selfUid: string;
   picked: boolean;
-  onToggle: (uid: string, name: string) => void;
+  onToggle: (uid: string, name: string, minor: boolean) => void;
 }) {
   const uid = otherParticipant(chat, selfUid);
   const peer = useChatPeer(uid, nameOf(chat, uid) || "Someone you are working with");
@@ -69,7 +69,7 @@ function Person({
   return (
     <motion.button
       type="button"
-      onClick={() => onToggle(uid, peer.name)}
+      onClick={() => onToggle(uid, peer.name, chat.minor)}
       whileTap={{ scale: 0.98 }}
       transition={SPRING_SNAP}
       aria-pressed={picked}
@@ -106,7 +106,8 @@ export default function GroupComposer({
   selfName: string | null;
 }) {
   const router = useRouter();
-  const [picked, setPicked] = useState<Record<string, string>>({});
+  /** Who is picked — with whether they are under 18, recorded when picked: their row can scroll out of the list. */
+  const [picked, setPicked] = useState<Record<string, { name: string; minor: boolean }>>({});
   const [title, setTitle] = useState("");
   const [group, setGroup] = useState<"led" | "peer">("led");
   const [creating, setCreating] = useState(false);
@@ -117,18 +118,15 @@ export default function GroupComposer({
   const count = Object.keys(picked).length;
   // Under-18s and adults together. The flag is the one on each two-person
   // chat — see Chat.minor for why a provider can trust it only so far.
-  const minorsPicked = people.filter((c) => {
-    const uid = otherParticipant(c, selfUid);
-    return c.minor && uid !== null && Boolean(picked[uid]);
-  }).length;
+  const minorsPicked = Object.values(picked).filter((p) => p.minor).length;
   const mixed = minorsPicked > 0 && minorsPicked < count;
   const blocked = group === "peer" && mixed;
 
-  function toggle(uid: string, name: string) {
+  function toggle(uid: string, name: string, minor: boolean) {
     setPicked((current) => {
       const next = { ...current };
       if (next[uid]) delete next[uid];
-      else next[uid] = name;
+      else next[uid] = { name, minor };
       return next;
     });
   }
@@ -141,7 +139,10 @@ export default function GroupComposer({
       const chatId = await createGroupChat(
         [selfUid, ...Object.keys(picked)],
         selfUid,
-        { ...picked, ...(selfName ? { [selfUid]: selfName } : {}) },
+        {
+          ...Object.fromEntries(Object.entries(picked).map(([uid, p]) => [uid, p.name])),
+          ...(selfName ? { [selfUid]: selfName } : {}),
+        },
         title,
         group,
       );
