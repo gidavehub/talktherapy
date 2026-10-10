@@ -130,6 +130,19 @@ const THIRD = "third-uid";
 const GROUP = "group_call_1";
 const groupRoom = { chatId: GROUP, participants: [PATIENT, PROVIDER, THIRD], status: "active" };
 const PAIR = [PATIENT, PROVIDER].sort().join("__");
+/** A group THIRD has since left: its room was opened when they were still in it. */
+const SHRUNK = "group_call_2";
+/** The same three as a peer group's chat. */
+const peerGroup = {
+  participants: [PATIENT, PROVIDER, THIRD],
+  names: {},
+  title: "Thursday circle",
+  createdBy: PROVIDER,
+  group: "peer",
+  lastMessage: "",
+  unread: { [PATIENT]: 0, [PROVIDER]: 0, [THIRD]: 0 },
+  typing: {},
+};
 
 /** A paid consultation, as the server writes it. */
 const entitlement = {
@@ -183,6 +196,29 @@ const CASES = [
     { ...chat, participants: [PATIENT, PROVIDER, STRANGER], createdBy: PATIENT }],
   ["a provider starts a group they are not in", "DENY", PROVIDER, "create", `${DOCS}/chats/group_4`, null,
     { ...chat, participants: [PATIENT, STRANGER, "another-uid"], createdBy: PROVIDER }],
+
+  ["a provider starts a peer group", "ALLOW", PROVIDER, "create", `${DOCS}/chats/group_5`, null,
+    { ...peerGroup }],
+  ["a group of a made-up kind", "DENY", PROVIDER, "create", `${DOCS}/chats/group_6`, null,
+    { ...peerGroup, group: "anything" }],
+
+  // --- leaving, and being taken out --------------------------------------
+  ["a member leaves a group", "ALLOW", PATIENT, "update", `${DOCS}/chats/${GROUP}`, peerGroup,
+    { ...peerGroup, participants: [PROVIDER, THIRD], unread: { [PROVIDER]: 0, [THIRD]: 0 } }],
+  ["a member takes somebody else out", "DENY", PATIENT, "update", `${DOCS}/chats/${GROUP}`, peerGroup,
+    { ...peerGroup, participants: [PATIENT, PROVIDER] }],
+  ["the provider who set it up takes somebody out", "ALLOW", PROVIDER, "update", `${DOCS}/chats/${GROUP}`, peerGroup,
+    { ...peerGroup, participants: [PATIENT, PROVIDER] }],
+  ["two out at once", "DENY", PROVIDER, "update", `${DOCS}/chats/${GROUP}`, peerGroup,
+    { ...peerGroup, participants: [PROVIDER] }],
+  ["one out and somebody new in", "DENY", PROVIDER, "update", `${DOCS}/chats/${GROUP}`, peerGroup,
+    { ...peerGroup, participants: [PROVIDER, THIRD, STRANGER] }],
+  ["leaving while renaming the group", "DENY", PATIENT, "update", `${DOCS}/chats/${GROUP}`, peerGroup,
+    { ...peerGroup, participants: [PROVIDER, THIRD], title: "Mine now" }],
+  ["a member claims to have set the group up", "DENY", PATIENT, "update", `${DOCS}/chats/${GROUP}`, peerGroup,
+    { ...peerGroup, createdBy: PATIENT }],
+  ["a member turns a led group into a peer group", "DENY", PATIENT, "update", `${DOCS}/chats/${GROUP}`,
+    { ...peerGroup, group: "led" }, { ...peerGroup, group: "peer" }],
 
   // --- sending -----------------------------------------------------------
   ["sending a message as yourself", "ALLOW", PATIENT, "create", `${DOCS}/chats/${CHAT}/messages/m2`, null, message],
@@ -400,6 +436,20 @@ const CASES = [
     { members: [PATIENT, PROVIDER] }],
   ["a third member reads a pair's link", "DENY", THIRD, "get", `${DOCS}/groupCalls/${GROUP}/links/${PAIR}`,
     { members: [PATIENT, PROVIDER] }],
+  ["a member reopens the call after somebody left the group", "ALLOW", PATIENT, "update",
+    `${DOCS}/groupCalls/${SHRUNK}`, { ...groupRoom, chatId: SHRUNK },
+    { ...groupRoom, chatId: SHRUNK, participants: [PATIENT, PROVIDER] }],
+  ["reopening it with the old list", "DENY", PATIENT, "update",
+    `${DOCS}/groupCalls/${SHRUNK}`, { ...groupRoom, chatId: SHRUNK }, { ...groupRoom, chatId: SHRUNK }],
+  ["somebody who left says they are in the call", "DENY", THIRD, "update",
+    `${DOCS}/groupCalls/${SHRUNK}/present/${THIRD}`, { uid: THIRD, session: "s1", heartbeatAt: 1 },
+    { uid: THIRD, session: "s1", heartbeatAt: 2 }],
+  ["somebody who left signals to a member", "DENY", THIRD, "create",
+    `${DOCS}/groupCalls/${SHRUNK}/links/${[PATIENT, THIRD].sort().join("__")}`, null, { members: [PATIENT, THIRD] }],
+  ["a member clears their own old candidates", "ALLOW", PATIENT, "delete",
+    `${DOCS}/groupCalls/${GROUP}/links/${PAIR}/candidates/c1`, { from: PATIENT, attempt: "a1" }],
+  ["clearing the other side's candidates", "DENY", PATIENT, "delete",
+    `${DOCS}/groupCalls/${GROUP}/links/${PAIR}/candidates/c2`, { from: PROVIDER, attempt: "a1" }],
   ["a candidate sent in somebody else's name", "DENY", PATIENT, "create",
     `${DOCS}/groupCalls/${GROUP}/links/${PAIR}/candidates/c1`, null, { from: PROVIDER, session: "s1" }],
 
@@ -455,12 +505,13 @@ const testCase = ([, expectation, uid, method, path, existing, incoming]) => ({
     ? { functionMocks: [parentChatMock] }
     : {}),
   ...(path.includes("/providerProfiles/") ? { functionMocks: userDocMocks } : {}),
-  // The group call room checks members against the chat, then its own room.
+  // The group call room checks members against the chat as it is NOW —
+  // including a group somebody has left since its room was opened.
   ...(path.includes("/groupCalls/")
     ? {
         functionMocks: [
           { function: "get", args: [{ exactValue: `${DOCS}/chats/${GROUP}` }], result: { value: { data: { participants: groupRoom.participants } } } },
-          { function: "get", args: [{ exactValue: `${DOCS}/groupCalls/${GROUP}` }], result: { value: { data: groupRoom } } },
+          { function: "get", args: [{ exactValue: `${DOCS}/chats/${SHRUNK}` }], result: { value: { data: { participants: [PATIENT, PROVIDER] } } } },
         ],
       }
     : {}),

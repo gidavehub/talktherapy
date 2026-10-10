@@ -311,8 +311,28 @@ service cloud.firestore {
           // deliberate decision, not something that falls out of this rule.
           (request.resource.data.participants.size() > 2
             && hasRole('provider')
-            && request.resource.data.createdBy == request.auth.uid)
+            && request.resource.data.createdBy == request.auth.uid
+            && request.resource.data.get('group', 'led') in ['led', 'peer'])
         );
+
+      // One person out of a group, nobody in: yourself — anybody may leave,
+      // always; nobody is kept in a room — or somebody else, by the provider
+      // who set the group up. Only the membership and that person's counters
+      // may change with it. Messages already sent keep their own copy of who
+      // was in the room, so whoever left keeps what they were part of and
+      // sees nothing new.
+      function isLeavingOrRemoval() {
+        let before = resource.data.participants;
+        let after = request.resource.data.participants;
+        let gone = before.removeAll(after);
+        return resource.data.get('createdBy', null) != null
+          && after.size() == before.size() - 1
+          && before.hasAll(after)
+          && gone.size() == 1
+          && (gone[0] == request.auth.uid || resource.data.createdBy == request.auth.uid)
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['participants', 'unread', 'typing']);
+      }
 
       // Participants are immutable, and this is the most important line in the
       // block. Everything else here — the preview, the unread counters, the
@@ -321,8 +341,15 @@ service cloud.firestore {
       // But adding a uid to a live chat would retroactively hand that person
       // every message already in it, because the message rule below trusts the
       // same array. Pinning it is what stops a participant doing that.
+      //
+      // Who set a group up, and what kind of group it is, are pinned too:
+      // removing somebody is that person's power, so it must not be claimable
+      // by rewriting `createdBy`.
       allow update: if isChatParticipant()
-        && request.resource.data.participants == resource.data.participants;
+        && request.resource.data.get('createdBy', null) == resource.data.get('createdBy', null)
+        && request.resource.data.get('group', null) == resource.data.get('group', null)
+        && (request.resource.data.participants == resource.data.participants
+            || isLeavingOrRemoval());
 
       // Nobody deletes a conversation from the client. One side deleting the
       // thread would destroy the other person's copy of it, and a therapeutic
@@ -384,34 +411,31 @@ service cloud.firestore {
 
     // ------------------------------------------------- WebRTC call signaling
 
-    // groupCalls/{chatId} — a group session's call. The room IS the group
-    // chat, so who may be in it is the chat's own member list, checked
-    // against the chat rather than taken from whoever opened it first (the
-    // same squatting the 1:1 room guards against).
+    // groupCalls/{chatId} — a group's call. The room IS the group chat, so
+    // who may be in it is the group's CURRENT membership, read from the chat
+    // every time. Never a copy taken when the room was first opened: that
+    // would lock the call for good the first time somebody left the group,
+    // and leave whoever was taken out still able to signal into it.
     match /groupCalls/{chatId} {
-      function roomMembers() {
-        return get(/databases/$(database)/documents/groupCalls/$(chatId)).data.participants;
+      function chatMembers() {
+        return get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
       }
 
-      allow get: if isSignedIn() && request.auth.uid in resource.data.participants;
-      allow create: if isSignedIn()
-        && request.auth.uid in request.resource.data.participants
-        && request.resource.data.participants ==
-             get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
-      allow update: if isSignedIn()
-        && request.auth.uid in resource.data.participants
-        && request.resource.data.participants == resource.data.participants;
+      allow get: if isSignedIn() && request.auth.uid in chatMembers();
+      // Opening the room, or refreshing it after the group has changed: the
+      // list it carries must be the chat's own, exactly.
+      allow create, update: if isSignedIn()
+        && request.auth.uid in chatMembers()
+        && request.resource.data.participants == chatMembers();
       allow delete: if false;
 
-      // Who is in the call now. Everyone in the group can see it — checked
-      // against the chat, not the room, so the group can see a call is on
-      // before they have joined it (or before anybody has opened the room).
-      // Each person writes only their own.
+      // Who is in the call now. Everyone in the group can see it, so a call
+      // that is on shows before you join it. Each person writes only their
+      // own, and only while they are in the group.
       match /present/{uid} {
-        allow read: if isSignedIn()
-          && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+        allow read: if isSignedIn() && request.auth.uid in chatMembers();
         allow create, update: if isSelf(uid)
-          && request.auth.uid in roomMembers()
+          && request.auth.uid in chatMembers()
           && request.resource.data.uid == uid;
         allow delete: if isSelf(uid);
       }
@@ -423,8 +447,8 @@ service cloud.firestore {
         function inPair() {
           return isSignedIn()
             && request.auth.uid in pair.split('__')
-            && pair.split('__')[0] in roomMembers()
-            && pair.split('__')[1] in roomMembers();
+            && pair.split('__')[0] in chatMembers()
+            && pair.split('__')[1] in chatMembers();
         }
         allow read, create, update: if inPair();
         allow delete: if false;
@@ -432,7 +456,10 @@ service cloud.firestore {
         match /candidates/{candidateId} {
           allow read: if inPair();
           allow create: if inPair() && request.resource.data.from == request.auth.uid;
-          allow update, delete: if false;
+          // Each side clears away its own from earlier connections, so a
+          // group that meets every week does not re-read months of them.
+          allow delete: if inPair() && resource.data.from == request.auth.uid;
+          allow update: if false;
         }
       }
     }

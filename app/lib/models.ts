@@ -804,6 +804,18 @@ export type Chat = {
    */
   createdBy: string | null;
   /**
+   * What kind of group this is; null for a two-person chat.
+   *
+   *   "led"   a group session. The provider leads it, and its call opens
+   *           only once they have started it.
+   *   "peer"  a peer group. A provider sets it up and stays in it — they can
+   *           read it and remove somebody — but the members can meet, and
+   *           call, without them.
+   *
+   * Fixed once created; firestore.rules refuses any change to it.
+   */
+  group: "led" | "peer" | null;
+  /**
    * uid -> display name, written once when the chat is opened.
    *
    * Denormalised because there is no other way for a provider to learn a

@@ -16,12 +16,14 @@ import { useChatPeer } from "./useChatPeer";
 import ProviderAvatar from "../providers/ProviderAvatar";
 import CallButton from "./CallButton";
 import GroupCallButton from "./GroupCallButton";
+import GroupInfo from "./GroupInfo";
 import type { VoiceRecording } from "./useVoiceRecorder";
 import { useReadAloud } from "../../lib/useReadAloud";
 import {
   clearTyping,
   markRead,
   groupTitle,
+  isGroupChat,
   nameOf,
   otherParticipant,
   sendImage,
@@ -63,6 +65,7 @@ export default function ChatThread({ chatId }: { chatId: string }) {
   const [chat, setChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<ChatMessage[] | null>(null);
   const [typingUids, setTypingUids] = useState<string[]>([]);
+  const [groupInfoOpen, setGroupInfoOpen] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -176,7 +179,9 @@ export default function ChatThread({ chatId }: { chatId: string }) {
   }, [chatId, uid]);
 
   const loading = messages === null || chat === null;
-  const isGroup = (chat?.participants.length ?? 0) > 2;
+  // By the group having been set up as one, not by head count: a group
+  // somebody has left can be down to two and is still a group.
+  const isGroup = chat ? isGroupChat(chat) : false;
 
   return (
     <motion.div
@@ -200,9 +205,19 @@ export default function ChatThread({ chatId }: { chatId: string }) {
         <ProviderAvatar photoPath={peer.photoPath} name={peer.name} size={38} />
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[14px] font-medium leading-tight">
-            {isGroup && chat ? groupTitle(chat) : peer.name}
-          </p>
+          {isGroup && chat ? (
+            // The group's name opens who is in it — and the ways out.
+            <button
+              type="button"
+              onClick={() => setGroupInfoOpen(true)}
+              aria-label={`${groupTitle(chat)}: who is in the group`}
+              className="block max-w-full truncate text-left text-[14px] font-medium leading-tight hover:underline underline-offset-2"
+            >
+              {groupTitle(chat)}
+            </button>
+          ) : (
+            <p className="truncate text-[14px] font-medium leading-tight">{peer.name}</p>
+          )}
           <div className="flex items-center gap-2">
             <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--muted)]">
               {typingUids.length > 0
@@ -222,7 +237,10 @@ export default function ChatThread({ chatId }: { chatId: string }) {
         {uid && peerUid && !isGroup ? (
           <CallButton selfUid={uid} peerUid={peerUid} canBook={!isProvider} />
         ) : null}
-        {uid && isGroup && chat ? <GroupCallButton chatId={chatId} leading={chat.createdBy === uid} /> : null}
+        {uid && isGroup && chat ? <GroupCallButton chat={chat} selfUid={uid} /> : null}
+        {uid && isGroup && chat ? (
+          <GroupInfo chat={chat} selfUid={uid} open={groupInfoOpen} onClose={() => setGroupInfoOpen(false)} />
+        ) : null}
       </div>
 
       {/* Thread */}

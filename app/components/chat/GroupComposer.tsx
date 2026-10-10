@@ -9,9 +9,10 @@ import Button from "../ui/Button";
 import { Alert } from "../ui/Feedback";
 import { Input } from "../ui/Input";
 import { IconCheck } from "../ui/icons";
+import MinorFlag from "../ui/MinorFlag";
 import { useChatPeer } from "./useChatPeer";
 import ProviderAvatar from "../providers/ProviderAvatar";
-import { createGroupChat, nameOf, otherParticipant } from "../../lib/chat";
+import { createGroupChat, isGroupChat, nameOf, otherParticipant } from "../../lib/chat";
 import type { Chat } from "../../lib/models";
 
 /**
@@ -27,7 +28,28 @@ import type { Chat } from "../../lib/models";
  * Everybody in a group sees everybody's messages and the name they gave Talk.
  * That is what a group IS, and the screen says so before it is created, so no
  * provider puts somebody in a room without realising what the others will see.
+ *
+ * Two kinds. A group SESSION is led: its call opens when the provider starts
+ * it. A PEER group lets the members meet and call without the provider, who
+ * stays in it — able to read it and to take somebody out — because peers
+ * holding each other up still need somebody who can act if it goes wrong.
+ * A peer group may not mix under-18s and adults: they would be meeting with
+ * no professional in the room.
  */
+
+const KINDS = [
+  {
+    value: "led",
+    label: "A group session",
+    detail: "You lead it. The group's call opens when you start it.",
+  },
+  {
+    value: "peer",
+    label: "A peer group",
+    detail:
+      "They can talk and call without you. You stay in it, can read it, and can take somebody out.",
+  },
+] as const;
 
 function Person({
   chat,
@@ -57,6 +79,7 @@ function Person({
     >
       <ProviderAvatar photoPath={peer.photoPath} name={peer.name} size={38} />
       <span className="min-w-0 flex-1 truncate text-[14px]">{peer.name}</span>
+      {chat.minor ? <MinorFlag size="row" className="text-[11px]" /> : null}
       <span
         className={`h-6 w-6 shrink-0 rounded-full flex items-center justify-center border transition-colors ${
           picked ? "border-white bg-white text-[var(--dark)]" : "border-[var(--border)]"
@@ -85,11 +108,21 @@ export default function GroupComposer({
   const router = useRouter();
   const [picked, setPicked] = useState<Record<string, string>>({});
   const [title, setTitle] = useState("");
+  const [group, setGroup] = useState<"led" | "peer">("led");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const people = useMemo(() => chats.filter((c) => c.participants.length === 2), [chats]);
+  // Two-person conversations only — not a group that has shrunk to two.
+  const people = useMemo(() => chats.filter((c) => !isGroupChat(c) && c.participants.length === 2), [chats]);
   const count = Object.keys(picked).length;
+  // Under-18s and adults together. The flag is the one on each two-person
+  // chat — see Chat.minor for why a provider can trust it only so far.
+  const minorsPicked = people.filter((c) => {
+    const uid = otherParticipant(c, selfUid);
+    return c.minor && uid !== null && Boolean(picked[uid]);
+  }).length;
+  const mixed = minorsPicked > 0 && minorsPicked < count;
+  const blocked = group === "peer" && mixed;
 
   function toggle(uid: string, name: string) {
     setPicked((current) => {
@@ -101,7 +134,7 @@ export default function GroupComposer({
   }
 
   async function create() {
-    if (count < 2) return;
+    if (count < 2 || blocked) return;
     setCreating(true);
     setError(null);
     try {
@@ -110,6 +143,7 @@ export default function GroupComposer({
         selfUid,
         { ...picked, ...(selfName ? { [selfUid]: selfName } : {}) },
         title,
+        group,
       );
       onClose();
       router.push(`/chats/${chatId}`);
@@ -120,8 +154,33 @@ export default function GroupComposer({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Start a group session">
+    <Modal open={open} onClose={onClose} title="Start a group">
       <div className="space-y-5">
+        <div role="radiogroup" aria-label="What kind of group" className="grid gap-2 sm:grid-cols-2">
+          {KINDS.map((k) => {
+            const on = group === k.value;
+            return (
+              <motion.button
+                key={k.value}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                onClick={() => setGroup(k.value)}
+                whileTap={{ scale: 0.98 }}
+                transition={SPRING_SNAP}
+                className={`rounded-[22px] px-4 py-3.5 text-left transition-colors ${
+                  on ? "bg-[var(--dark)] text-white" : "bg-[var(--background)] hover:bg-black/[.06]"
+                }`}
+              >
+                <span className="block text-[14px] font-medium">{k.label}</span>
+                <span className={`mt-1 block text-[12px] leading-relaxed ${on ? "text-white/70" : "text-[var(--muted)]"}`}>
+                  {k.detail}
+                </span>
+              </motion.button>
+            );
+          })}
+        </div>
+
         <Input
           label="What is the group called?"
           hint="Everyone in it will see this — for example, Thursday grief group."
@@ -159,6 +218,19 @@ export default function GroupComposer({
           )}
         </div>
 
+        {blocked ? (
+          <Alert tone="warning" title="Under-18s and adults together">
+            A peer group meets without you, so it cannot put under-18s and
+            adults in one room. Make it a group session you lead, or pick only
+            one or the other.
+          </Alert>
+        ) : mixed ? (
+          <Alert tone="info" title="Under-18s and adults together">
+            This group mixes under-18s and adults. You lead it, and its call
+            only opens when you start it — keep that in mind when you do.
+          </Alert>
+        ) : null}
+
         {count >= 2 ? (
           <p className="text-[12px] text-[var(--muted)] leading-relaxed">
             Everyone in a group sees everyone&apos;s messages and the name they
@@ -174,7 +246,7 @@ export default function GroupComposer({
         ) : null}
 
         <div className="flex items-center gap-3">
-          <Button onClick={() => void create()} disabled={count < 2 || creating}>
+          <Button onClick={() => void create()} disabled={count < 2 || creating || blocked}>
             {creating ? "Creating…" : count < 2 ? "Pick at least two people" : `Start with ${count} people`}
           </Button>
           <button

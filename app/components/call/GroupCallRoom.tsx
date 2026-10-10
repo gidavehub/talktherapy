@@ -10,7 +10,7 @@ import Button from "../ui/Button";
 import { useAuth } from "../AuthProvider";
 import { useChatPeer } from "../chat/useChatPeer";
 import ProviderAvatar from "../providers/ProviderAvatar";
-import { groupTitle, nameOf, watchChat } from "../../lib/chat";
+import { groupTitle, isGroupChat, nameOf, watchChat } from "../../lib/chat";
 import {
   MAX_IN_CALL,
   hasRelay,
@@ -22,13 +22,14 @@ import {
 import type { Chat } from "../../lib/models";
 
 /**
- * A group session's call: the provider and the people in their group, by
- * video or voice, inside Talk.
+ * A group's call: everybody in the group, by video or voice, inside Talk.
  *
- * Provider-led, like the group itself. The provider opens the call; the
- * others can see it is on — here and in the chat header — and walk in. Until
- * the provider is there, nobody else can start one: a support group with no
- * one leading it is not the session these people signed up for.
+ * A group SESSION is led: the provider opens the call, the others see it is
+ * on — here and in the chat header — and walk in. Until the provider is
+ * there nobody else can start it, and once they have left the group its
+ * calls cannot start at all: a support group with nobody leading it is not
+ * the session these people signed up for. A PEER group meets without the
+ * provider, so anybody in it can start the call.
  *
  * As with the 1:1 call, joining is a tap, never automatic, and voice sits
  * beside video as an equal way in — on mobile data it is often the one that
@@ -38,6 +39,7 @@ import type { Chat } from "../../lib/models";
 const LEFT_TEXT = {
   full: `The call is full — ${MAX_IN_CALL} people is as many as it can carry on mobile data. Stay in the chat; you can join if somebody leaves.`,
   replaced: "You joined this call from another tab or phone, so it carried on there.",
+  removed: "You are no longer in this group, so you have left its call.",
 } as const;
 
 function Video({
@@ -122,7 +124,7 @@ function PeerTile({ chat, peer }: { chat: Chat; peer: Peer }) {
       <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/55 to-transparent px-3 pb-2.5 pt-6">
         <p className="truncate text-[12.5px] text-white">
           {person.name}
-          {chat.createdBy === peer.uid ? <span className="text-white/60"> · leading</span> : null}
+          {chat.group === "led" && chat.createdBy === peer.uid ? <span className="text-white/60"> · leading</span> : null}
         </p>
         {status ? (
           <span className="shrink-0 text-[10.5px] uppercase tracking-[0.14em] text-white/65">{status}</span>
@@ -219,16 +221,41 @@ export default function GroupCallRoom({ chatId }: { chatId: string }) {
   const callRef = useRef<GroupCallController | null>(null);
   /** Still on this page — a join that finishes after you have gone must undo itself. */
   const hereRef = useRef(true);
+  /** Cancels a join still under way when you leave the page. */
+  const joiningRef = useRef<AbortController | null>(null);
 
-  useEffect(() => watchChat(chatId, setChat), [chatId]);
+  // The group as it is now. Taken out of it — or it gone — while in its
+  // call: leave the call, rather than carry on behind a "no such group"
+  // screen with no way to hang up. Anybody else taken out is dropped.
+  useEffect(
+    () =>
+      watchChat(chatId, (next) => {
+        setChat(next);
+        const call = callRef.current;
+        if (!call) return;
+        if (!next || !uid || !next.participants.includes(uid)) {
+          callRef.current = null;
+          setJoined(false);
+          setPeers([]);
+          setLocalStream(null);
+          setLeft("removed");
+          void call.leave();
+          return;
+        }
+        call.setMembers(next.participants);
+      }),
+    [chatId, uid],
+  );
   useEffect(() => watchGroupCall(chatId, setInCall), [chatId]);
 
-  // Leaving the page must end the call: a camera light still on after somebody
-  // has walked away is alarming, and a breach of what this product promises.
+  // Leaving the page must end the call — and a join still under way: a
+  // camera light still on after somebody has walked away is alarming, and a
+  // breach of what this product promises.
   useEffect(() => {
     hereRef.current = true;
     return () => {
       hereRef.current = false;
+      joiningRef.current?.abort();
       void callRef.current?.leave();
       callRef.current = null;
     };
@@ -246,6 +273,8 @@ export default function GroupCallRoom({ chatId }: { chatId: string }) {
     setLeft(null);
     setCameraFellBack(false);
     setJoining(true);
+    const cancel = new AbortController();
+    joiningRef.current = cancel;
     try {
       const call = await joinGroupCall(
         chatId,
@@ -258,11 +287,18 @@ export default function GroupCallRoom({ chatId }: { chatId: string }) {
             reset();
             setLeft("replaced");
           },
+          onFull: () => {
+            callRef.current = null;
+            reset();
+            setLeft("full");
+          },
         },
-        { video: withVideo },
+        { video: withVideo, signal: cancel.signal },
       );
       if (!call) {
-        setLeft("full");
+        // Full — unless it was cancelled because you left, or another tab of
+        // yours took the call over while this one was joining.
+        if (hereRef.current) setLeft((l) => l ?? "full");
         return;
       }
       if (!hereRef.current) {
@@ -286,6 +322,7 @@ export default function GroupCallRoom({ chatId }: { chatId: string }) {
           : "Talk could not open the call. Check your connection and try again.",
       );
     } finally {
+      if (joiningRef.current === cancel) joiningRef.current = null;
       setJoining(false);
     }
   }
@@ -313,7 +350,7 @@ export default function GroupCallRoom({ chatId }: { chatId: string }) {
     );
   }
 
-  if (chat.participants.length <= 2) {
+  if (!isGroupChat(chat)) {
     // Two people call inside a booked session, where the call belongs.
     return (
       <Alert tone="info" title="This is a conversation between two people">
@@ -326,11 +363,15 @@ export default function GroupCallRoom({ chatId }: { chatId: string }) {
   }
 
   const title = groupTitle(chat) ?? "Group session";
+  const peerGroup = chat.group === "peer";
   const leader = chat.createdBy;
-  const leading = leader === uid;
-  const leaderHere = leader ? inCall.includes(leader) : true;
-  // Everybody else waits for the person leading it.
-  const canJoin = leading || leaderHere;
+  const leading = !peerGroup && leader === uid;
+  // A led group whose leader has left it cannot start a call any more.
+  const leaderGone = !peerGroup && (!leader || !chat.participants.includes(leader));
+  const leaderHere = Boolean(leader && inCall.includes(leader));
+  // In a led group everybody else waits for the person leading it.
+  const canJoin = peerGroup || leading || (!leaderGone && leaderHere);
+  const canStart = peerGroup || leading;
   const others = inCall.filter((u) => u !== uid);
   const isFull = !joined && others.length >= MAX_IN_CALL;
   const showSelfVideo = cameraOn && !audioOnly;
@@ -433,11 +474,11 @@ export default function GroupCallRoom({ chatId }: { chatId: string }) {
               </>
             ) : (
               <>
-                {leader ? <Face chat={chat} uid={leader} size={80} /> : null}
+                {!peerGroup && leader && !leaderGone ? <Face chat={chat} uid={leader} size={80} /> : null}
                 <p className="max-w-[340px] text-[14px] leading-relaxed text-white/75">
-                  {leading
+                  {canStart
                     ? "Nobody is in the call yet. When you start it, the group will see it is on and can join you."
-                    : "The call has not started. It opens when the person leading the group starts it — you will see it here and in the chat."}
+                    : "The call has not started."}
                 </p>
               </>
             )}
@@ -464,14 +505,22 @@ export default function GroupCallRoom({ chatId }: { chatId: string }) {
         </Alert>
       ) : null}
 
+      {!joined && !canJoin ? (
+        <Alert tone="info" title={leaderGone ? "This group's calls have ended" : "Not open yet"}>
+          {leaderGone
+            ? "The person who led this group has left it, so its calls cannot start any more. You can still write to each other in the chat."
+            : "The call opens when the person leading the group is in it — you will see it here and in the chat when they are."}
+        </Alert>
+      ) : null}
+
       {!joined ? (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-3">
             <Button onClick={() => void join(true)} disabled={!canJoin || isFull} loading={joining}>
-              {leading && others.length === 0 ? "Start with video" : "Join with video"}
+              {canStart && others.length === 0 ? "Start with video" : "Join with video"}
             </Button>
             <Button variant="secondary" onClick={() => void join(false)} disabled={!canJoin || isFull || joining}>
-              {leading && others.length === 0 ? "Start by voice" : "Join by voice"}
+              {canStart && others.length === 0 ? "Start by voice" : "Join by voice"}
             </Button>
           </div>
 

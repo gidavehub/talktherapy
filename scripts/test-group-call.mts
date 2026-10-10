@@ -5,11 +5,12 @@
  *
  * The cases that matter on real phones: a person whose clock is set by hand
  * must not be dropped from a call they are in; a tab that closed without
- * saying goodbye must not be called for ever; and the same person in two tabs
- * must end up in exactly one of them.
+ * saying goodbye must not make the call look full or its leader look present;
+ * the same person on two devices must end up in exactly one of them; and two
+ * people tapping Join at the same moment must not overfill the call.
  */
 
-import { GHOST_MS, STALE_MS, asPresence, joinedAfter, liveness, type Presence } from "../app/lib/groupCallPresence.ts";
+import { STALE_MS, asPresence, joinedAfter, joinedBefore, liveness, type Presence } from "../app/lib/groupCallPresence.ts";
 
 let failures = 0;
 function check(name: string, ok: boolean) {
@@ -18,12 +19,12 @@ function check(name: string, ok: boolean) {
 }
 
 const NOW = 1_800_000_000_000;
-const person = (uid: string, heartbeatAt: number, session = `${uid}-s1`): Presence => ({
+const person = (uid: string, heartbeatAt: number, session = `${uid}-s1`, joinedAt: number | null = heartbeatAt): Presence => ({
   uid,
   session,
   video: true,
-  joinedAt: heartbeatAt,
   heartbeatAt,
+  joins: { [session]: joinedAt },
 });
 const uids = (ps: Presence[]) => ps.map((p) => p.uid).sort().join(",");
 
@@ -32,10 +33,10 @@ const uids = (ps: Presence[]) => ps.map((p) => p.uid).sort().join(",");
   const alive = liveness();
   // Their phone is nine minutes slow: every beat looks old by our clock.
   const slow = (t: number) => person("slow", t - 9 * 60_000);
-  check("a phone nine minutes slow is in the call on first sight", uids(alive([slow(NOW)], NOW)) === "slow");
-  check("…and still there after its next beat", uids(alive([slow(NOW + 10_000)], NOW + 10_000)) === "slow");
-  check("…and still there between beats", uids(alive([slow(NOW + 10_000)], NOW + 30_000)) === "slow");
-  check("…and gone once its beats stop", uids(alive([slow(NOW + 10_000)], NOW + 10_000 + STALE_MS)) === "");
+  check("a phone nine minutes slow is not counted on first sight", uids(alive([slow(NOW)], NOW)) === "");
+  check("…but is the moment its next beat arrives", uids(alive([slow(NOW + 10_000)], NOW + 10_000)) === "slow");
+  check("…and stays between beats", uids(alive([slow(NOW + 10_000)], NOW + 30_000)) === "slow");
+  check("…and is gone once its beats stop", uids(alive([slow(NOW + 10_000)], NOW + 10_000 + STALE_MS)) === "");
 }
 {
   const alive = liveness();
@@ -48,20 +49,20 @@ const uids = (ps: Presence[]) => ps.map((p) => p.uid).sort().join(",");
 // --- ghosts -----------------------------------------------------------------
 {
   const alive = liveness();
-  const ghost = person("ghost", NOW - GHOST_MS - 1);
-  check("a tab that closed long ago is not in the call", uids(alive([ghost], NOW)) === "");
-  check("…not even later, while it stays silent", uids(alive([ghost], NOW + 20_000)) === "");
-  // The same person comes back: a new join, a new beat.
+  // A tab closed a minute ago and its goodbye never reached the server.
+  const ghost = person("ghost", NOW - 60_000);
+  check("a tab closed a minute ago is not in the call", uids(alive([ghost], NOW)) === "");
+  check("…not later either, while it stays silent", uids(alive([ghost], NOW + 20_000)) === "");
   const back = person("ghost", NOW + 30_000, "ghost-s2");
   check("…but they are, the moment they rejoin", uids(alive([back], NOW + 30_000)) === "ghost");
 }
 {
+  // Five in a call, two of whom closed their tabs 90 seconds ago. A newcomer
+  // opening the call must see three, not five — and be let in.
   const alive = liveness();
-  // A tab closed a minute ago: looks alive on first sight, gone once its beat
-  // has not changed for STALE_MS on our own clock.
-  const recent = person("recent", NOW - 60_000);
-  check("a tab closed a minute ago is given one chance", uids(alive([recent], NOW)) === "recent");
-  check("…and dropped when it never beats again", uids(alive([recent], NOW + STALE_MS)) === "");
+  const live = ["a", "b", "c"].map((u) => person(u, NOW - 4_000));
+  const dead = ["d", "e"].map((u) => person(u, NOW - 90_000));
+  check("dead tabs do not make a call look full", uids(alive([...live, ...dead], NOW)) === "a,b,c");
 }
 
 // --- comings and goings -----------------------------------------------------
@@ -71,25 +72,40 @@ const uids = (ps: Presence[]) => ps.map((p) => p.uid).sort().join(",");
   const b = person("b", NOW);
   check("two people, both here", uids(alive([a, b], NOW)) === "a,b");
   check("one leaves (their presence is deleted)", uids(alive([a], NOW + 1_000)) === "a");
-  // They come back with the same old document contents (an offline write
-  // replaying): forgotten when they left, so judged afresh, and alive.
-  check("…and comes back", uids(alive([a, b], NOW + 2_000)) === "a,b");
+  check("…and comes back", uids(alive([a, { ...b, heartbeatAt: NOW + 2_000 }], NOW + 2_000)) === "a,b");
 }
 
 // --- the same person twice --------------------------------------------------
 {
-  const first = { joinedAt: NOW, session: "x" };
-  const second = { joinedAt: NOW + 5_000, session: "y" };
+  const first = { at: NOW, session: "x" };
+  const second = { at: NOW + 5_000, session: "y" };
   check("the later join keeps the call", joinedAfter(second, first) && !joinedAfter(first, second));
-  const tieA = { joinedAt: NOW, session: "a" };
-  const tieB = { joinedAt: NOW, session: "b" };
+  const tieA = { at: NOW, session: "a" };
+  const tieB = { at: NOW, session: "b" };
   check("a tie is still decided, one way only", joinedAfter(tieB, tieA) !== joinedAfter(tieA, tieB));
+}
+
+// --- joining at the same moment ---------------------------------------------
+{
+  // Four in; two more tap Join together. The server ordered them f, then g.
+  const inCall = ["a", "b", "c", "d"].map((u, i) => person(u, NOW, `${u}-s1`, NOW - 60_000 + i));
+  const f = person("f", NOW, "f-s1", NOW + 100);
+  const g = person("g", NOW, "g-s1", NOW + 200);
+  check("the first of two late joiners fits", joinedBefore([...inCall, g], NOW + 100, "f-s1").length === 4);
+  check("the second finds the call already full", joinedBefore([...inCall, f], NOW + 200, "g-s1").length === 5);
+  const pending = person("p", NOW, "p-s1", null);
+  check("a join the server has not stamped yet is not counted", joinedBefore([pending], NOW, "z").length === 0);
 }
 
 // --- what is read from the database -----------------------------------------
 check("a presence with no uid is ignored", asPresence({ session: "s" }) === null);
 check("camera counts as on unless it says off", asPresence({ uid: "u", session: "s" })?.video === true);
 check("camera off is read as off", asPresence({ uid: "u", session: "s", video: false })?.video === false);
+check(
+  "a server time is read from a Firestore timestamp",
+  asPresence({ uid: "u", session: "s", joins: { s: { toMillis: () => 42 } } })?.joins.s === 42,
+);
+check("a pending server time reads as not yet", asPresence({ uid: "u", session: "s", joins: { s: null } })?.joins.s === null);
 
 console.log(failures === 0 ? "\nAll group call checks passed." : `\n${failures} group call check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

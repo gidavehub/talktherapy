@@ -11,7 +11,7 @@ import Button from "../ui/Button";
 import { useChatPeer } from "./useChatPeer";
 import ProviderAvatar from "../providers/ProviderAvatar";
 import { useReadAloud } from "../../lib/useReadAloud";
-import { groupTitle, nameOf, otherParticipant, unreadFor, watchChats } from "../../lib/chat";
+import { groupTitle, isGroupChat, nameOf, otherParticipant, unreadFor, watchChats } from "../../lib/chat";
 import GroupComposer from "./GroupComposer";
 import type { Chat } from "../../lib/models";
 
@@ -70,7 +70,7 @@ function ChatRow({
   fallbackName: string;
 }) {
   const peerUid = otherParticipant(chat, selfUid);
-  const isGroup = chat.participants.length > 2;
+  const isGroup = isGroupChat(chat);
   const peer = useChatPeer(peerUid, nameOf(chat, peerUid) || fallbackName);
   const name = isGroup ? groupTitle(chat) ?? "Group session" : peer.name;
   const unread = unreadFor(chat, selfUid);
@@ -184,13 +184,13 @@ export default function ChatList() {
 
   return (
     <div className="space-y-2">
-      {/* Provider-led group sessions start here, from the people they
+      {/* Groups — led sessions and peer groups — start here, from the people they
           already work with. Clients never see this control. */}
       {isProvider ? (
         <>
           <div className="flex justify-end pb-1">
             <Button variant="secondary" size="sm" onClick={() => setComposing(true)}>
-              New group session
+              New group
             </Button>
           </div>
           <GroupComposer

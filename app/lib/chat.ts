@@ -23,8 +23,10 @@
 
 import {
   addDoc,
+  arrayRemove,
   arrayUnion,
   collection,
+  deleteField,
   doc,
   getDoc,
   increment,
@@ -125,6 +127,9 @@ function toChat(id: string, data: DocumentData): Chat {
     minor: data.minor === true,
     title: typeof data.title === "string" && data.title.trim() ? data.title.trim() : null,
     createdBy: typeof data.createdBy === "string" ? data.createdBy : null,
+    // Only a group has somebody who created it; every group made before peer
+    // groups existed was a led one.
+    group: typeof data.createdBy === "string" ? (data.group === "peer" ? "peer" : "led") : null,
     lastMessage: typeof data.lastMessage === "string" ? data.lastMessage : "",
     // Falls back to createdAt, not to now: an empty chat should sort by when it
     // was opened rather than drifting to the top of the list on every render.
@@ -259,6 +264,7 @@ export async function createGroupChat(
   createdBy: string,
   names: Record<string, string> = {},
   title = "",
+  group: "led" | "peer" = "led",
 ): Promise<string> {
   const unique = Array.from(new Set(participants));
   if (!unique.includes(createdBy)) {
@@ -279,6 +285,7 @@ export async function createGroupChat(
     // The provider leading it. firestore.rules checks this is the caller and
     // that the caller is a provider.
     createdBy,
+    group,
     lastMessage: "",
     lastMessageAt: serverTimestamp(),
     unread: Object.fromEntries(unique.map((uid) => [uid, 0])),
@@ -700,6 +707,37 @@ export function nameOf(chat: Chat, uid: string | null): string | null {
 }
 
 /**
+ * Whether a chat is a group. Decided by the group having somebody who set it
+ * up, not by how many are in it: a group somebody has left can be down to two
+ * and is still a group, at a generated id, with its own history.
+ */
+export function isGroupChat(chat: Chat): boolean {
+  return chat.group !== null;
+}
+
+/**
+ * Leave a group. Anybody may, always — nobody is kept in a room. What was
+ * said while you were there stays readable to you (each message carries its
+ * own copy of who was in the room); nothing said after reaches you.
+ */
+export async function leaveGroup(chatId: string, uid: string): Promise<void> {
+  await updateDoc(chatRef(chatId), {
+    participants: arrayRemove(uid),
+    [`unread.${uid}`]: deleteField(),
+    [`typing.${uid}`]: deleteField(),
+  });
+}
+
+/**
+ * The provider who set a group up takes somebody out of it — the one power a
+ * peer group needs somebody to hold. firestore.rules refuses it from anyone
+ * else.
+ */
+export async function removeFromGroup(chatId: string, uid: string): Promise<void> {
+  await leaveGroup(chatId, uid);
+}
+
+/**
  * What a conversation is called in a list or a header.
  *
  * A group session by its title; a two-person chat by the other person, which
@@ -707,8 +745,8 @@ export function nameOf(chat: Chat, uid: string | null): string | null {
  * for that case rather than guessing.
  */
 export function groupTitle(chat: Chat): string | null {
-  if (chat.participants.length <= 2) return null;
-  return chat.title || "Group session";
+  if (!isGroupChat(chat)) return null;
+  return chat.title || (chat.group === "peer" ? "Peer group" : "Group session");
 }
 
 /** Unread count for one person, tolerating the field being absent. */
