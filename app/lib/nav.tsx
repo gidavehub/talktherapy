@@ -11,6 +11,7 @@ import {
   IconCalendar,
   IconClock,
   IconWallet,
+  IconShield,
 } from "../components/ui/icons";
 
 /**
@@ -65,4 +66,14 @@ export const PROVIDER_NAV: NavItem[] = [
   { href: "/pro/profile", label: "Profile", icon: <IconPeople />, primary: true },
   // Off the bottom bar (five fit), still in the menu.
   { href: "/settings", label: "Settings", icon: <IconSettings /> },
+];
+
+/**
+ * Staff. One job here: what is waiting for a person — payments held for
+ * review, payouts flagged, sessions a patient said did not happen.
+ */
+export const ADMIN_NAV: NavItem[] = [
+  { href: "/admin/review", label: "Review", icon: <IconShield />, primary: true },
+  { href: "/chats", label: "Messages", icon: <IconChat />, primary: true },
+  { href: "/settings", label: "Settings", icon: <IconSettings />, primary: true },
 ];

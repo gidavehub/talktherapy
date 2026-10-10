@@ -9,6 +9,7 @@ import type { UserDoc } from "./models";
  *   provider, verified       → their messages
  *   patient, new             → Talk, who does the onboarding by conversation
  *   patient, onboarded       → their dashboard
+ *   admin                    → the review queue
  *
  * Before this existed each button hard-coded /sign-up, so a signed-in person
  * pressing "Book session" was asked to log in again.
@@ -22,13 +23,15 @@ export function homeFor(profile: UserDoc | null): string {
   // and is approved no patient can find them, and an empty inbox explains
   // none of that.
   if (profile.role === "provider") return profile.verified ? "/chats" : "/pro/profile";
+  // Staff have no intake either: their work is what is waiting for a person.
+  if (profile.role === "admin") return "/admin/review";
 
   return profile.onboarded ? "/dashboard" : "/therapy";
 }
 
 /** Past the setup step: onboarded, or a provider, for whom there isn't one. */
 export function isSettled(profile: UserDoc | null): boolean {
-  return Boolean(profile && (profile.role === "provider" || profile.onboarded));
+  return Boolean(profile && (profile.role === "provider" || profile.role === "admin" || profile.onboarded));
 }
 
 /**

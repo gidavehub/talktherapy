@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "../AuthProvider";
 import AppShell from "../ui/AppShell";
 import Orb from "../Orb";
-import { PATIENT_NAV, PROVIDER_NAV } from "../../lib/nav";
+import { ADMIN_NAV, PATIENT_NAV, PROVIDER_NAV } from "../../lib/nav";
 import { useUnreadCount } from "../../lib/useUnread";
 
 /**
@@ -72,7 +72,7 @@ export default function AppGate({ children }: { children: React.ReactNode }) {
     // she has learned what they need. A provider has no intake to do — sending
     // them to /therapy would ask a clinician what brings them here today, and
     // then file the answer as their own case notes.
-    if (profile.role !== "provider" && !profile.onboarded && !openBeforeOnboarding(pathname)) {
+    if (profile.role === "patient" && !profile.onboarded && !openBeforeOnboarding(pathname)) {
       router.replace("/therapy");
     }
   }, [ready, user, profile, router, pathname]);
@@ -82,12 +82,12 @@ export default function AppGate({ children }: { children: React.ReactNode }) {
   if (!profile) return <Splash label="Loading your profile" />;
 
   const isProvider = profile.role === "provider";
-  if (!isProvider && !profile.onboarded && !openBeforeOnboarding(pathname)) {
+  if (profile.role === "patient" && !profile.onboarded && !openBeforeOnboarding(pathname)) {
     return <Splash label="Taking you to Talk" />;
   }
 
   // Messages carries the count of what is waiting, on both sides of the app.
-  const nav = (isProvider ? PROVIDER_NAV : PATIENT_NAV).map((item) =>
+  const nav = (isProvider ? PROVIDER_NAV : profile.role === "admin" ? ADMIN_NAV : PATIENT_NAV).map((item) =>
     item.href === "/chats" && unread > 0 ? { ...item, badge: unread } : item,
   );
 

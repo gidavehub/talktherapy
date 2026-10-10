@@ -45,6 +45,7 @@ import {
 } from "../../app/lib/payments/modempay-protocol";
 import { AI_PURPOSE, AI_TIERS, tierAlreadyHeld, tierForPurpose, type AiTierId } from "../../app/lib/models";
 import { onSchedule } from "firebase-functions/v2/scheduler";
+import { resolveReview as decide } from "./review";
 import { bookSlot, cancelBooking, reportMissedSession as reportMissed } from "./bookings";
 import { PAYOUT_HOLD_MS } from "../../app/lib/payouts";
 import {
@@ -760,6 +761,27 @@ export const reportMissedSession = onCall(CALLABLE, async (request) => {
   const result = await reportMissed(uid, bookingId, PAYOUT_HOLD_MS);
   if (!result.ok) throw new HttpsError("failed-precondition", result.reason);
   return { reported: true };
+});
+
+/**
+ * A person's decision on something held for review. Staff only — read from
+ * the user document, whose role the browser cannot change.
+ */
+export const resolveReview = onCall(CALLABLE, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+  const role = (await db().collection("users").doc(uid).get()).data()?.role;
+  if (role !== "admin") throw new HttpsError("permission-denied", "Staff only.");
+  const result = await decide(uid, {
+    kind: String(request.data?.kind ?? ""),
+    id: String(request.data?.id ?? "").trim(),
+    decision: String(request.data?.decision ?? ""),
+    note: String(request.data?.note ?? ""),
+  });
+  if (!result.ok) throw new HttpsError("failed-precondition", result.reason);
+  // A granted consultation is put on the account too, as the webhook does.
+  if (result.grant) await grantClaim(result.grant);
+  return { resolved: true };
 });
 
 /** What a provider has earned — counted exactly as a withdrawal would count it. */

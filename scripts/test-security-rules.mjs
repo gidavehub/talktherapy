@@ -26,6 +26,7 @@ const DOCS = `/databases/(default)/documents`;
 const PATIENT = "patient-uid";
 const PROVIDER = "provider-uid";
 const STRANGER = "stranger-uid";
+const ADMIN = "admin-uid";
 const CHAT = `${PATIENT}__${PROVIDER}`;
 
 /** A chat document as `openChat` writes it. */
@@ -372,6 +373,15 @@ const CASES = [
     payoutAccount, { ...payoutAccount, accountNumber: "9999999" }],
   ["a session marked paid out from the browser", "DENY", PROVIDER, "update", `${DOCS}/bookings/bk_1`, booking,
     { ...booking, payoutId: "po_9" }],
+
+  // --- the staff review queues -------------------------------------------
+  ["staff list payments held for review", "ALLOW", ADMIN, "list", `${DOCS}/payments/pi_1`, payment],
+  ["staff list flagged payouts", "ALLOW", ADMIN, "list", `${DOCS}/payouts/po_1`, payout],
+  ["staff list disputed sessions", "ALLOW", ADMIN, "list", `${DOCS}/bookings/bk_1`, { ...booking, disputed: true }],
+  ["a patient lists the payments queue", "DENY", PATIENT, "list", `${DOCS}/payments/pi_1`, payment],
+  ["a provider lists another provider's payouts", "DENY", STRANGER, "list", `${DOCS}/payouts/po_1`, payout],
+  ["staff cannot rewrite a payment from the browser", "DENY", ADMIN, "update", `${DOCS}/payments/pi_1`, payment,
+    { ...payment, fulfilled: true }],
 ];
 
 /**
@@ -395,6 +405,7 @@ const userDocMocks = [
   [PROVIDER, "provider"],
   [PATIENT, "patient"],
   [STRANGER, "patient"],
+  [ADMIN, "admin"],
 ].map(([uid, role]) => ({
   function: "get",
   args: [{ exactValue: `${DOCS}/users/${uid}` }],
@@ -415,6 +426,8 @@ const testCase = ([, expectation, uid, method, path, existing, incoming]) => ({
     ? { functionMocks: [parentChatMock] }
     : {}),
   ...(path.includes("/providerProfiles/") ? { functionMocks: userDocMocks } : {}),
+  // The staff review queues ask whether the caller is an admin.
+  ...(method === "list" && /\/(payments|payouts|bookings)\//.test(path) ? { functionMocks: userDocMocks } : {}),
   // Starting a group asks whether the caller is a provider.
   ...(method === "create" && /\/chats\/[^/]+$/.test(path) ? { functionMocks: userDocMocks } : {}),
   // Creating a call room reads the booking it belongs to, which is the whole
