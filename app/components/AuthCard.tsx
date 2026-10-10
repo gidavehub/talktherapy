@@ -48,15 +48,26 @@ function nextParam(): string | null {
  *
  * It settles `role` on the user document, which only an admin can change
  * afterwards — so this is the one moment it is decided.
+ *
+ * EMBEDDED (`onSignedIn` given) it is a step inside something else — the
+ * landing page, where Talk is speaking while it is open — and must not
+ * navigate anywhere: not when somebody is already signed in, not after they
+ * sign in, not to switch between signing in and creating an account. Any one
+ * of those is a page load that ends her voice and the whole sequence.
  */
 export default function AuthCard({
-  mode,
+  mode: initialMode,
   role = "patient",
+  onSignedIn,
 }: {
   mode: Mode;
   role?: SignUpRole;
+  /** Embedded: called instead of navigating. See above. */
+  onSignedIn?: (user: AppUser) => void;
 }) {
   const router = useRouter();
+  const embedded = Boolean(onSignedIn);
+  const [mode, setMode] = useState<Mode>(initialMode);
   const { user, profile, ready } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,15 +79,19 @@ export default function AuthCard({
   // they belong instead of asking them to log in again. This was the bug:
   // every "get started" button led here, signed in or not.
   useEffect(() => {
-    if (!ready || !user || !profile || busy) return;
+    if (embedded || !ready || !user || !profile || busy) return;
     router.replace(afterSignIn(profile, nextParam()));
-  }, [ready, user, profile, busy, router]);
+  }, [embedded, ready, user, profile, busy, router]);
 
   async function withCatch(fn: () => Promise<AppUser>) {
     setBusy(true);
     setError(null);
     try {
       const signedIn = await fn();
+      if (onSignedIn) {
+        onSignedIn(signedIn);
+        return;
+      }
       // New accounts meet Talk, who does the onboarding by conversation;
       // everyone else goes home (or back where they were headed).
       router.push(afterSignIn(signedIn, nextParam()));
@@ -97,7 +112,11 @@ export default function AuthCard({
       initial={{ y: 60, opacity: 0, rotate: isSignUp ? 1.2 : -1.2 }}
       animate={{ y: 0, opacity: 1, rotate: 0 }}
       transition={{ ...SPRING_SOFT, mass: 1 }}
-      className="w-full max-w-[440px] rounded-3xl bg-white shadow-[0_30px_80px_-30px_rgba(0,0,0,0.25)] p-6 sm:p-8 md:p-10"
+      className={
+        embedded
+          ? "w-full"
+          : "w-full max-w-[440px] rounded-3xl bg-white shadow-[0_30px_80px_-30px_rgba(0,0,0,0.25)] p-6 sm:p-8 md:p-10"
+      }
     >
       <motion.p
         initial={{ x: -20, opacity: 0 }}
@@ -243,12 +262,25 @@ export default function AuthCard({
         className="mt-6 text-[13px] text-[var(--muted)] text-center"
       >
         {isSignUp ? "Already have an account?" : "New here?"}{" "}
-        <Link
-          href={isSignUp ? "/sign-in" : "/sign-up"}
-          className="text-[var(--foreground)] underline underline-offset-4"
-        >
-          {isSignUp ? "Sign in" : "Create an account"}
-        </Link>
+        {embedded ? (
+          <button
+            type="button"
+            onClick={() => {
+              setError(null);
+              setMode(isSignUp ? "sign-in" : "sign-up");
+            }}
+            className="text-[var(--foreground)] underline underline-offset-4"
+          >
+            {isSignUp ? "Sign in" : "Create an account"}
+          </button>
+        ) : (
+          <Link
+            href={isSignUp ? "/sign-in" : "/sign-up"}
+            className="text-[var(--foreground)] underline underline-offset-4"
+          >
+            {isSignUp ? "Sign in" : "Create an account"}
+          </Link>
+        )}
       </motion.p>
     </motion.div>
   );

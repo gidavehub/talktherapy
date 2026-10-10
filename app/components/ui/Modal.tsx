@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { SPRING_SOFT, SPRING_SNAP } from "../motion/primitives";
 
@@ -11,7 +12,22 @@ import { SPRING_SOFT, SPRING_SNAP } from "../motion/primitives";
  * sheet on mobile, because a centred dialog on a 375px screen is unusable once
  * the keyboard opens. Which one you get is driven by `variant`, defaulting to
  * the responsive pairing.
+ *
+ * Rendered into document.body, not where it is written. `position: fixed`
+ * stops meaning "the screen" inside any ancestor with a transform — and every
+ * animated wrapper on the landing page has one — so a modal opened from the
+ * hero was positioned and clipped inside the hero instead of covering the
+ * page. A portal makes that impossible wherever a modal is used.
  */
+
+/** True once on the client — the portal needs a document to render into. */
+function useHasDocument(): boolean {
+  return useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+}
 
 function useScrollLock(active: boolean) {
   useEffect(() => {
@@ -45,6 +61,7 @@ export default function Modal({
   className?: string;
 }) {
   useScrollLock(open);
+  const hasDocument = useHasDocument();
 
   useEffect(() => {
     if (!open) return;
@@ -58,7 +75,9 @@ export default function Modal({
   const asSheet = variant === "sheet";
   const responsive = variant === "responsive";
 
-  return (
+  if (!hasDocument) return null;
+
+  return createPortal(
     <AnimatePresence>
       {open ? (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
@@ -131,6 +150,7 @@ export default function Modal({
           </motion.div>
         </div>
       ) : null}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }

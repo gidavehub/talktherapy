@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "probe:models": "node scripts/probe-models.mjs",
+    "build:voice": "node scripts/build-voice-lines.mjs",
     "probe:accounts": "node scripts/verify-service-accounts.mjs",
     "probe:pipeline": "node scripts/probe-pipeline.mjs",
     "smoke:companion": "node scripts/smoke-companion.mjs"
@@ -23,6 +24,7 @@
     "server-only": "^0.0.1"
   },
   "devDependencies": {
+    "@breezystack/lamejs": "1.2.7",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "19.3.0",

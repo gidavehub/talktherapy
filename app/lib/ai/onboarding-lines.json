@@ -1,0 +1,47 @@
+{
+  "about": "What Talk says on the landing page, before anybody has signed in. Spoken from pre-recorded files (public/voice/onboarding), never generated per visit. Edit the text here, then run `npm run build:voice`. English is the source. The Wolof was drafted by the model, back-translated to check the meaning, and is marked draft until a Gambian translator has checked it — correct `wo` here and set `woDraft` to false.",
+  "lines": [
+    {
+      "id": "welcome",
+      "en": "Welcome to Talk Therapy.",
+      "wo": "Dalal ak jamm ci Talk Therapy.",
+      "woDraft": true,
+      "woBack": "Welcome to Talk Therapy."
+    },
+    {
+      "id": "sign-in",
+      "en": "To begin a session with us, please sign in.",
+      "wo": "Ngir tambali ab session ak nun, ndax man nga sign in?",
+      "woDraft": true,
+      "woBack": "To begin a session with us, can you sign in?"
+    },
+    {
+      "id": "how",
+      "en": "You can use your email, or Google.",
+      "wo": "Mën nga jëfandikoo sa email, walla Google.",
+      "woDraft": true,
+      "woBack": "You can use your email, or Google."
+    },
+    {
+      "id": "price",
+      "en": "To continue, the consultation is two hundred dalasi.",
+      "wo": "Ngir nu wey ci, consultation bi ñaari téméer dalasi la.",
+      "woDraft": true,
+      "woBack": "For us to continue, the consultation is two hundred dalasis."
+    },
+    {
+      "id": "paid",
+      "en": "Thank you. Now, let us begin.",
+      "wo": "Jërëjëf. Léegi nag, nanu tàmbli.",
+      "woDraft": true,
+      "woBack": "Thank you. Now then, let's start."
+    },
+    {
+      "id": "welcome-back",
+      "en": "Welcome back. Let us carry on.",
+      "wo": "Dalal jàmm waat. Nan wéy.",
+      "woDraft": true,
+      "woBack": "Welcome back. Let's continue."
+    }
+  ]
+}

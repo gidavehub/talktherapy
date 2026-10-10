@@ -66,3 +66,23 @@ export async function spokenBytes(text, language, paceWpm) {
   }
   return bytes;
 }
+
+/**
+ * Her voice for a line, as one buffer of 16-bit mono PCM.
+ *
+ * For the pre-recorded lines (scripts/build-voice-lines.mjs): the same speak()
+ * the conversation uses, so the landing page and the app are the same voice.
+ * Collected and joined ONCE — a header per chunk would make a file that plays
+ * only its first chunk.
+ */
+export async function spokenPcm(text, language, paceWpm) {
+  const parts = [];
+  let sampleRate = 24000;
+  for await (const chunk of brain.speak(text, language, undefined, paceWpm)) {
+    parts.push(chunk.pcm);
+    sampleRate = chunk.sampleRate;
+  }
+  const pcm = Buffer.concat(parts);
+  if (!pcm.length) throw new Error(`no audio for "${text.slice(0, 40)}…"`);
+  return { pcm, sampleRate, seconds: pcm.length / (sampleRate * 2) };
+}

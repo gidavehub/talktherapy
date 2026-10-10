@@ -30,7 +30,7 @@ const TIERS = [
     featured: false,
   },
   {
-    name: "Human counselling",
+    name: "A human provider",
     price: formatDalasiRange(HUMAN_RATE_MIN_MINOR, HUMAN_RATE_MAX_MINOR),
     cadence: "per session",
     blurb:
@@ -50,7 +50,7 @@ const TIERS = [
     price: formatDalasi(AI_TIERS.initial.amountMinor),
     cadence: "first consultation",
     blurb:
-      "An initial 5–7 minute conversation with the AI companion, ending with a referral to a human professional.",
+      `A first conversation of up to ${Math.round(AI_TIERS.initial.durationSec / 60)} minutes with the AI companion, ending with providers matched to you.`,
     features: [
       "Private, judgement-free first conversation",
       "Guided reflection and grounding",

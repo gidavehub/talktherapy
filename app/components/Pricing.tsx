@@ -3,6 +3,8 @@
 import { motion } from "motion/react";
 import { SPRING_SOFT, SPRING_SNAP } from "./motion/primitives";
 import StartLink from "./StartLink";
+import { formatDalasi } from "../lib/money";
+import { AI_TIERS, HUMAN_RATE_MIN_MINOR } from "../lib/models";
 
 type Tier = {
   name: string;
@@ -14,45 +16,52 @@ type Tier = {
   featured?: boolean;
 };
 
+/**
+ * What Talk actually charges — read from the same table the server prices
+ * from, so this page cannot promise a price the checkout does not charge.
+ *
+ * There are no plans or subscriptions: a conversation with Talk, or a session
+ * with a person, each paid for on its own. (This section used to sell monthly
+ * plans in US dollars, a free first conversation and "crisis-line priority
+ * routing" — none of which existed.)
+ */
 const tiers: Tier[] = [
   {
-    name: "Intro",
-    price: "Free",
-    cadence: "one consult",
-    blurb: "A taste of what matching feels like. No card, no pressure.",
+    name: "First conversation",
+    price: formatDalasi(AI_TIERS.initial.amountMinor),
+    cadence: "once",
+    blurb: "Up to eight minutes with Talk, in your own language. She gets to know what you need, then introduces you to providers who fit.",
     features: [
-      "AI-guided 15-minute intake",
-      "One free intro call with a matched provider",
-      "Daily mood check-ins",
+      "English, Wolof, Mandinka or Pulaar",
+      "Answer by speaking, or by tapping",
+      "Ends with providers matched to you",
     ],
-    cta: "Start Free",
+    cta: "Begin with Talk",
   },
   {
-    name: "Plus",
-    price: "$49",
-    cadence: "per month",
-    blurb: "For people who want regular sessions without the friction.",
+    name: "Sessions with a provider",
+    price: `From ${formatDalasi(HUMAN_RATE_MIN_MINOR)}`,
+    cadence: "per session",
+    blurb: "A qualified provider, by video or audio call inside Talk. Each provider sets their own fee, shown before you book.",
     features: [
-      "Everything in Intro",
-      "Two provider sessions / month",
-      "Unlimited text-chat with your provider",
-      "Guided meditations & journaling",
+      "Message your provider any time",
+      "Video or audio calls in the app",
+      "Pay with Wave, Afrimoney, QMoney or a card",
     ],
-    cta: "Choose Plus",
+    cta: "Find your provider",
     featured: true,
   },
   {
-    name: "Premium",
-    price: "$129",
-    cadence: "per month",
-    blurb: "Deep, ongoing support — with priority access on hard days.",
+    name: "A longer talk",
+    price: formatDalasi(AI_TIERS.extended.amountMinor),
+    cadence: "per conversation",
+    blurb: "Twenty minutes with Talk, for when you are not ready to speak to a person yet.",
     features: [
-      "Everything in Plus",
-      "Weekly provider sessions",
-      "Same-day session rebooking",
-      "Crisis-line priority routing",
+      "Everything in the first conversation",
+      "Twenty minutes instead of eight",
+      "Urgent help is always free — no payment, no account",
     ],
-    cta: "Choose Premium",
+    cta: "Talk again",
   },
 ];
 
@@ -88,7 +97,7 @@ export default function Pricing() {
             }}
             className="mt-3 text-[34px] sm:text-[44px] md:text-[54px] leading-[1.02] tracking-[-0.025em] font-medium"
           >
-            {["Pick what fits.", "Change anytime."].map((line, i) => (
+            {["Pay for what", "you use."].map((line, i) => (
               <motion.span
                 key={i}
                 variants={{
@@ -113,7 +122,8 @@ export default function Pricing() {
             transition={{ ...SPRING_SOFT, delay: 0.4 }}
             className="mt-4 text-[14px] md:text-[15px] text-[var(--muted)]"
           >
-            Cancel or move tiers whenever you want — no questions asked.
+            No plans and no subscription. Each conversation and each session is
+            paid for on its own, with Wave, mobile money or a card.
           </motion.p>
         </div>
 
@@ -144,7 +154,7 @@ export default function Pricing() {
             >
               {tier.featured ? (
                 <span className="absolute -top-3 left-6 inline-flex h-6 items-center rounded-full bg-[var(--accent)] px-3 text-[10px] uppercase tracking-[0.18em] text-white">
-                  Most chosen
+                  Where Talk leads you
                 </span>
               ) : null}
 

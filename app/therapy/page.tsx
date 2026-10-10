@@ -28,6 +28,13 @@ import { useReadAloud } from "@/lib/useReadAloud";
 import { IconSpeaker } from "@/components/ui/icons";
 import ProviderCard from "@/components/providers/ProviderCard";
 import GuardianConsentModal from "@/components/therapy/GuardianConsentModal";
+import PaymentSheet from "@/components/onboarding/PaymentSheet";
+import SpokenCaption from "@/components/onboarding/SpokenCaption";
+import AuthCard from "@/components/AuthCard";
+import Modal from "@/components/ui/Modal";
+import { useVoice, voice } from "@/lib/audio/lines";
+import { claimConsultation, useConsultation } from "@/lib/payments/consultation";
+import { AI_TIERS } from "@/lib/models";
 
 /**
  * Talk — the voice surface, and for a new person, the whole onboarding.
@@ -85,12 +92,8 @@ export default function TherapyPage() {
   /** Set once the conversation is finished; the shortlist derives from it. */
   const [finished, setFinished] = useState<Intake | null>(null);
 
-  useEffect(() => {
-    // Signed-out visitors go to sign in, under `next dev` too: the companion
-    // functions refuse any request without an ID token, so there is nothing a
-    // signed-out page could do but fail.
-    if (ready && !user) router.replace("/sign-in?next=%2Ftherapy");
-  }, [ready, user, router]);
+  // Signed out is NOT sent away to a sign-in page any more. This screen is the
+  // way in: Talk brings sign-in up here, as she says it — see "the doorway".
 
   const uid = user?.uid ?? null;
   const getToken = useCallback(() => (user ? user.getIdToken() : Promise.resolve(null)), [user]);
@@ -244,9 +247,146 @@ export default function TherapyPage() {
     if (finished && matches && matches.length === 0) router.replace("/matches?welcome=1");
   }, [finished, matches, router]);
 
-  // Pressing Start is not consent. Talk asks for it out loud — see onConsent.
+  // ---- paid for? -----------------------------------------------------------
+  // A conversation with Talk is paid for first: the D200 initial consultation
+  // for somebody new, the longer one for anybody coming back after it. The
+  // AI functions refuse an unpaid one (a 402) whatever this page does — this
+  // is so the person sees the payment sheet rather than an error.
+  const tier = intakeMode ? "initial" : "extended";
+  const consultation = useConsultation(tier);
+  const { paid } = consultation;
+  const price = formatDalasi(AI_TIERS[tier].amountMinor);
   const { start } = talk;
-  const begin = useCallback(() => start(), [start]);
+
+  // ---- the doorway --------------------------------------------------------
+  // Talk runs the way in, from this screen, in her recorded voice (English,
+  // then Wolof), and each step appears AS SHE SAYS IT:
+  //
+  //   "Welcome to Talk Therapy."
+  //   "To begin a session with us, please sign in."   → sign-in opens
+  //   "You can use your email, or Google."
+  //   (signed in)
+  //   "To continue, the consultation is two hundred dalasi."  → payment opens
+  //   (paid)
+  //   "Thank you. Now, let us begin."                  → the conversation starts
+  //
+  // It usually begins on the landing page — that tap unlocks sound and starts
+  // her speaking, then brings them here mid-sentence (lib/audio/lines keeps
+  // her voice going across the move). Arriving here any other way, the first
+  // tap on Start or the blob begins it.
+  const heard = useVoice();
+  const doorway = heard.spoken.length > 0;
+  const recorded = Boolean(heard.saying) && !talk.active;
+
+  // Sign-in: up once she has asked for it, until they close it.
+  const [signInClosed, setSignInClosed] = useState(false);
+  const signInOpen = ready && !user && !signInClosed && heard.spoken.includes("sign-in");
+
+  // Payment: up once she has said the price, or when Start is pressed unpaid,
+  // or by itself when a checkout brings them back to this tab.
+  const [payOpen, setPayOpen] = useState(false);
+  const [payClosed, setPayClosed] = useState(false);
+  const sheetOpen =
+    Boolean(user) &&
+    paid === false &&
+    !payClosed &&
+    (payOpen || heard.spoken.includes("price") || consultation.phase !== "idle");
+
+  // Whether this screen is still the one on show. A line's onDone can fire
+  // after somebody has left, and must not open a microphone on a page that
+  // has gone.
+  const here = useRef(false);
+  useEffect(() => {
+    here.current = true;
+    return () => {
+      here.current = false;
+      // Stop her only if the screen has really gone: React remounts once on
+      // the way in (in development, and on some navigations), and stopping on
+      // that would cut her off mid-welcome. A real exit stays unmounted.
+      setTimeout(() => {
+        if (!here.current) voice.stop();
+      }, 0);
+    };
+  }, []);
+
+  /** Into the conversation, without a fresh tap if the browser allows it. */
+  const startTalk = useCallback(async () => {
+    voice.stop();
+    if (!here.current || document.visibilityState !== "visible") return;
+    await start({ fromTap: false });
+  }, [start]);
+
+  // Signed in (on this screen, or before): what next? Once whatever she is
+  // saying has finished — the welcome, say — she says the price, or, for
+  // somebody who has already paid, welcomes them back and begins.
+  const decided = useRef(false);
+  useEffect(() => {
+    if (!doorway || decided.current || !ready || !user || !profile || heard.saying || paid === null || talk.active) {
+      return;
+    }
+    decided.current = true;
+    if (paid) voice.say(["welcome-back"], { onDone: () => void startTalk() });
+    else voice.say(["price"]);
+  }, [doorway, heard.saying, paid, profile, ready, startTalk, talk.active, user]);
+
+  // Paid, in this visit. The checkout is in another tab; the moment the
+  // consultation is written she thanks them and begins — once somebody is
+  // looking at this tab, so she does not start talking to nobody.
+  const thanked = useRef(false);
+  useEffect(() => {
+    if (!paid || thanked.current || talk.active || consultation.phase !== "waiting") return;
+    const go = () => {
+      if (document.visibilityState !== "visible" || thanked.current) return;
+      thanked.current = true;
+      setPayOpen(false);
+      voice.say(["paid"], { onDone: () => void startTalk() });
+    };
+    go();
+    document.addEventListener("visibilitychange", go);
+    return () => document.removeEventListener("visibilitychange", go);
+  }, [consultation.phase, paid, startTalk, talk.active]);
+
+  // Start, or a tap on the blob. Pressing Start is not consent: Talk asks for
+  // that out loud once the conversation begins — see onConsent.
+  const begin = () => {
+    if (!user) {
+      setSignInClosed(false);
+      // Already asked: just bring sign-in back. Otherwise she starts the way
+      // in — inside this tap, which is what lets her be heard.
+      if (heard.spoken.includes("sign-in")) return;
+      voice.unlock();
+      voice.say(["welcome", "sign-in", "how"]);
+      return;
+    }
+    if (!paid) {
+      setPayClosed(false);
+      setPayOpen(true);
+      return;
+    }
+    voice.stop();
+    void start();
+  };
+
+  // Refused for payment although this account HAS paid: the paid claim did
+  // not reach the token. Put it back and mint a fresh token — one round trip —
+  // instead of asking somebody to pay twice.
+  const repairing = useRef(false);
+  const [repaired, setRepaired] = useState(false);
+  const paymentRefused = talk.error?.kind === "payment";
+  useEffect(() => {
+    if (!paymentRefused || repairing.current) return;
+    repairing.current = true;
+    void (async () => {
+      const ok = paid ? await claimConsultation() : false;
+      if (ok) {
+        await user?.getIdToken(true).catch(() => null);
+        setRepaired(true);
+      } else {
+        setPayOpen(true);
+      }
+      repairing.current = false;
+    })();
+  }, [paid, paymentRefused, user]);
 
   const denied = mic.status === "denied" || mic.status === "unsupported" || mic.status === "error";
   // Without a microphone the keyboard is the only way to answer, so it is open.
@@ -255,7 +395,9 @@ export default function TherapyPage() {
   const lastTalk = findLast(talk.lines, "talk");
   const translated = Boolean(lastUser?.english || lastTalk?.english);
   const learned = REQUIRED_FIELDS.length - missingFields(talk.intake).length;
-  const canStart = ready;
+  // Not before the payment lookup has answered: Start means pay or talk, and
+  // which one is not known yet. Signed out, Start begins the way in.
+  const canStart = ready && (!user || paid !== null);
 
   // A tap on the blob never ends the session — that is the button's job. A
   // tap meant to interrupt Talk that lands a moment after she finished would
@@ -316,7 +458,10 @@ export default function TherapyPage() {
             send them straight back here. */}
         <Link
           href={intakeMode && !profile?.onboarded ? "/" : "/dashboard"}
-          onClick={() => talk.stop()}
+          onClick={() => {
+            voice.stop();
+            talk.stop();
+          }}
           className="h-10 px-4 rounded-full border border-white/20 text-[12px] uppercase tracking-[0.14em] font-medium flex items-center hover:bg-white/10 transition-colors"
         >
           Exit
@@ -364,9 +509,11 @@ export default function TherapyPage() {
               blob follows whoever is talking. The canvas overflows the button
               on purpose and ignores the pointer, so only the body is the tap
               target; the page's overflow-hidden trims it at the viewport. */}
+          {/* Her recorded lines move the particles exactly as her live voice
+              does — it is the same Talk, from the first word. */}
           <TalkBlob
-            state={talk.blobState}
-            feed={talk.feed}
+            state={recorded ? "speaking" : talk.blobState}
+            feed={recorded ? voice.feed() : talk.feed}
             className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
             style={{ width: "var(--blob-canvas)", height: "var(--blob-canvas)" }}
           />
@@ -384,17 +531,23 @@ export default function TherapyPage() {
         >
           {denied
             ? "Microphone blocked — type your answers below, or allow the microphone and start again."
-            : STATUS[talk.phase]}
+            : recorded
+              ? "Talk is speaking."
+              : STATUS[talk.phase]}
         </p>
 
         {/* What was said, both ways. The newest exchange only: this is a
             conversation, not a chat log, and the words are there to confirm
             Talk heard you right — and for when her voice cannot be heard. */}
         <div className="relative z-10 mt-5 w-full max-w-[560px] min-h-[96px] text-center" aria-live="polite">
-          <AnimatePresence initial={false}>
-            {lastUser ? <Caption key={lastUser.id} line={lastUser} showEnglish={showEnglish} /> : null}
-            {lastTalk ? <Caption key={lastTalk.id} line={lastTalk} showEnglish={showEnglish} /> : null}
-          </AnimatePresence>
+          {recorded ? (
+            <SpokenCaption saying={heard.saying} tone="dark" className="mx-auto max-w-[460px]" />
+          ) : (
+            <AnimatePresence initial={false}>
+              {lastUser ? <Caption key={lastUser.id} line={lastUser} showEnglish={showEnglish} /> : null}
+              {lastTalk ? <Caption key={lastTalk.id} line={lastTalk} showEnglish={showEnglish} /> : null}
+            </AnimatePresence>
+          )}
           {translated ? (
             <button
               type="button"
@@ -498,7 +651,11 @@ export default function TherapyPage() {
           </motion.div>
         ) : null}
 
-        {talk.error ? (
+        {talk.error?.kind === "payment" ? (
+          <div className="relative z-10 mt-4 max-w-[440px] text-center text-[13px] text-white/70">
+            {repaired ? "All set — tap to carry on." : "Checking your consultation…"}
+          </div>
+        ) : talk.error ? (
           <div className="relative z-10 mt-4 max-w-[440px] text-center text-[13px] text-[var(--accent-soft)]">
             {talk.error.message}
             {talk.error.kind === "auth" ? (
@@ -631,7 +788,17 @@ export default function TherapyPage() {
             onClick={talk.active ? talk.stop : begin}
             className="h-12 px-7 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-soft)] disabled:opacity-40 text-white text-[12px] uppercase tracking-[0.14em] font-medium transition-colors"
           >
-            {talk.active ? "End" : intakeMode ? "Start" : "Begin"}
+            {talk.active
+              ? "End"
+              : !user
+                ? "Begin"
+                : paid === false
+                ? `Pay ${price} to begin`
+                : paid === null
+                  ? "One moment"
+                  : intakeMode
+                    ? "Start"
+                    : "Begin"}
           </button>
           {talk.active && !talk.textOnly ? (
             <button
@@ -684,6 +851,31 @@ export default function TherapyPage() {
       </main>
 
       <GuardianConsentModal {...guardian.modal} language={talk.language ?? guardian.modal.language} />
+
+      {/* "Confirm payment for consultation". Opens on Start for somebody who
+          has not paid, and by itself when a checkout brings them back here. */}
+      {/* Sign-in, brought up by Talk as she says "please sign in". Embedded:
+          nothing navigates, so she keeps speaking and the next step follows. */}
+      <Modal open={signInOpen} onClose={() => setSignInClosed(true)} variant="responsive">
+        <div className="space-y-5">
+          <SpokenCaption saying={heard.saying} tone="light" />
+          <AuthCard mode="sign-up" onSignedIn={() => voice.stop()} />
+        </div>
+      </Modal>
+
+      {/* "Confirm payment for consultation" — up as she says the price. */}
+      <PaymentSheet
+        open={sheetOpen}
+        onClose={() => {
+          setPayOpen(false);
+          setPayClosed(true);
+          voice.stop();
+          if (consultation.phase !== "idle") consultation.reset();
+        }}
+        tier={tier}
+        consultation={consultation}
+        saying={heard.saying}
+      />
     </div>
   );
 }

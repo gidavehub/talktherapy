@@ -6,6 +6,7 @@ import { useRef } from "react";
 import StatCard from "./StatCard";
 import { SPRING_SOFT, SPRING_SNAP } from "./motion/primitives";
 import StartLink from "./StartLink";
+import HeroSequence from "./onboarding/HeroSequence";
 
 function Star({ delay = 0 }: { delay?: number }) {
   return (
@@ -239,7 +240,10 @@ export default function Hero() {
           md:absolute md:left-1/2 md:-translate-x-1/2 md:bottom-[200px]
         "
       >
-        <CTAButton />
+        {/* Talk runs the way in: one tap and she speaks, and sign-in and
+            payment open under her words. Somebody already set up gets the
+            ordinary button instead. */}
+        <HeroSequence fallback={<CTAButton />} />
       </motion.div>
 
       {/* Giant italic stamp — sits behind everything as a watermark on both

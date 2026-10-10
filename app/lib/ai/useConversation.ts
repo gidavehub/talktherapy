@@ -51,6 +51,8 @@ export type Line = {
 
 export type ConversationError =
   | { kind: "auth"; message: string }
+  /** The consultation is not paid for — or the browser's token predates the payment. */
+  | { kind: "payment"; message: string }
   | { kind: "busy"; message: string }
   | { kind: "failed"; message: string }
   | { kind: "voice"; message: string };
@@ -290,6 +292,12 @@ export function useConversation({
           if (res.status === 401) {
             setError({ kind: "auth", message: payload.error ?? "Sign in to talk to Talk." });
             return; // the auth effect below ends the session
+          }
+          if (res.status === 402) {
+            // Ends the session too: nothing will succeed until it is paid for,
+            // and the page knows how to sort that out.
+            setError({ kind: "payment", message: payload.error ?? "Your consultation has not been paid for yet." });
+            return;
           }
           setError({
             kind: res.status === 429 ? "busy" : "failed",
@@ -590,8 +598,16 @@ export function useConversation({
     go("idle");
   }, [go, micStop]);
 
-  const start = useCallback(async () => {
-    if (activeRef.current) return;
+  /**
+   * Begin. `fromTap: false` is for starting without a fresh tap — straight
+   * after paying, say — and it only goes ahead if the browser lets the page
+   * make a sound; otherwise it backs out quietly, returns false, and the page
+   * waits for a tap as usual. (Safari will not start audio that was not
+   * begun inside a tap, and Talk speaking into a silent context would leave
+   * her stuck mid-sentence with nothing to hear.)
+   */
+  const start = useCallback(async ({ fromTap = true }: { fromTap?: boolean } = {}): Promise<boolean> => {
+    if (activeRef.current) return true;
     activeRef.current = true;
     doneRef.current = false;
     startedAtRef.current = Date.now();
@@ -607,7 +623,17 @@ export function useConversation({
       // Denied, unsupported, or ended while the permission prompt was open.
       activeRef.current = false;
       go("idle");
-      return;
+      return false;
+    }
+    if (!fromTap && graph.ctx.state !== "running") {
+      await Promise.race([graph.ctx.resume().catch(() => {}), new Promise((r) => setTimeout(r, 400))]);
+      // Read again: resume() may have changed it, which TypeScript cannot see.
+      if ((graph.ctx.state as AudioContextState) !== "running") {
+        activeRef.current = false;
+        micStop();
+        go("idle");
+        return false;
+      }
     }
 
     const player = new StreamPlayer(graph.ctx);
@@ -651,10 +677,11 @@ export function useConversation({
         displayName: opts.current.displayName,
         consented: hasConsent(),
       });
-      return;
+      return true;
     }
     listen();
-  }, [afterTurn, go, hasConsent, listen, micGraph, micStart, speakRequest, turnBody]);
+    return true;
+  }, [afterTurn, go, hasConsent, listen, micGraph, micStart, micStop, speakRequest, turnBody]);
 
   /** A typed message, for anyone who cannot or would rather not speak right now. */
   const sendText = useCallback(
@@ -728,9 +755,10 @@ export function useConversation({
     }
   }, [afterSpeaking, listen]);
 
-  // An auth failure ends the session: nothing will succeed until sign-in.
+  // An auth or payment failure ends the session: nothing will succeed until
+  // somebody signs in, or pays.
   useEffect(() => {
-    if (error?.kind === "auth" && activeRef.current) stop();
+    if ((error?.kind === "auth" || error?.kind === "payment") && activeRef.current) stop();
   }, [error, stop]);
 
   // Leaving the page ends everything — microphone light included.

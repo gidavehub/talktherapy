@@ -3,11 +3,17 @@
 import { motion } from "motion/react";
 import { SPRING_SOFT, SPRING_SNAP } from "./motion/primitives";
 import StartLink from "./StartLink";
+import { formatDalasi } from "../lib/money";
+import { AI_TIERS } from "../lib/models";
 
 /**
  * Slim full-width banner — about half a viewport at most. Sits between the
- * hero and the longer content sections to drive the free-consult CTA without
- * eating the whole page.
+ * hero and the longer content sections.
+ *
+ * It says what the first conversation costs, because it costs something: the
+ * D200 initial consultation is paid up front (see AI_TIERS). It used to say
+ * "Your first session is on us" and "No card. No pressure." on the same page
+ * as the payment — and promised a free intro call that does not exist.
  */
 export default function ConsultationBanner() {
   return (
@@ -48,7 +54,7 @@ export default function ConsultationBanner() {
               transition={{ ...SPRING_SOFT, delay: 0.1 }}
               className="text-[11px] uppercase tracking-[0.22em] text-white/65"
             >
-              No card. No pressure.
+              Wave, mobile money or card
             </motion.p>
             <motion.h2
               initial="hidden"
@@ -60,7 +66,7 @@ export default function ConsultationBanner() {
               }}
               className="mt-3 text-[32px] sm:text-[42px] md:text-[54px] leading-[1.02] tracking-[-0.02em] font-medium"
             >
-              {["Your first session", "is on us."].map((line, i) => (
+              {["Your first conversation:", `${formatDalasi(AI_TIERS.initial.amountMinor)}.`].map((line, i) => (
                 <motion.span
                   key={i}
                   variants={{
@@ -85,8 +91,9 @@ export default function ConsultationBanner() {
               transition={{ ...SPRING_SOFT, delay: 0.4 }}
               className="mt-4 text-[14px] md:text-[15px] text-white/70 max-w-[460px] leading-relaxed"
             >
-              Up to eight minutes with Talk to understand what you&apos;re going
-              through, then a free intro call with a matched provider.
+              Up to eight minutes with Talk, in your own language, to understand
+              what you&apos;re going through — and then she introduces you to
+              providers who fit.
             </motion.p>
           </div>
 
@@ -102,7 +109,7 @@ export default function ConsultationBanner() {
                 
                 className="inline-flex h-12 md:h-14 items-center gap-3 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-soft)] transition-colors pl-6 md:pl-8 pr-2 text-white text-[12px] md:text-[13px] uppercase tracking-[0.14em] font-medium shadow-[0_18px_40px_-15px_rgba(255,90,31,0.65)]"
               >
-                Book Free Consult
+                Begin with Talk
                 <motion.span
                   className="h-10 w-10 md:h-11 md:w-11 rounded-full bg-white/15 flex items-center justify-center"
                   whileHover={{ x: 4 }}
