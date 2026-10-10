@@ -33,7 +33,10 @@ import {
   MODEM_PAY_BASE_URL,
   buildCheckoutBody,
   decideFulfilment,
+  isTransferEvent,
+  normaliseTransferEvent,
   normaliseWebhookEvent,
+  readTransferResponse,
   paymentMethodsFor,
   readCheckoutResponse,
   verifyWebhookSignature,
@@ -61,6 +64,15 @@ import {
   type ConsultationGrant,
 } from "./payments";
 import type { PaymentRecord } from "../../app/lib/payments/modempay-protocol";
+import {
+  applyTransferEvent,
+  checkPayout as checkPayoutStatus,
+  earningsFor,
+  requestPayout as reservePayout,
+  savePayoutAccount as savePayoutAccountFor,
+  type TransferClient,
+  type TransferLookup,
+} from "./payouts";
 
 export {
   companionTurn,
@@ -622,6 +634,114 @@ async function reconcile(paymentIntentId: string, record: PaymentRecord) {
   };
 }
 
+// ------------------------------------------------------------------ payouts
+
+/**
+ * The transfer call, as the modem-pay SDK makes it (resources/transfer.js):
+ * the body bare, the idempotency key as a header.
+ *
+ * What matters most is telling "refused" from "no idea". A 4xx is a refusal
+ * — nothing was sent, and the sessions can go back into the balance. A
+ * timeout, a 5xx, a 409 or a 429 might have sent it: those are "unknown",
+ * and the payout is asked about again with the same key, never released.
+ */
+const modemTransfer: TransferClient = async (body, idempotencyKey) => {
+  const key = MODEM_PAY_SECRET_KEY.value().trim();
+  if (!key) return { kind: "refused", message: "Payments are not configured." };
+  let res: Response;
+  try {
+    res = await fetch(`${MODEM_PAY_BASE_URL}/v1/transfers`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(25_000),
+    });
+  } catch (error) {
+    return { kind: "unknown", message: `no answer: ${(error as Error).message}` };
+  }
+  const text = await res.text();
+  let parsed: unknown = null;
+  try {
+    parsed = text ? JSON.parse(text) : null;
+  } catch {
+    // Kept as text for the log.
+  }
+  if (res.ok) return { kind: "accepted", ...readTransferResponse(parsed) };
+  // Logged, not returned: a gateway error can carry account details.
+  console.error(`Modem Pay transfer ${idempotencyKey} answered ${res.status}: ${text.slice(0, 300)}`);
+  if (res.status >= 500 || [408, 409, 425, 429].includes(res.status)) {
+    return { kind: "unknown", message: `gateway ${res.status}` };
+  }
+  return { kind: "refused", message: `gateway ${res.status}` };
+};
+
+const modemTransferLookup: TransferLookup = async (reference) => {
+  try {
+    const body = await modemPay(`/v1/transfers/${encodeURIComponent(reference)}`, { method: "GET" });
+    return { state: readTransferResponse(body).state };
+  } catch (error) {
+    console.warn("Modem Pay transfer lookup failed:", (error as Error).message);
+    return null;
+  }
+};
+
+async function requireProvider(uid: string): Promise<void> {
+  const role = (await db().collection("users").doc(uid).get()).data()?.role;
+  if (role !== "provider") throw new HttpsError("permission-denied", "Only providers are paid out.");
+}
+
+/**
+ * Where a provider is paid. Through here and nowhere else — the browser
+ * cannot write it — so it is checked, and every change is kept.
+ */
+export const savePayoutAccount = onCall(CALLABLE, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+  const result = await savePayoutAccountFor(uid, {
+    network: request.data?.network,
+    accountNumber: request.data?.accountNumber,
+    beneficiaryName: request.data?.beneficiaryName,
+  });
+  if (!result.ok) throw new HttpsError("invalid-argument", result.reason);
+  return result.account;
+});
+
+/**
+ * Withdraw what a provider has earned: every session paid for, over, and
+ * past the hold, less the platform's share — to their own wallet.
+ */
+export const requestPayout = onCall({ ...CALLABLE, secrets: [MODEM_PAY_SECRET_KEY] }, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+  await requireProvider(uid);
+  const result = await reservePayout(uid, modemTransfer, { callbackUrl: WEBHOOK_URL });
+  if (!result.ok) throw new HttpsError("failed-precondition", result.reason);
+  return result;
+});
+
+/** What a provider has earned — counted exactly as a withdrawal would count it. */
+export const providerEarnings = onCall(CALLABLE, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+  await requireProvider(uid);
+  return earningsFor(uid);
+});
+
+/** Where does this payout stand? Asks again, safely, when the answer was unclear. */
+export const checkPayout = onCall({ ...CALLABLE, secrets: [MODEM_PAY_SECRET_KEY] }, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+  const payoutId = String(request.data?.payoutId ?? "").trim();
+  if (!payoutId) throw new HttpsError("invalid-argument", "Missing payout.");
+  const result = await checkPayoutStatus(uid, payoutId, modemTransfer, modemTransferLookup, WEBHOOK_URL);
+  if (!result.ok) throw new HttpsError("not-found", result.reason);
+  return result;
+});
+
 // ------------------------------------------------------------------ webhook
 
 /**
@@ -668,6 +788,20 @@ export const modemWebhook = onRequest(
       parsed = JSON.parse(raw);
     } catch {
       res.status(200).json({ received: true, acted: false, reason: "Body was not JSON" });
+      return;
+    }
+
+    // A transfer is not a payment, and must never be read as one: its status
+    // is "completed", which the payment reader would call a success.
+    if (isTransferEvent(parsed)) {
+      try {
+        const reason = await applyTransferEvent(normaliseTransferEvent(parsed));
+        console.log(`modemWebhook: transfer — ${reason}`);
+        res.status(200).json({ received: true, acted: true, reason });
+      } catch (error) {
+        console.error("modemWebhook: failed to apply a transfer event", error);
+        res.status(500).json({ error: "Could not record the transfer. Please retry." });
+      }
       return;
     }
 

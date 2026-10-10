@@ -224,6 +224,23 @@ async function main() {
     `held for a human, not marked fulfilled with nothing delivered (${mysteryDoc.reviewReason})`,
   );
 
+  console.log("\nA transfer event — never read as a payment");
+  // Its status is "completed", which the payment reader calls a success: read
+  // as a payment it would have recorded money arriving for an id that is not
+  // a payment at all.
+  const transferId = `tr_smoke_${randomUUID().slice(0, 8)}`;
+  const transfer = await deliver(
+    JSON.stringify({
+      event: "transfer.succeeded",
+      event_id: `evt_smoke_${randomUUID().slice(0, 8)}`,
+      data: { id: transferId, transfer_reference: transferId, status: "completed", amount: 1700, metadata: { payout_id: "po_smoke_none" } },
+    }),
+  );
+  check(transfer.status === 200, `answered 200 (got ${transfer.status})`);
+  check(/payout/i.test(transfer.json.reason ?? ""), `handled as a payout: ${transfer.json.reason}`);
+  const asPayment = await db.collection("payments").doc(transferId).get();
+  check(!asPayment.exists, "and no payment record was made for it");
+
   // ---- a session fee, which must confirm the booking ----------------------
   console.log("\nA session fee");
   const sessionIntent = `pi_smoke_${randomUUID().slice(0, 8)}`;

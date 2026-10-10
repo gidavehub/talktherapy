@@ -49,6 +49,13 @@ export const COLLECTIONS = {
    * anybody grant themselves the D200 consultation from the browser console.
    */
   entitlements: "entitlements",
+  /**
+   * `payouts/{id}` — money sent to a provider, one document per withdrawal,
+   * and `payoutAccounts/{uid}` — where they are paid. Server-written only.
+   * See app/lib/payouts.ts.
+   */
+  payouts: "payouts",
+  payoutAccounts: "payoutAccounts",
   resources: "resources",
   escalations: "escalations",
   organizations: "organizations",
@@ -355,6 +362,12 @@ export type Booking = {
    * rules refuse every client write to a booking, so it cannot be cleared.
    */
   patientMinor: boolean;
+  /**
+   * The payout that paid the provider for this session, once withdrawn. A
+   * session can be claimed by one payout only — the guard against paying a
+   * provider twice. Server-written.
+   */
+  payoutId: string | null;
   /**
    * A Google Meet link the provider may attach, for anyone who would rather
    * meet there. The session itself happens inside Talk; this is the fallback

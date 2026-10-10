@@ -493,6 +493,28 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // payouts/{id} — money sent to a provider. Server-written only: a provider
+    // who could write here could mark sessions paid out to nobody, or a
+    // payout complete that never left. They read their own.
+    match /payouts/{payoutId} {
+      allow get: if isSignedIn() && resource.data.providerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.providerId == request.auth.uid;
+      allow get, list: if isAdmin();
+      allow write: if false;
+    }
+
+    // payoutAccounts/{uid} — where a provider is paid. Written only through
+    // the savePayoutAccount function, which checks it and keeps every change:
+    // where money goes is the first thing a stolen session would change.
+    match /payoutAccounts/{uid} {
+      allow get: if isSelf(uid) || isAdmin();
+      allow write: if false;
+      match /changes/{changeId} {
+        allow read: if isSelf(uid) || isAdmin();
+        allow write: if false;
+      }
+    }
+
     // paymentEvents/{eventKey} — the webhook idempotency ledger. One document
     // per delivery acted on, keyed by the provider's event id or a hash of the
     // raw body.

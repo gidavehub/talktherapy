@@ -10,6 +10,7 @@ import {
   IconChat,
   IconCalendar,
   IconClock,
+  IconWallet,
 } from "../components/ui/icons";
 
 /**
@@ -47,10 +48,10 @@ export const PATIENT_NAV: NavItem[] = [
 /**
  * A provider's side of the app.
  *
- * Short, because a provider only has two jobs here today: answer the people
- * who have written to them, and keep the listing that lets those people find
- * them in the first place. Messages comes first — it is the one thing that is
- * waiting on them, and the one thing that is urgent.
+ * Short: answer the people who have written to them, keep the listing that
+ * lets those people find them, and be paid for the work. Messages comes first
+ * — it is the one thing that is waiting on them, and the one thing that is
+ * urgent.
  *
  * Mood, journal and the companion are deliberately absent. They are a
  * patient's tools, and putting a provider's own notes in the same place as the
@@ -60,6 +61,8 @@ export const PROVIDER_NAV: NavItem[] = [
   { href: "/chats", label: "Messages", icon: <IconChat />, primary: true },
   { href: "/sessions", label: "Sessions", icon: <IconCalendar />, primary: true },
   { href: "/pro/availability", label: "Hours", icon: <IconClock />, primary: true },
+  { href: "/pro/earnings", label: "Earnings", icon: <IconWallet />, primary: true },
   { href: "/pro/profile", label: "Profile", icon: <IconPeople />, primary: true },
-  { href: "/settings", label: "Settings", icon: <IconSettings />, primary: true },
+  // Off the bottom bar (five fit), still in the menu.
+  { href: "/settings", label: "Settings", icon: <IconSettings /> },
 ];

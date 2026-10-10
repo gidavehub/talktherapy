@@ -685,6 +685,123 @@ export function isPayoutNetwork(value: string): value is PayoutNetwork {
   return (PAYOUT_NETWORKS as readonly string[]).includes(value);
 }
 
+/**
+ * What `POST /v1/transfers` takes. Sent BARE — unlike a payment, which the
+ * API wants wrapped in `{ data }`. Both shapes are what the official modem-pay
+ * SDK sends (resources/transfer.js vs resources/payment-intent.js), and the
+ * owner's connekteasy pays out through exactly this call.
+ *
+ * `amount` is DALASI, like a payment's. The idempotency key travels as the
+ * `Idempotency-Key` header, not in the body.
+ */
+export type TransferRequest = {
+  amount: number;
+  currency: "GMD";
+  network: PayoutNetwork;
+  account_number: string;
+  beneficiary_name: string;
+  narration: string;
+  metadata: Record<string, string>;
+  callback_url: string;
+};
+
+export function buildTransferBody(input: {
+  amountMajor: number;
+  network: PayoutNetwork;
+  accountNumber: string;
+  beneficiaryName: string;
+  narration: string;
+  metadata: Record<string, string>;
+  callbackUrl: string;
+}): TransferRequest {
+  return {
+    amount: input.amountMajor,
+    currency: "GMD",
+    network: input.network,
+    account_number: input.accountNumber,
+    beneficiary_name: input.beneficiaryName,
+    narration: input.narration,
+    metadata: input.metadata,
+    callback_url: input.callbackUrl,
+  };
+}
+
+export type TransferState = "pending" | "completed" | "failed" | "unknown";
+
+const TRANSFER_DONE = new Set(["completed", "complete", "success", "successful", "succeeded", "paid"]);
+const TRANSFER_FAILED = new Set(["failed", "cancelled", "canceled", "reversed", "declined", "rejected"]);
+const TRANSFER_PENDING = new Set(["pending", "processing", "queued", "initiated"]);
+
+function transferState(status: string | null): TransferState {
+  const s = (status ?? "").toLowerCase();
+  if (TRANSFER_DONE.has(s)) return "completed";
+  if (TRANSFER_FAILED.has(s)) return "failed";
+  if (TRANSFER_PENDING.has(s)) return "pending";
+  return "unknown";
+}
+
+/**
+ * The reply to a transfer: its reference and where it stands. Tolerant of
+ * the body being the transfer or wrapping it in `data`, as the payment reply
+ * is read.
+ */
+export function readTransferResponse(body: unknown): { reference: string | null; state: TransferState } {
+  const envelope = asRecord(body) ?? {};
+  const transfer = asRecord(envelope.data) ?? envelope;
+  return {
+    reference: asString(transfer.transfer_reference) ?? asString(transfer.reference) ?? asString(transfer.id),
+    state: transferState(asString(transfer.status)),
+  };
+}
+
+export type TransferEvent = {
+  eventName: string;
+  /** Modem Pay's reference for the transfer. */
+  reference: string | null;
+  /** Ours, from the metadata we sent. Preferred: it cannot be confused with anything else. */
+  payoutId: string | null;
+  outcome: "succeeded" | "failed" | "pending" | "unknown";
+};
+
+/**
+ * Is this delivery about a TRANSFER rather than a payment?
+ *
+ * Asked first, because a transfer event read as a payment looks like a
+ * success — its status is "completed" — for a payment id that does not exist.
+ */
+export function isTransferEvent(body: unknown): boolean {
+  const envelope = asRecord(body) ?? {};
+  const name = (asString(envelope.event) ?? asString(envelope.type) ?? "").toLowerCase();
+  if (name.startsWith("transfer.")) return true;
+  const payload = asRecord(envelope.payload) ?? asRecord(envelope.data) ?? envelope;
+  const metadata = asRecord(payload.metadata) ?? {};
+  return Boolean(asString(payload.transfer_reference) || asString(metadata.payout_id));
+}
+
+export function normaliseTransferEvent(body: unknown): TransferEvent {
+  const envelope = asRecord(body) ?? {};
+  const eventName = (asString(envelope.event) ?? asString(envelope.type) ?? "").toLowerCase();
+  const payload = asRecord(envelope.payload) ?? asRecord(envelope.data) ?? envelope;
+  const metadata = asRecord(payload.metadata) ?? {};
+  const state = transferState(asString(payload.status));
+  // The event name decides when it says; failure wins a disagreement, as it
+  // does for payments — the cautious reading is the one that cannot lose money.
+  const outcome =
+    eventName === "transfer.failed" || eventName === "transfer.reversed" || state === "failed"
+      ? "failed"
+      : eventName === "transfer.succeeded" || eventName === "transfer.completed" || state === "completed"
+        ? "succeeded"
+        : state === "pending"
+          ? "pending"
+          : "unknown";
+  return {
+    eventName,
+    reference: asString(payload.transfer_reference) ?? asString(payload.reference) ?? asString(payload.id),
+    payoutId: asString(metadata.payout_id),
+    outcome,
+  };
+}
+
 // -------------------------------------------------------------------- helpers
 
 function asRecord(value: unknown): Record<string, unknown> | null {

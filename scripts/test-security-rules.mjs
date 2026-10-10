@@ -113,6 +113,17 @@ const payment = {
 const NOW = "2026-10-03T12:05:00Z";
 const BACKDATED = "2026-09-26T12:05:00Z";
 
+/** A payout, and where a provider is paid, as the server writes them. */
+const payout = {
+  id: "po_1", providerId: PROVIDER, amountMinor: 68000, bookingIds: ["bk_1"], network: "wave",
+  accountNumber: "7000000", accountHint: "••• 0000", beneficiaryName: "Awa Jallow",
+  status: "pending", transferReference: null, failureReason: null, needsReview: false,
+  createdAt: 1_790_000_000_000, updatedAt: 1_790_000_000_000,
+};
+const payoutAccount = {
+  uid: PROVIDER, network: "wave", accountNumber: "7000000", beneficiaryName: "Awa Jallow", updatedAt: 1_790_000_000_000,
+};
+
 /** A paid consultation, as the server writes it. */
 const entitlement = {
   uid: PATIENT,
@@ -343,6 +354,24 @@ const CASES = [
     `${DOCS}/entitlements/${PATIENT}`, entitlement, { ...entitlement, expiresAt: 4_102_444_800_000 }],
   ["upgrading your own consultation", "DENY", PATIENT, "update",
     `${DOCS}/entitlements/${PATIENT}`, entitlement, { ...entitlement, aiTier: "extended" }],
+
+  // --- paying providers ---------------------------------------------------
+  // Written only by the server. A provider who could write a payout could
+  // mark one complete that never left, or free their sessions to be paid
+  // again; one who could write their account could not be audited.
+  ["a provider reads their own payout", "ALLOW", PROVIDER, "get", `${DOCS}/payouts/po_1`, payout],
+  ["a stranger reads a provider's payout", "DENY", STRANGER, "get", `${DOCS}/payouts/po_1`, payout],
+  ["a provider marks a payout complete", "DENY", PROVIDER, "update", `${DOCS}/payouts/po_1`, payout,
+    { ...payout, status: "completed" }],
+  ["a provider invents a payout", "DENY", PROVIDER, "create", `${DOCS}/payouts/po_2`, null, payout],
+  ["a provider reads where they are paid", "ALLOW", PROVIDER, "get", `${DOCS}/payoutAccounts/${PROVIDER}`, payoutAccount],
+  ["a stranger reads where a provider is paid", "DENY", STRANGER, "get", `${DOCS}/payoutAccounts/${PROVIDER}`, payoutAccount],
+  ["a provider changes their account from the browser", "DENY", PROVIDER, "update", `${DOCS}/payoutAccounts/${PROVIDER}`,
+    payoutAccount, { ...payoutAccount, accountNumber: "9999999" }],
+  ["somebody redirects a provider's money", "DENY", STRANGER, "update", `${DOCS}/payoutAccounts/${PROVIDER}`,
+    payoutAccount, { ...payoutAccount, accountNumber: "9999999" }],
+  ["a session marked paid out from the browser", "DENY", PROVIDER, "update", `${DOCS}/bookings/bk_1`, booking,
+    { ...booking, payoutId: "po_9" }],
 ];
 
 /**
