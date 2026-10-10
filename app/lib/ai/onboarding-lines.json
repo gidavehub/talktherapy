@@ -1,5 +1,5 @@
 {
-  "about": "What Talk says on the landing page, before anybody has signed in. Spoken from pre-recorded files (public/voice/onboarding), never generated per visit. Edit the text here, then run `npm run build:voice`. English is the source. The Wolof was drafted by the model, back-translated to check the meaning, and is marked draft until a Gambian translator has checked it — correct `wo` here and set `woDraft` to false.",
+  "about": "What Talk says from recordings: the landing page before anybody has signed in, and the urgent-help page, which anybody can open. Spoken from pre-recorded files (public/voice/onboarding), never generated per visit. Edit the text here, then run `npm run build:voice`. English is the source. The Wolof was drafted by the model, back-translated to check the meaning, and is marked draft until a Gambian translator has checked it — correct `wo` here and set `woDraft` to false.",
   "lines": [
     {
       "id": "welcome",
@@ -42,6 +42,34 @@
       "wo": "Dalal jàmm waat. Nan wéy.",
       "woDraft": true,
       "woBack": "Welcome back. Let's continue."
+    },
+    {
+      "id": "crisis-call",
+      "en": "If you are in danger right now, call one-one-seven for the police, or one-one-six for an ambulance.",
+      "wo": "Su fekkee ne yaa ngi ci danger léegi, woowl one-one-seven ngir police walla one-one-six ngir ambulance.",
+      "woDraft": true,
+      "woBack": "If you are in danger right now, call one-one-seven for police or one-one-six for an ambulance."
+    },
+    {
+      "id": "crisis-fire",
+      "en": "For a fire or an accident, call one-one-eight. These calls are free.",
+      "wo": "Su dee lakk-lakk walla accident, wooteel ci one-one-eight. Woote yooyu amul benn fey.",
+      "woDraft": true,
+      "woBack": "If it is a fire or an accident, call one-one-eight. Those calls are free of charge."
+    },
+    {
+      "id": "crisis-young",
+      "en": "If you are under eighteen, tell an adult you trust today: a parent, a teacher, or a health worker.",
+      "wo": "Su fekkee amulo fukki at ak juróom-ñett, waxal tey ak mag boo wóolu: sa waajur, sa jàngalekat, walla liggéeykat bu wér-gi-yaram.",
+      "woDraft": true,
+      "woBack": "If you are not eighteen, speak today with an adult you trust: your parent, your teacher, or a healthcare worker."
+    },
+    {
+      "id": "crisis-alone",
+      "en": "You do not have to carry this on your own. Telling one person is often the hardest step, and the most useful.",
+      "wo": "Doo war a yenu li yaw rekk sa bopp. Wax ko kenn nit mooy la ëpp solo ak la gën a jafe.",
+      "woDraft": true,
+      "woBack": "You should not carry this all by yourself. Telling someone is the most important and the hardest thing."
     }
   ]
 }

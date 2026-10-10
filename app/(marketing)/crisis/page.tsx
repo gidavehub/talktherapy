@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import CrisisReadAloud from "@/components/marketing/CrisisReadAloud";
 
 export const metadata: Metadata = {
   title: "Urgent help — Talk",
@@ -11,7 +12,8 @@ export const metadata: Metadata = {
  * Crisis page.
  *
  * Deliberately a server component with no `motion`, no client hooks and no
- * data fetching. Someone reaching this page may be in genuine distress on a
+ * data fetching (the read-aloud button is a separate island; nothing here
+ * waits for it). Someone reaching this page may be in genuine distress on a
  * slow connection, and every dependency is another way the numbers fail to
  * appear. Nothing here animates in, nothing waits on hydration, and nothing is
  * gated behind auth.
@@ -94,6 +96,10 @@ export default function CrisisPage() {
           you or someone near you is at immediate risk, contact one of these
           services directly.
         </p>
+
+        {/* The one client piece on this page — for somebody who cannot read
+            it. The numbers below render without it. */}
+        <CrisisReadAloud />
 
         {/* The single most important element on the site. Large tap targets,
             real tel: links, no decoration competing with them. */}

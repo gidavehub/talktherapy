@@ -120,6 +120,86 @@
           "draft": true
         }
       }
+    },
+    {
+      "id": "crisis-call",
+      "clips": {
+        "en": {
+          "src": "/voice/onboarding/crisis-call.en.5d7580a082.mp3",
+          "text": "If you are in danger right now, call one-one-seven for the police, or one-one-six for an ambulance.",
+          "seconds": 8.41,
+          "bytes": 50832,
+          "sha256": "5d7580a082a225763c4f359ae334d0b48eeb6165eee2efc4fbd28088ac585849"
+        },
+        "wo": {
+          "src": "/voice/onboarding/crisis-call.wo.fed0f0e190.mp3",
+          "text": "Su fekkee ne yaa ngi ci danger léegi, woowl one-one-seven ngir police walla one-one-six ngir ambulance.",
+          "seconds": 8.15,
+          "bytes": 49248,
+          "sha256": "fed0f0e19030919161f872b22fb7b2c8a9633cc9b949ee4abf91766100d455f2",
+          "draft": true
+        }
+      }
+    },
+    {
+      "id": "crisis-fire",
+      "clips": {
+        "en": {
+          "src": "/voice/onboarding/crisis-fire.en.0bc1fe415a.mp3",
+          "text": "For a fire or an accident, call one-one-eight. These calls are free.",
+          "seconds": 7.12,
+          "bytes": 43056,
+          "sha256": "0bc1fe415a3f22b9a48cbfbbd5dc1e1b422faad4ba48ac9eafe2a5455e37c75b"
+        },
+        "wo": {
+          "src": "/voice/onboarding/crisis-fire.wo.fcddb6099d.mp3",
+          "text": "Su dee lakk-lakk walla accident, wooteel ci one-one-eight. Woote yooyu amul benn fey.",
+          "seconds": 8.57,
+          "bytes": 51840,
+          "sha256": "fcddb6099d71949700b86651187b8fd3311d98ee589947b7b22e727fdb02bcd7",
+          "draft": true
+        }
+      }
+    },
+    {
+      "id": "crisis-young",
+      "clips": {
+        "en": {
+          "src": "/voice/onboarding/crisis-young.en.082f42af4c.mp3",
+          "text": "If you are under eighteen, tell an adult you trust today: a parent, a teacher, or a health worker.",
+          "seconds": 8.89,
+          "bytes": 53712,
+          "sha256": "082f42af4cd21617f7676a9ad2eb9b3cd2fdded232329bb0372a4730d3ac4969"
+        },
+        "wo": {
+          "src": "/voice/onboarding/crisis-young.wo.7fecf9e573.mp3",
+          "text": "Su fekkee amulo fukki at ak juróom-ñett, waxal tey ak mag boo wóolu: sa waajur, sa jàngalekat, walla liggéeykat bu wér-gi-yaram.",
+          "seconds": 10.06,
+          "bytes": 60768,
+          "sha256": "7fecf9e5731046708efd2469eb4b376cc98c2a1cbffcfbb899add08847e24ebd",
+          "draft": true
+        }
+      }
+    },
+    {
+      "id": "crisis-alone",
+      "clips": {
+        "en": {
+          "src": "/voice/onboarding/crisis-alone.en.d0ab39b8af.mp3",
+          "text": "You do not have to carry this on your own. Telling one person is often the hardest step, and the most useful.",
+          "seconds": 10.38,
+          "bytes": 62640,
+          "sha256": "d0ab39b8af88609131e983f56d2fedbac2558205096ab85122c08fc7320ee8bb"
+        },
+        "wo": {
+          "src": "/voice/onboarding/crisis-alone.wo.9c23b80279.mp3",
+          "text": "Doo war a yenu li yaw rekk sa bopp. Wax ko kenn nit mooy la ëpp solo ak la gën a jafe.",
+          "seconds": 7.51,
+          "bytes": 45360,
+          "sha256": "9c23b80279d6dbb7a9948744e7d2c16aac08ea40547b4be72ddb950c89f809a6",
+          "draft": true
+        }
+      }
     }
   ]
 }
