@@ -41,6 +41,23 @@ const LOCALES = { en: "english", wo: "wolof" };
 const args = process.argv.slice(2);
 const force = args.includes("--force");
 const draftWolof = args.includes("--draft-wolof");
+
+/**
+ * French in Gambian Wolof. Gambians mix ENGLISH into Wolof, never French; a
+ * French word makes Talk sound Senegalese, which is the complaint that made
+ * this list. The model drafts Wolof and still slips (it wrote "kontine" and
+ * "Konfirmeer" after being told not to), so no Wolof line is recorded with
+ * one of these in it — fix the text in onboarding-lines.json instead.
+ */
+const FRENCH_IN_WOLOF = [
+  /\bkontin\w*/i, /\bkonfirm\w*/i, /\bmerci\b/i, /\bparce que\b/i, /\bmaintenant\b/i, /\bvraiment\b/i,
+  /\bd'accord\b/i, /\ben tout cas\b/i, /\bportable\b/i, /\bt[ée]l[ée]phone\b/i, /\brendez-vous\b/i,
+  /\bcarte\b/i, /\bl?opitaan\b/i, /\bdonc\b/i, /\bmais\b/i, /\bça va\b/i,
+];
+function assertGambianWolof(id, text) {
+  const hit = FRENCH_IN_WOLOF.find((re) => re.test(text));
+  if (hit) throw new Error(`"${id}" Wolof has a French word (${text.match(hit)[0]}): "${text}". Use the Wolof or the English a Gambian would say.`);
+}
 const only = args.find((a) => a.startsWith("--only="))?.slice("--only=".length) ?? null;
 
 const sha = (text) => createHash("sha256").update(text).digest("hex");
@@ -114,6 +131,9 @@ async function main() {
       sourceChanged = true;
       console.log(`  drafted wolof for ${line.id}: ${line.wo}\n      reads back as: ${line.woBack}`);
     }
+
+    // Written or drafted: never recorded with a French word in it.
+    assertGambianWolof(line.id, line.wo);
 
     const clips = {};
     for (const [locale, language] of Object.entries(LOCALES)) {

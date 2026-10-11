@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { voice } from "@/lib/audio/lines";
 import { useState } from "react";
 import { motion } from "motion/react";
 import { SPRING_SOFT } from "@/components/motion/primitives";
@@ -52,6 +53,7 @@ export default function ProvidersForYouPage() {
             ))}
             <Link
               href="/talk?intake"
+            onClick={() => voice.unlock()}
               className="ml-1 text-[12px] uppercase tracking-[0.14em] text-[var(--muted)] underline underline-offset-4 hover:text-[var(--foreground)] transition-colors"
             >
               Change
@@ -90,6 +92,7 @@ export default function ProvidersForYouPage() {
       {!intake ? (
         <Link
           href="/talk?intake"
+            onClick={() => voice.unlock()}
           className="flex items-center justify-between gap-4 rounded-[28px] bg-[var(--dark)] text-white px-6 md:px-8 py-6 hover:bg-[var(--dark-soft)] transition-colors"
         >
           <span className="text-[16px] md:text-[18px] font-medium">Tell Talk what you need</span>

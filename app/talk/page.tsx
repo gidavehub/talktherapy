@@ -438,20 +438,47 @@ function Talk() {
   };
 
   // Signed in (on this screen, or before): what next? Once whatever she is
-  // saying has finished, she says the price — the D200 line only to somebody
-  // buying the D200 — or, for somebody who has already paid, welcomes them
-  // back and begins.
+  // saying has finished:
+  //
+  //   - not paid for the consultation: she walks them to paying AT ONCE,
+  //     however they arrived — the price (the sheet opens as she says it),
+  //     why this first consultation matters, then exactly what to tap. The
+  //     way to paying is the way in, just as signing in is.
+  //   - paid, and they came in through a tap: welcome back, and begin.
+  //
+  // Arriving without a tap (a refresh, a redirect), the browser may refuse
+  // her voice: the captions and the sheet still come, on time, and the first
+  // tap anywhere replays the line she is on (see `blocked` below).
   const decided = useRef(false);
   useEffect(() => {
-    if (!doorway || decided.current || concluded.current || !ready || !user || !profile) return;
-    if (heard.saying || paid === null || talk.active || isSettled(profile)) return;
+    if (decided.current || concluded.current || !ready || !user || !profile) return;
+    if (heard.saying || paid === null || talk.active || profile.role !== "patient") return;
+    if (!paid) {
+      // Only for the D200: the lines name its price and a FIRST consultation.
+      if (tier !== "initial") return;
+      decided.current = true;
+      voice.say(heard.spoken.includes("welcome") ? PAY_LINES : ["welcome", ...PAY_LINES]);
+      return;
+    }
+    if (!doorway || isSettled(profile)) return;
     decided.current = true;
-    if (paid) voice.say(["welcome-back"], { onDone: () => beginTalk(false) });
-    // The way to paying, as the way in: the price (the sheet opens as she
-    // says it), why this first consultation matters, then exactly what to
-    // tap — English, then Wolof, each on the sheet as she says it.
-    else if (tier === "initial") voice.say(PAY_LINES);
+    voice.say(["welcome-back"], { onDone: () => beginTalk(false) });
   });
+
+  // Her voice was refused (nobody had tapped yet): the first tap anywhere
+  // unlocks it and she says again the line on screen, then the rest.
+  useEffect(() => {
+    if (!heard.blocked) return;
+    const replay = () => {
+      const current = heard.saying?.id ?? null;
+      const order = ["welcome", "sign-in", "how", ...PAY_LINES];
+      const from = current ? order.indexOf(current) : -1;
+      voice.unlock();
+      if (from >= 0) voice.say(order.slice(from).filter((id) => id !== "sign-in" || !user).filter((id) => id !== "how" || !user));
+    };
+    document.addEventListener("pointerdown", replay, { once: true, capture: true });
+    return () => document.removeEventListener("pointerdown", replay, { capture: true });
+  }, [heard.blocked, heard.saying, user]);
 
   // Paid, in this visit. The checkout is in another tab; the moment the
   // consultation is written she thanks them and begins — once somebody is

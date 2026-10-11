@@ -44,6 +44,12 @@ export type VoiceState = {
   /** Every line that has STARTED since the page loaded, in order. */
   spoken: string[];
   muted: boolean;
+  /**
+   * The browser refused to play a line: nobody has tapped this page yet (a
+   * refresh, a redirect, a plain link). The captions carry on regardless; the
+   * page can replay the line on the first tap.
+   */
+  blocked: boolean;
 };
 
 // ------------------------------------------------------------------ the player
@@ -64,8 +70,8 @@ let onDone: (() => void) | null = null;
  */
 let token = 0;
 
-let state: VoiceState = { saying: null, spoken: [], muted: false };
-const SERVER_STATE: VoiceState = { saying: null, spoken: [], muted: false };
+let state: VoiceState = { saying: null, spoken: [], muted: false, blocked: false };
+const SERVER_STATE: VoiceState = { saying: null, spoken: [], muted: false, blocked: false };
 const listeners = new Set<() => void>();
 
 function set(next: Partial<VoiceState>) {
@@ -142,7 +148,15 @@ function playNext(): void {
   // An element that neither ends nor errors (a stalled download) still moves
   // on, a little after it should have finished.
   after(clip.seconds * 1000 + 2500);
-  audio.play().catch(() => after(clip.seconds * 1000));
+  audio.play().then(
+    () => {
+      if (state.blocked) set({ blocked: false });
+    },
+    (error: unknown) => {
+      if ((error as { name?: string } | null)?.name === "NotAllowedError" && !state.blocked) set({ blocked: true });
+      after(clip.seconds * 1000);
+    },
+  );
 }
 
 export const voice = {

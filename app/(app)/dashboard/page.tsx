@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { voice } from "@/lib/audio/lines";
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { SPRING_SOFT } from "@/components/motion/primitives";
@@ -160,6 +161,7 @@ export default function DashboardPage() {
         {!intake ? (
           <Link
             href="/talk?intake"
+            onClick={() => voice.unlock()}
             className="mt-4 inline-block text-[12px] uppercase tracking-[0.14em] underline underline-offset-4 hover:text-[var(--accent)] transition-colors"
           >
             Tell Talk what you need for better matches
@@ -322,6 +324,7 @@ export default function DashboardPage() {
           </p>
           <Link
             href="/talk"
+            onClick={() => voice.unlock()}
             className="mt-4 inline-block text-[12px] uppercase tracking-[0.14em] underline underline-offset-4 hover:text-[var(--accent)] transition-colors"
           >
             Open Talk

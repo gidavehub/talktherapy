@@ -12,11 +12,11 @@
           "sha256": "77bdbfc2f2d1f0de1b0ae666bda4a13d2df38bb49c842bffa33b83308bf4b7cd"
         },
         "wo": {
-          "src": "/voice/onboarding/welcome.wo.74b61a8e5a.mp3",
-          "text": "Dalal ak jamm ci Talk Therapy.",
-          "seconds": 2.34,
-          "bytes": 14400,
-          "sha256": "74b61a8e5a73d03e811a4b4f2eff1e47d6fc056eeabebdc35b971e5b903e6879",
+          "src": "/voice/onboarding/welcome.wo.5b104a3b0e.mp3",
+          "text": "Dalal ak jàmm ci Talk Therapy.",
+          "seconds": 2.65,
+          "bytes": 16272,
+          "sha256": "5b104a3b0e5f9e9f3a4210bea78248658b59e64521900b58cafb509a71f3f056",
           "draft": true
         }
       }
@@ -32,11 +32,11 @@
           "sha256": "0a9e38f2aa9b0c0a59ae6e0ad0d6b06718b3a71ac55e2057e1375c7afff96a2e"
         },
         "wo": {
-          "src": "/voice/onboarding/sign-in.wo.0fe476e71e.mp3",
-          "text": "Ngir tambali ab session ak nun, ndax man nga sign in?",
-          "seconds": 3.22,
-          "bytes": 19728,
-          "sha256": "0fe476e71ef2d5e55cde26a2dba0bc0537079d6dd8cc4c194172e2197aa9677c",
+          "src": "/voice/onboarding/sign-in.wo.c6e209c3d6.mp3",
+          "text": "Ngir tàmbli ab session ak nun, bu la neexee sign in.",
+          "seconds": 3.98,
+          "bytes": 24192,
+          "sha256": "c6e209c3d615ef37fb1d7a266721541a1d4057b90e39dca850b14113d7361491",
           "draft": true
         }
       }
@@ -72,11 +72,11 @@
           "sha256": "cd06ab97f2386adb83fb24bd3f20883642d5bd0b30c244570dc3330a8b35e849"
         },
         "wo": {
-          "src": "/voice/onboarding/price.wo.aedf68d0ee.mp3",
-          "text": "Ngir nu wey ci, consultation bi ñaari téméer dalasi la.",
-          "seconds": 4.57,
-          "bytes": 27792,
-          "sha256": "aedf68d0ee982b3df3a64d4e97f40e7d28ebd5cbe85bc1e323f01e27b2b8410e",
+          "src": "/voice/onboarding/price.wo.35eb36d5f3.mp3",
+          "text": "Ngir nu wéy, consultation bi two hundred dalasi la.",
+          "seconds": 4.35,
+          "bytes": 26496,
+          "sha256": "35eb36d5f3296e706fa7b06a10277a0cce1106e3d6b9a86cd3d181be92704af5",
           "draft": true
         }
       }
@@ -92,11 +92,11 @@
           "sha256": "9970cd3998d4eefeaceb8f88023cbf1097a3d2c439311bb56fad108e9260f88e"
         },
         "wo": {
-          "src": "/voice/onboarding/why.wo.618982abfc.mp3",
-          "text": "Jokkale bu jëkk bii day ma dimbali ma xam li ngay dundu, ngir ma mën la gisal nit ki la mën a dimbali.",
-          "seconds": 6.57,
-          "bytes": 39744,
-          "sha256": "618982abfcf56ca5e0b997ba2a543e1d80d07c727b64eb4c87c384f26b6a6553",
+          "src": "/voice/onboarding/why.wo.ff30f683e7.mp3",
+          "text": "Consultation bi njëkk dina ma dimbali ma xam li ngay dundu, ngir ma man la wutalaal provider bi baax te war la dimbali.",
+          "seconds": 9.11,
+          "bytes": 55008,
+          "sha256": "ff30f683e7289e5b4d8b2ce39692ec29d82303dd97cd1162865a4c7858970f97",
           "draft": true
         }
       }
@@ -112,11 +112,11 @@
           "sha256": "29c568dde753b22a9d4d3b8f19467222e58b88467e33f5e53df0a621516f1c78"
         },
         "wo": {
-          "src": "/voice/onboarding/pay-how.wo.fb812f64d3.mp3",
-          "text": "Bës-al ci Pay, bi loolu weesoo nga tànn Wave walla sa card. Konfirmaar ko ci sa phone, daal di délsi fii.",
-          "seconds": 8.25,
-          "bytes": 49824,
-          "sha256": "fb812f64d33db85511fa72e32d25c2431c7f7548bc271530cbcb45693984954b",
+          "src": "/voice/onboarding/pay-how.wo.886de53ec3.mp3",
+          "text": "Bësal Pay, daldi tànn Wave walla sa card. Confirm ko ci sa phone, nga dellusi fi.",
+          "seconds": 6.37,
+          "bytes": 38592,
+          "sha256": "886de53ec3f52d90a8b14aaaa3b40ce8a47c4267c7e48a188fb79b6b9d3d683a",
           "draft": true
         }
       }
@@ -132,11 +132,11 @@
           "sha256": "e5c16ed1ea55e5eb4245c6df1f6630ae0a3da11eb76837cee8495c6b47441336"
         },
         "wo": {
-          "src": "/voice/onboarding/paid.wo.c02e957a29.mp3",
-          "text": "Jërëjëf. Léegi nag, nanu tàmbli.",
-          "seconds": 3.73,
-          "bytes": 22752,
-          "sha256": "c02e957a29c94814c554eb61788e8cd90bb2151f7ae3c2fd1712ebe537fbeaf2",
+          "src": "/voice/onboarding/paid.wo.787491dc00.mp3",
+          "text": "Jërëjëf. Léegi, nanu tàmbli.",
+          "seconds": 3.23,
+          "bytes": 19728,
+          "sha256": "787491dc000f66069cae5e88f43c048fd33a41dd2bbd4deae7361d9d25984ef9",
           "draft": true
         }
       }
@@ -152,11 +152,11 @@
           "sha256": "50f8c34f4288ede831641f4502d55889b292f39c143d0d24b3fc60cdc0709dd8"
         },
         "wo": {
-          "src": "/voice/onboarding/welcome-back.wo.3a3705fb68.mp3",
-          "text": "Dalal jàmm waat. Nan wéy.",
-          "seconds": 3.43,
-          "bytes": 20880,
-          "sha256": "3a3705fb68ec1fb23a2987d74d86c5ede9555a4439a6452aa380b84c5ed2cec2",
+          "src": "/voice/onboarding/welcome-back.wo.d5c093c319.mp3",
+          "text": "Dalal jàmm. Nan wéy.",
+          "seconds": 2.72,
+          "bytes": 16704,
+          "sha256": "d5c093c3190c2ee65e7263819f3a66775f6b62da0d0239f49591a81b1b6e4864",
           "draft": true
         }
       }
@@ -172,11 +172,11 @@
           "sha256": "5d7580a082a225763c4f359ae334d0b48eeb6165eee2efc4fbd28088ac585849"
         },
         "wo": {
-          "src": "/voice/onboarding/crisis-call.wo.fed0f0e190.mp3",
-          "text": "Su fekkee ne yaa ngi ci danger léegi, woowl one-one-seven ngir police walla one-one-six ngir ambulance.",
-          "seconds": 8.15,
-          "bytes": 49248,
-          "sha256": "fed0f0e19030919161f872b22fb7b2c8a9633cc9b949ee4abf91766100d455f2",
+          "src": "/voice/onboarding/crisis-call.wo.e6abe731d0.mp3",
+          "text": "Su fekkee yaa ngi ci danger léegi, woo one-one-seven ngir police, walla one-one-six ngir ambulance.",
+          "seconds": 6.98,
+          "bytes": 42192,
+          "sha256": "e6abe731d017d526fd78f6972236027915fabd988868671cfbebbfe213c6c29b",
           "draft": true
         }
       }
@@ -192,11 +192,11 @@
           "sha256": "0bc1fe415a3f22b9a48cbfbbd5dc1e1b422faad4ba48ac9eafe2a5455e37c75b"
         },
         "wo": {
-          "src": "/voice/onboarding/crisis-fire.wo.fcddb6099d.mp3",
-          "text": "Su dee lakk-lakk walla accident, wooteel ci one-one-eight. Woote yooyu amul benn fey.",
-          "seconds": 8.57,
-          "bytes": 51840,
-          "sha256": "fcddb6099d71949700b86651187b8fd3311d98ee589947b7b22e727fdb02bcd7",
+          "src": "/voice/onboarding/crisis-fire.wo.e89efb76d6.mp3",
+          "text": "Su dee lak-lak walla accident, woowalleen one-one-eight. Woté yii amuñu fay.",
+          "seconds": 7.29,
+          "bytes": 44064,
+          "sha256": "e89efb76d6c73c276e3a6e7a2dc5eb1d674ba578b3d0327b4c24180e8b625f16",
           "draft": true
         }
       }
@@ -212,11 +212,11 @@
           "sha256": "082f42af4cd21617f7676a9ad2eb9b3cd2fdded232329bb0372a4730d3ac4969"
         },
         "wo": {
-          "src": "/voice/onboarding/crisis-young.wo.7fecf9e573.mp3",
-          "text": "Su fekkee amulo fukki at ak juróom-ñett, waxal tey ak mag boo wóolu: sa waajur, sa jàngalekat, walla liggéeykat bu wér-gi-yaram.",
-          "seconds": 10.06,
-          "bytes": 60768,
-          "sha256": "7fecf9e5731046708efd2469eb4b376cc98c2a1cbffcfbb899add08847e24ebd",
+          "src": "/voice/onboarding/crisis-young.wo.a7aec82970.mp3",
+          "text": "Soo amagul eighteen, waxal tey ak mag boo wóolu: sa parent, sa teacher, walla health worker.",
+          "seconds": 9.01,
+          "bytes": 54432,
+          "sha256": "a7aec82970e177baf729f85333afef4b32aff4418dd8dca140441191a61b82d0",
           "draft": true
         }
       }
@@ -232,11 +232,11 @@
           "sha256": "d0ab39b8af88609131e983f56d2fedbac2558205096ab85122c08fc7320ee8bb"
         },
         "wo": {
-          "src": "/voice/onboarding/crisis-alone.wo.9c23b80279.mp3",
-          "text": "Doo war a yenu li yaw rekk sa bopp. Wax ko kenn nit mooy la ëpp solo ak la gën a jafe.",
-          "seconds": 7.51,
-          "bytes": 45360,
-          "sha256": "9c23b80279d6dbb7a9948744e7d2c16aac08ea40547b4be72ddb950c89f809a6",
+          "src": "/voice/onboarding/crisis-alone.wo.1fd554bbf0.mp3",
+          "text": "Doo war a yenu lii yaw rekk. Wax ko benn nit mooy li gën a jafe yenn saa yi, te moo gën a am njariñ.",
+          "seconds": 7.91,
+          "bytes": 47808,
+          "sha256": "1fd554bbf0da2ead2137b80260b386cc5e23fdb1568d4ff756940ac7183f0916",
           "draft": true
         }
       }

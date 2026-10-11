@@ -4,16 +4,16 @@
     {
       "id": "welcome",
       "en": "Welcome to Talk Therapy.",
-      "wo": "Dalal ak jamm ci Talk Therapy.",
+      "wo": "Dalal ak jàmm ci Talk Therapy.",
       "woDraft": true,
       "woBack": "Welcome to Talk Therapy."
     },
     {
       "id": "sign-in",
       "en": "To begin a session with us, please sign in.",
-      "wo": "Ngir tambali ab session ak nun, ndax man nga sign in?",
+      "wo": "Ngir tàmbli ab session ak nun, bu la neexee sign in.",
       "woDraft": true,
-      "woBack": "To begin a session with us, can you sign in?"
+      "woBack": "To start a session with us, please sign in."
     },
     {
       "id": "how",
@@ -25,65 +25,65 @@
     {
       "id": "price",
       "en": "To continue, the consultation is two hundred dalasi.",
-      "wo": "Ngir nu wey ci, consultation bi ñaari téméer dalasi la.",
+      "wo": "Ngir nu wéy, consultation bi two hundred dalasi la.",
       "woDraft": true,
-      "woBack": "For us to continue, the consultation is two hundred dalasis."
+      "woBack": "For us to continue, the consultation is two hundred dalasi."
     },
     {
       "id": "why",
       "en": "This first consultation helps me understand what you are going through, so I can find the right person to help you.",
-      "wo": "Jokkale bu jëkk bii day ma dimbali ma xam li ngay dundu, ngir ma mën la gisal nit ki la mën a dimbali.",
+      "wo": "Consultation bi njëkk dina ma dimbali ma xam li ngay dundu, ngir ma man la wutalaal provider bi baax te war la dimbali.",
       "woDraft": true,
-      "woBack": "This first contact helps me know what you are going through, so I can find you someone who can help you."
+      "woBack": "The first consultation will help me understand what you are going through, so that I can find you the right provider who can help you."
     },
     {
       "id": "pay-how",
       "en": "Tap Pay, then choose Wave or your card. Approve it on your phone, and come back here.",
-      "wo": "Bës-al ci Pay, bi loolu weesoo nga tànn Wave walla sa card. Konfirmaar ko ci sa phone, daal di délsi fii.",
+      "wo": "Bësal Pay, daldi tànn Wave walla sa card. Confirm ko ci sa phone, nga dellusi fi.",
       "woDraft": true,
-      "woBack": "Click on Pay, after that select Wave or your card. Confirm it on your phone, then come back here."
+      "woBack": "Press Pay, then choose Wave or your card. Confirm it on your phone, then come back here."
     },
     {
       "id": "paid",
       "en": "Thank you. Now, let us begin.",
-      "wo": "Jërëjëf. Léegi nag, nanu tàmbli.",
+      "wo": "Jërëjëf. Léegi, nanu tàmbli.",
       "woDraft": true,
-      "woBack": "Thank you. Now then, let's start."
+      "woBack": "Thank you. Now, let's begin."
     },
     {
       "id": "welcome-back",
       "en": "Welcome back. Let us carry on.",
-      "wo": "Dalal jàmm waat. Nan wéy.",
+      "wo": "Dalal jàmm. Nan wéy.",
       "woDraft": true,
-      "woBack": "Welcome back. Let's continue."
+      "woBack": "Welcome. Let's continue."
     },
     {
       "id": "crisis-call",
       "en": "If you are in danger right now, call one-one-seven for the police, or one-one-six for an ambulance.",
-      "wo": "Su fekkee ne yaa ngi ci danger léegi, woowl one-one-seven ngir police walla one-one-six ngir ambulance.",
+      "wo": "Su fekkee yaa ngi ci danger léegi, woo one-one-seven ngir police, walla one-one-six ngir ambulance.",
       "woDraft": true,
-      "woBack": "If you are in danger right now, call one-one-seven for police or one-one-six for an ambulance."
+      "woBack": "If you are in danger now, call 117 for the police, or 116 for an ambulance."
     },
     {
       "id": "crisis-fire",
       "en": "For a fire or an accident, call one-one-eight. These calls are free.",
-      "wo": "Su dee lakk-lakk walla accident, wooteel ci one-one-eight. Woote yooyu amul benn fey.",
+      "wo": "Su dee lak-lak walla accident, woowalleen one-one-eight. Woté yii amuñu fay.",
       "woDraft": true,
-      "woBack": "If it is a fire or an accident, call one-one-eight. Those calls are free of charge."
+      "woBack": "If it is a fire or an accident, call 118. These calls are free."
     },
     {
       "id": "crisis-young",
       "en": "If you are under eighteen, tell an adult you trust today: a parent, a teacher, or a health worker.",
-      "wo": "Su fekkee amulo fukki at ak juróom-ñett, waxal tey ak mag boo wóolu: sa waajur, sa jàngalekat, walla liggéeykat bu wér-gi-yaram.",
+      "wo": "Soo amagul eighteen, waxal tey ak mag boo wóolu: sa parent, sa teacher, walla health worker.",
       "woDraft": true,
-      "woBack": "If you are not eighteen, speak today with an adult you trust: your parent, your teacher, or a healthcare worker."
+      "woBack": "If you are not yet eighteen, talk today to an adult you trust: your parent, your teacher, or a health worker."
     },
     {
       "id": "crisis-alone",
       "en": "You do not have to carry this on your own. Telling one person is often the hardest step, and the most useful.",
-      "wo": "Doo war a yenu li yaw rekk sa bopp. Wax ko kenn nit mooy la ëpp solo ak la gën a jafe.",
+      "wo": "Doo war a yenu lii yaw rekk. Wax ko benn nit mooy li gën a jafe yenn saa yi, te moo gën a am njariñ.",
       "woDraft": true,
-      "woBack": "You should not carry this all by yourself. Telling someone is the most important and the hardest thing."
+      "woBack": "You should not carry this alone. Talking to someone is sometimes the hardest part, but it is the most helpful."
     }
   ]
 }

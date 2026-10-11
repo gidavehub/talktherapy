@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { SPRING_SOFT, SPRING_SNAP } from "../motion/primitives";
 import { useAuth } from "../AuthProvider";
 import { signOutToHome } from "../../lib/signOutFlow";
+import { voice } from "../../lib/audio/lines";
 import { Avatar } from "./Feedback";
 
 /**
@@ -49,7 +50,12 @@ function NavLink({
     <motion.div whileHover={{ x: 6 }} transition={SPRING_SNAP}>
       <Link
         href={item.href}
-        onClick={onNavigate}
+        onClick={() => {
+          // Into Talk: unlock her voice inside this tap, so she can speak
+          // the moment the screen opens.
+          if (item.href.startsWith("/talk")) voice.unlock();
+          onNavigate?.();
+        }}
         aria-current={active ? "page" : undefined}
         className={`flex items-center gap-3 rounded-full h-11 px-4 text-[13px] tracking-wide transition-colors ${
           active
@@ -239,6 +245,9 @@ export default function AppShell({
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={() => {
+                  if (item.href.startsWith("/talk")) voice.unlock();
+                }}
                 aria-current={active ? "page" : undefined}
                 className="relative flex-1 flex flex-col items-center justify-center gap-1 py-2.5"
               >
