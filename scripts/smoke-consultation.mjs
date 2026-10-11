@@ -6,9 +6,13 @@
  * The D200 initial consultation, end to end, minus a real wallet:
  *   1. startConsultationPayment opens a real payment at Modem Pay, priced by
  *      the SERVER — a price sent by the client is ignored.
- *   2. A signed delivery for a paid consultation grants it: entitlements/{uid}
- *      is written, and the paid claim is set on the account, so the AI
- *      functions (which cannot read the database) can see it on the token.
+ *   2. A paid consultation grants it: entitlements/{uid} is written, and the
+ *      paid claim is set on the account, so the AI functions (which cannot
+ *      read the database) can see it on the token. Since 2026-10-11 the
+ *      webhook acts on a "succeeded" only when Modem Pay's own record says
+ *      paid, so a made-up payment can no longer go through it — this proves
+ *      that it refuses one, then grants through the SAME compiled server code
+ *      the webhook runs once Modem Pay has vouched (paidAsModemPayReports).
  *   3. A second purchase while one is held is refused before any money moves.
  *   4. claimConsultation repairs a claim from the entitlement.
  *   5. The AI functions answer 402 to somebody who has not paid — when the
@@ -17,12 +21,12 @@
  * IT CREATES ONE REAL PAYMENT INTENT AND NEVER PAYS IT — a row in the Modem
  * Pay dashboard titled "Initial consultation", and nothing else; no money
  * moves (see scripts/check-modempay-live.mjs for the same rule). The paid
- * consultation in step 2 is a separate, made-up intent id, delivered and
- * signed exactly as Modem Pay would. Everything written is removed at the end,
+ * consultation in step 2 is a separate, made-up intent id. Everything
+ * written is removed at the end,
  * including the claim on the `smoke-tests` account.
  */
 
-import { createHmac, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
@@ -62,7 +66,10 @@ async function deliver(raw) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-modem-signature": createHmac("sha512", SECRET).update(raw, "utf8").digest("hex"),
+      // As Modem Pay signs a callback_url delivery: keyed by SHA-256 of the merchant key.
+      "x-modem-signature": createHmac("sha512", createHash("sha256").update(SECRET, "utf8").digest("hex"))
+        .update(raw, "utf8")
+        .digest("hex"),
     },
     body: raw,
   });
@@ -116,10 +123,15 @@ async function main() {
     check(record.uid === UID && record.bookingId === null && record.fulfilled === false, "for this account, with no booking, not yet fulfilled");
   }
 
-  console.log("\nA paid consultation arrives (signed, as Modem Pay would)");
+  console.log("\nA made-up \"paid\" delivery, correctly signed, is not believed");
   const paidIntent = await seedPayment(UID, "ai_initial", 200_00);
-  const delivered = await deliver(paymentBody(paidIntent, UID, "ai_initial", 200));
-  check(delivered.status === 200 && delivered.json.acted === true, `the webhook acted on it: ${delivered.json.reason}`);
+  const forged = await deliver(paymentBody(paidIntent, UID, "ai_initial", 200));
+  check(forged.status === 500, `the webhook asks for it again rather than granting (got ${forged.status})`);
+  check(!(await db.collection("entitlements").doc(UID).get()).exists, "and nothing is granted");
+
+  console.log("\nA paid consultation arrives (as the webhook applies one Modem Pay has vouched for)");
+  const delivered = await paidAsModemPayReports(paidIntent, UID, "ai_initial", 200);
+  check(delivered.acted === true, `acted on: ${delivered.reason}`);
 
   const granted = (await db.collection("entitlements").doc(UID).get()).data() ?? {};
   check(granted.status === "granted" && granted.aiTier === "initial", "the consultation is granted");
@@ -161,8 +173,8 @@ async function main() {
 
   console.log("\nThe longer one, while holding the first — an upgrade, granted");
   const upgrade = await seedPayment(UID, "ai_extended", 500_00);
-  const upgraded = await deliver(paymentBody(upgrade, UID, "ai_extended", 500));
-  check(upgraded.json.acted === true, `acted on: ${upgraded.json.reason}`);
+  const upgraded = await paidAsModemPayReports(upgrade, UID, "ai_extended", 500);
+  check(upgraded.acted === true, `acted on: ${upgraded.reason}`);
   const longer = (await db.collection("entitlements").doc(UID).get()).data() ?? {};
   check(longer.aiTier === "extended" && longer.paymentIntentId === upgrade, `now holds the longer one (${longer.aiTier})`);
   const upgradeDoc = (await db.collection("payments").doc(upgrade).get()).data() ?? {};
@@ -172,7 +184,7 @@ async function main() {
   const RACER = `smoke-race-${randomUUID().slice(0, 6)}`;
   racers.push(RACER);
   const [a, b] = await Promise.all([seedPayment(RACER, "ai_initial", 200_00), seedPayment(RACER, "ai_initial", 200_00)]);
-  await Promise.all([deliver(paymentBody(a, RACER, "ai_initial", 200)), deliver(paymentBody(b, RACER, "ai_initial", 200))]);
+  await Promise.all([paidAsModemPayReports(a, RACER, "ai_initial", 200), paidAsModemPayReports(b, RACER, "ai_initial", 200)]);
   const [da, dbb] = await Promise.all([a, b].map(async (id) => (await db.collection("payments").doc(id).get()).data() ?? {}));
   const fulfilled = [da, dbb].filter((d) => d.fulfilled === true).length;
   const heldForReview = [da, dbb].filter((d) => d.fulfilled === false && d.needsReview === true).length;
@@ -214,6 +226,55 @@ async function seedPayment(uid, purpose, amountMinor) {
     updatedAt: Date.now(),
   });
   return id;
+}
+
+/** The compiled server code the webhook runs after its checks. */
+const payments = await import("../functions/lib/functions/src/payments.js");
+const protocol = await import("../functions/lib/app/lib/payments/modempay-protocol.js");
+
+/**
+ * What modemWebhook does with a delivery once its signature has passed and
+ * Modem Pay's own record says the payment is paid — the same compiled code,
+ * in the same order (functions/src/index.ts, after the PAID_STATUSES gate),
+ * minus the HTTP. Keep the two in step.
+ */
+async function paidAsModemPayReports(intent, uid, purpose, amountMajor) {
+  const raw = paymentBody(intent, uid, purpose, amountMajor);
+  const event = protocol.normaliseWebhookEvent(JSON.parse(raw));
+  const amountMinor = amountMajor * 100;
+  const consultation = await payments.consultationToCredit({ purpose, payerUid: uid, amountMinor, paymentIntentId: intent });
+  const { outcome, decision } = await payments.recordAndApply({
+    eventKey: protocol.webhookEventKey(raw, event.eventId),
+    paymentIntentId: intent,
+    eventName: event.eventName || event.statusText || "unknown",
+    signatureRouting: "smoke-vouched",
+    reads: consultation ? [payments.entitlementRef(consultation.uid)] : [],
+    decide: (current, [held]) =>
+      protocol.decideFulfilment({
+        event,
+        current,
+        resolvedUid: uid,
+        reportedAmountMinor: amountMinor,
+        expectedAmountMinor: event.expectedAmountMinor,
+        resolvedPurpose: purpose,
+        resolvedEmail: null,
+        grantable: Boolean(consultation && (!held || payments.consultationStillGrantable(held, consultation, intent))),
+      }),
+    credit: consultation ? payments.creditConsultation(consultation, intent) : undefined,
+  });
+  if (outcome === "applied" && decision.credit && consultation) {
+    // grantClaim, as the webhook does it: keep other claims, no end time yet,
+    // and a claim that cannot be set (no such account) is logged, not fatal.
+    try {
+      const user = await getAuth().getUser(consultation.uid);
+      const { aiEndsAt: _previous, ...others } = user.customClaims ?? {};
+      void _previous;
+      await getAuth().setCustomUserClaims(consultation.uid, { ...others, aiTier: consultation.tier, aiExpiresAt: consultation.expiresAt });
+    } catch {
+      // As grantClaim: the entitlement is what counts; claimConsultation repairs the claim.
+    }
+  }
+  return { acted: outcome === "applied", reason: decision.reason };
 }
 
 /** Exactly what Modem Pay would deliver for a successful payment. */

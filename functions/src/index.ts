@@ -133,9 +133,11 @@ async function modemPay(path: string, init: RequestInit = {}) {
   const res = await fetch(`${MODEM_PAY_BASE_URL}${path}`, {
     ...init,
     // Never wait on Modem Pay for ever. Its API was seen to hang a full minute
-    // on a transaction it does not know; a webhook held that long times out
-    // anyway, and a checkout button would just spin.
-    signal: init.signal ?? AbortSignal.timeout(20_000),
+    // on a transaction it does not know, so a LOOKUP gives up after 20s (the
+    // webhook then answers 500 and is sent again). CREATING a payment was
+    // seen to take over 20s on a slow day, so it gets 50 — still inside the
+    // function's own 60s, so the person sees an error, never a dead spinner.
+    signal: init.signal ?? AbortSignal.timeout((init.method ?? "GET").toUpperCase() === "GET" ? 20_000 : 50_000),
     headers: {
       Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
