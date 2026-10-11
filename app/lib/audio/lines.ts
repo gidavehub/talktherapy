@@ -159,6 +159,40 @@ function playNext(): void {
   );
 }
 
+/**
+ * 50ms of silence, as a WAV data URI. Played inside a tap, it is what an
+ * iPhone needs before it will let this element speak LATER — after a page
+ * change, after a network round trip. Creating an AudioContext in the tap is
+ * not enough on its own; the element itself has to have played.
+ */
+let silence: string | null = null;
+function silentWav(): string {
+  if (silence) return silence;
+  const samples = 400; // 50ms at 8kHz
+  const bytes = new Uint8Array(44 + samples);
+  const view = new DataView(bytes.buffer);
+  const text = (at: number, s: string) => [...s].forEach((c, i) => view.setUint8(at + i, c.charCodeAt(0)));
+  text(0, "RIFF");
+  view.setUint32(4, 36 + samples, true);
+  text(8, "WAVE");
+  text(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); // PCM
+  view.setUint16(22, 1, true); // mono
+  view.setUint32(24, 8000, true);
+  view.setUint32(28, 8000, true);
+  view.setUint16(32, 1, true);
+  view.setUint16(34, 8, true);
+  text(36, "data");
+  view.setUint32(40, samples, true);
+  bytes.fill(128, 44); // 8-bit silence is the midpoint
+  let binary = "";
+  bytes.forEach((b) => (binary += String.fromCharCode(b)));
+  silence = `data:audio/wav;base64,${btoa(binary)}`;
+  return silence;
+}
+let primed = false;
+
 export const voice = {
   /**
    * Call SYNCHRONOUSLY inside a tap, before say(). It creates the element and
@@ -168,6 +202,22 @@ export const voice = {
   unlock() {
     if (typeof window === "undefined") return;
     const audio = element();
+    // Prime the element with silence inside this tap — unless a line is
+    // about to be played in the same tap anyway (say() right after), which
+    // replaces the source and primes it just the same.
+    if (!primed && audio.paused) {
+      primed = true;
+      audio.src = silentWav();
+      audio.play().then(
+        () => {
+          if (audio.src.startsWith("data:audio/wav")) audio.pause();
+        },
+        () => {
+          // Interrupted by a real line (fine), or refused (try again next tap).
+          if (audio.src.startsWith("data:audio/wav")) primed = false;
+        },
+      );
+    }
     if (!ctx) {
       try {
         const Ctx: typeof AudioContext =

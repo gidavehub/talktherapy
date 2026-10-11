@@ -466,19 +466,28 @@ function Talk() {
   });
 
   // Her voice was refused (nobody had tapped yet): the first tap anywhere
-  // unlocks it and she says again the line on screen, then the rest.
+  // unlocks it and she says it again — from the line on screen, or, if she
+  // already finished in silence, the part that matters now (how to sign in,
+  // or how to pay). A "Tap to hear Talk" prompt sits with the captions
+  // meanwhile (SpokenCaption).
   useEffect(() => {
     if (!heard.blocked) return;
     const replay = () => {
+      const sequence = !user
+        ? ["welcome", "sign-in", "how"]
+        : paid === false && tier === "initial"
+          ? ["welcome", ...PAY_LINES]
+          : ["welcome"];
       const current = heard.saying?.id ?? null;
-      const order = ["welcome", "sign-in", "how", ...PAY_LINES];
-      const from = current ? order.indexOf(current) : -1;
+      const from = current ? sequence.indexOf(current) : -1;
+      const lines =
+        from >= 0 ? sequence.slice(from) : !user ? ["sign-in", "how"] : sequence.length > 1 ? PAY_LINES : [];
       voice.unlock();
-      if (from >= 0) voice.say(order.slice(from).filter((id) => id !== "sign-in" || !user).filter((id) => id !== "how" || !user));
+      if (lines.length) voice.say(lines);
     };
     document.addEventListener("pointerdown", replay, { once: true, capture: true });
     return () => document.removeEventListener("pointerdown", replay, { capture: true });
-  }, [heard.blocked, heard.saying, user]);
+  }, [heard.blocked, heard.saying, user, paid, tier]);
 
   // Paid, in this visit. The checkout is in another tab; the moment the
   // consultation is written she thanks them and begins — once somebody is

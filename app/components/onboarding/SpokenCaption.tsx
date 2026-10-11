@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { SPRING_SOFT } from "../motion/primitives";
-import { LOCALE_NAMES, type Saying } from "../../lib/audio/lines";
+import { LOCALE_NAMES, useVoice, type Saying } from "../../lib/audio/lines";
 
 /**
  * What Talk is saying right now, and in which language.
@@ -21,8 +21,26 @@ export default function SpokenCaption({
   tone?: "light" | "page" | "dark";
   className?: string;
 }) {
+  // The browser refused her voice: say so, where the eye already is. Any tap
+  // replays her (the screen she is on listens for it); this is the obvious
+  // place to make one.
+  const { blocked } = useVoice();
   return (
     <div className={`min-h-[52px] ${className}`} aria-live="polite">
+      {blocked ? (
+        <button
+          type="button"
+          className={`mb-2 inline-flex h-10 items-center gap-2 rounded-full px-4 text-[12px] font-medium uppercase tracking-[0.14em] ${
+            tone === "dark" ? "bg-white text-[var(--dark)]" : "bg-[var(--accent)] text-white"
+          }`}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+            <path d="M11 5L6 9H3v6h3l5 4V5z" />
+            <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" strokeLinecap="round" />
+          </svg>
+          Tap to hear Talk
+        </button>
+      ) : null}
       <AnimatePresence mode="wait" initial={false}>
         {saying ? (
           <motion.div
