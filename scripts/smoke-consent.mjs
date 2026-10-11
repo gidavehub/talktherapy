@@ -31,7 +31,8 @@ const check = (ok, what) => {
   if (!ok) failures += 1;
 };
 const intake = (patch = {}) => ({ ...EMPTY_INTAKE, ...patch });
-const HELP = /\b11[67]\b/;
+// Digits, or said in English words as Wolof, Mandinka and Pulaar replies write them.
+const HELP = /\b11[67]\b|\bone[\s-]+one[\s-]+(?:six|seven)\b/i;
 
 console.log("Asked after the language, in that language");
 {

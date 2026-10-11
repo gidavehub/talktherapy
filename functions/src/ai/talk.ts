@@ -1,4 +1,5 @@
 import { generate, models, streamGenerate, textOf, type Content } from "./vertex";
+import { englishNumbers } from "./spokenNumbers";
 import { fold, mentions } from "../../../app/lib/ai/choiceMatch";
 import {
   INTAKE_BUDGET_SEC,
@@ -91,6 +92,8 @@ Names that may be spoken — spell them this way: ${SPELLINGS.join(", ")}.
 
 LANGUAGE
 Four languages, equal footing. Each is a real language with its own spelling — never answer one of them in another.
+Talk is a Gambian platform, and The Gambia is English-speaking. Its Wolof, Mandinka and Pulaar are GAMBIAN ENGLISH Wolof, GAMBIAN ENGLISH Mandinka and GAMBIAN ENGLISH Pulaar: mixed with English the way Gambians really speak them, never with French, and never the Senegalese way.
+- NUMBERS are always said in English, in every language — never French (un, deux, trois, cinq, dix, vingt, cent, mille…). In Wolof, Mandinka and Pulaar write them out as English words, never digits. Prices: two hundred dalasi. Phone and emergency numbers one digit at a time: one-one-seven, one-one-six, one-one-eight. Times: ten o'clock, two thirty. Minutes, ages, days, counts: eight minutes, twenty-five years old, seven days.
 - English: plain English as spoken in The Gambia.
 - Wolof: GAMBIAN Wolof — as people speak it in Banjul, Serrekunda and the Kombos, and on Gambian radio. Never Senegalese or Dakar Wolof: Gambian listeners hear Dakar Wolof and French words at once, and it makes Talk sound foreign to them. Gambians mix ENGLISH into their Wolof, never French. So:
   - For modern and everyday things use the English word, as a Gambian says it: phone (never portable or téléphone), card (never carte), confirm (never konfirme, konfirmeer or konfirmaar), appointment (never rendez-vous), hospital, doctor, school, transport, money app, Wave, online, session, provider.
@@ -99,6 +102,7 @@ Four languages, equal footing. Each is a real language with its own spelling —
   Standard Latin orthography, e.g. "Salaam aleekum, maa ngi tudd Talk. Naka nga def? Yéwénal sa xel, amul gaaw."
 - Mandinka: Gambian Mandinka, written in standard Latin orthography with ŋ and ñ, e.g. "I be ñaadi? Ŋa a fo i ye, n too mu Talk le ti. Kana korto, waati be jee."
 - Pulaar (Fula): Pulaar as spoken in The Gambia, written with its hooked letters ɗ ɓ ƴ ŋ, e.g. "Jam waali. Ko mi Talk. No mbaɗ-ɗaa? Hoolo, alaa heñaare ɗoo."
+- Mandinka and Pulaar follow the same rule as Wolof: modern and everyday things take the English word a Gambian uses (phone, card, hospital, appointment, school, money, Wave, session, provider), never the French one, and never French connecting words or interjections.
 - If you are unsure how to say something naturally in their language, say something simpler. Never invent words, and never substitute another language because it is easier.
 
 HOW YOU SPEAK
@@ -115,7 +119,17 @@ SAFETY — this overrides everything above
 - elevated: thoughts of self-harm or suicide without immediate intent, abuse, or feeling unsafe.
 - low: real distress without danger.
 - none: everything else.
-- When risk is elevated or urgent: stay calm and caring and take them seriously. Your reply MUST say the numbers out loud — call 117 for the police or 116 for an ambulance — in their language, and also point them to someone near them they trust and to a human provider. This is the one time a longer reply is right; never drop the numbers to keep it short. Ask whether they are safe right now. Never give information about methods or means of harm. Never promise that what they say stays secret if someone is in danger.`;
+- When risk is elevated or urgent: stay calm and caring and take them seriously. Your reply MUST say the numbers out loud — call 117 for the police or 116 for an ambulance — in their language, with the numbers in English (one-one-seven, one-one-six), and also point them to someone near them they trust and to a human provider. This is the one time a longer reply is right; never drop the numbers to keep it short. Ask whether they are safe right now. Never give information about methods or means of harm. Never promise that what they say stays secret if someone is in danger.`;
+
+/**
+ * Said again at the END of every instruction Talk is given — every turn,
+ * greeting and line. The LANGUAGE rules above are long and come first; left
+ * there alone, replies drifted back to French numbers and Senegalese Wolof
+ * and people complained. The last thing she reads is what she follows best.
+ */
+const LANGUAGE_REMINDER = `
+
+REMINDER — EVERY TIME: Talk is Gambian, and The Gambia speaks English. Your Wolof is Gambian English Wolof, your Mandinka is Gambian English Mandinka, your Pulaar is Gambian English Pulaar — mixed with English the way Gambians speak, never French, never Senegalese. Every number is said in English: two hundred dalasi, one-one-seven, ten o'clock, eight minutes. In Wolof, Mandinka and Pulaar, write numbers as English words, never digits.`;
 
 /**
  * Talk's audio profile: who is speaking, where, and how her accent sounds.
@@ -135,10 +149,15 @@ const VOICE_ACCENT: Record<Language, string> = {
     "NOT Nigerian, NOT Ghanaian, NOT British or American",
   wolof:
     "everyday Gambian Wolof of Serrekunda and Banjul, the way it sounds on Gambian radio — " +
-    "NOT Senegalese, NOT Dakar Wolof, no French sounds at all; any English word in it (phone, " +
-    "card, Wave) said the Gambian way — relaxed and conversational, never formal or broadcast",
-  mandinka: "everyday Gambian Mandinka — relaxed and conversational, never formal or broadcast",
-  pulaar: "everyday Gambian Pulaar — relaxed and conversational, never formal or broadcast",
+    "NOT Senegalese, NOT Dakar Wolof, no French sounds at all; every number and any English word " +
+    "in it (two hundred, one-one-seven, phone, card, Wave) said in English, the Gambian way — " +
+    "relaxed and conversational, never formal or broadcast",
+  mandinka:
+    "everyday Gambian Mandinka — NOT Senegalese, no French sounds at all; every number and any " +
+    "English word in it said in English, the Gambian way — relaxed and conversational, never formal or broadcast",
+  pulaar:
+    "everyday Gambian Pulaar — NOT Senegalese, no French sounds at all; every number and any " +
+    "English word in it said in English, the Gambian way — relaxed and conversational, never formal or broadcast",
   other: "the language of the text, with a natural Gambian street accent",
 };
 
@@ -196,11 +215,19 @@ const HELP_EN = "If you might act on these thoughts, please call 117 for the pol
 const HELP_EN_MINOR =
   "If you are in danger, call 117 for the police or 116 for an ambulance right now, and tell an adult you trust — a parent, a teacher, a health worker — today.";
 
+/**
+ * 117 or 116, as digits or as said: in Wolof, Mandinka and Pulaar they are
+ * written "one-one-seven", and that counts. Missing it would append the help
+ * line to a reply that already says it — and pass over the help line in
+ * their own language for the English one.
+ */
+const SAYS_EMERGENCY_NUMBER = /\b11[67]\b|\bone[\s-]+one[\s-]+(?:six|seven)\b/i;
+
 function ensureHelp(result: TurnResult, helpLine: string, minor = false): TurnResult {
   if (result.risk !== "elevated" && result.risk !== "urgent") return result;
-  if (!result.reply || /\b11[67]\b/.test(result.reply)) return result;
+  if (!result.reply || SAYS_EMERGENCY_NUMBER.test(result.reply)) return result;
   const fallback = minor ? HELP_EN_MINOR : HELP_EN;
-  const line = /\b11[67]\b/.test(helpLine) ? helpLine : fallback;
+  const line = SAYS_EMERGENCY_NUMBER.test(helpLine) ? helpLine : fallback;
   return {
     ...result,
     reply: `${result.reply} ${line}`,
@@ -261,7 +288,7 @@ function systemFor(
   const task = awaitingConsent ? CONSENT_SECTION : mode === "intake" ? intakeSection(intake, remainingSec) : "";
   // In BOTH modes. Most returning people are in companion mode, and a child in
   // danger there needs this as much as one who is mid-intake.
-  return SYSTEM + minorSafety(intake) + task + memory;
+  return SYSTEM + minorSafety(intake) + task + memory + LANGUAGE_REMINDER;
 }
 
 /**
@@ -1026,8 +1053,9 @@ export async function presentProviders(
 
 /**
  * English text as it would be said in another language — for reading the
- * screen aloud. Not a literal translation: it is meant to be heard, so names,
- * numbers and prices stay as they are.
+ * screen aloud. Not a literal translation: it is meant to be heard, so names
+ * stay as they are, and numbers and prices keep their value — said in
+ * English, as Gambians say them.
  */
 export async function renderInLanguage(
   language: Language,
@@ -1036,7 +1064,7 @@ export async function renderInLanguage(
 ): Promise<string> {
   const said = await sayInLanguage(
     language,
-    `Say this naturally, as speech, keeping every name, number and price exactly as written: "${text}"`,
+    `Say this naturally, as speech, keeping every name exactly as written and every number and price the same, said in English words: "${text}"`,
     signal,
   );
   // If the model gives nothing back, the English is still better than silence.
@@ -1052,7 +1080,7 @@ async function sayInLanguage(
   const res = await generate(
     models.text,
     {
-      systemInstruction: { parts: [{ text: SYSTEM }] },
+      systemInstruction: { parts: [{ text: SYSTEM + LANGUAGE_REMINDER }] },
       contents: [{ role: "user", parts: [{ text: `[Write this in ${language}, and only this: ${instruction}]` }] }],
       generationConfig: {
         temperature: 0.6,
@@ -1143,7 +1171,9 @@ export async function runGreeting(
   const res = await generate(
     models.text,
     {
-      systemInstruction: { parts: [{ text: SYSTEM + (input.mode === "intake" ? intakeSection(intake) : "") }] },
+      systemInstruction: {
+        parts: [{ text: SYSTEM + (input.mode === "intake" ? intakeSection(intake) : "") + LANGUAGE_REMINDER }],
+      },
       contents: [{ role: "user", parts: [{ text: `[${ask} Reply only with what you will say.]` }] }],
       generationConfig: {
         temperature: 0.6,
@@ -1183,6 +1213,9 @@ const VOICE_ENV: Record<Language, string> = {
   other: "TALK_VOICE",
 };
 
+/** The languages whose numbers the voice must be handed as English words. */
+const ENGLISH_NUMBERS = new Set<Language>(["wolof", "mandinka", "pulaar"]);
+
 function voiceName(language: Language) {
   // One voice served all four languages at first. A per-language override
   // exists because the same prebuilt voice does not pronounce Pulaar and
@@ -1202,8 +1235,11 @@ export async function* speak(
   signal?: AbortSignal,
   paceWpm?: number,
 ): AsyncGenerator<{ pcm: Buffer; sampleRate: number }> {
+  // Digits in Wolof, Mandinka or Pulaar are read in French. Not one reaches
+  // the voice: they are said in English, as Gambians say them.
+  const spoken = ENGLISH_NUMBERS.has(language) ? englishNumbers(text) : text;
   const body = {
-    contents: [{ role: "user", parts: [{ text: voicePrompt(language, paceWpm, text) }] }],
+    contents: [{ role: "user", parts: [{ text: voicePrompt(language, paceWpm, spoken) }] }],
     generationConfig: {
       responseModalities: ["AUDIO"],
       speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName(language) } } },
