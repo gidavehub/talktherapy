@@ -126,10 +126,10 @@ export default function DashboardPage() {
           </Link>
         </div>
         {matchesLoading ? (
-          <div role="status" aria-label="Finding providers for you" aria-busy="true" className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <ProviderCardSkeleton compact />
-            <ProviderCardSkeleton compact />
-            <ProviderCardSkeleton compact />
+          <div role="status" aria-label="Finding providers for you" aria-busy="true" className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
+            <ProviderCardSkeleton tile />
+            <ProviderCardSkeleton tile />
+            <ProviderCardSkeleton tile />
           </div>
         ) : matchesError ? (
           <EmptyState
@@ -138,7 +138,7 @@ export default function DashboardPage() {
             description="This is on our side, not yours. Pull to refresh, or try again in a minute."
           />
         ) : matches && matches.length ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
             {matches.slice(0, 3).map((m, i) => (
               <ProviderCard
                 key={m.profile.uid}
@@ -147,6 +147,7 @@ export default function DashboardPage() {
                 reasons={intake ? m.reasons : undefined}
                 best={Boolean(intake) && i === 0 && m.reasons.length > 0}
                 compact
+                tile
                 onOpen={(p) => void openProvider(p)}
               />
             ))}

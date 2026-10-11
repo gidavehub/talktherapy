@@ -1,6 +1,6 @@
 """Strip the magenta backdrop off the OptiQ portraits: transparent WebP, 640px.
 
-The portraits are rendered by OptiQ (C:/Projects/optiq/scratch/talk-redesign.mjs:
+The portraits are rendered by OptiQ (C:/Projects/optiq/scratch/talk-redesign-v2.mjs:
 gemini-3-pro-image on flat magenta), then cut out here into public/people/.
 
 Keys on each image's OWN backdrop colour (sampled from the top corners — the

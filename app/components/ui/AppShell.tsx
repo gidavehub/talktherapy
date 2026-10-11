@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { createContext, useContext, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { SPRING_SOFT, SPRING_SNAP } from "../motion/primitives";
 import { useAuth } from "../AuthProvider";
@@ -26,12 +27,34 @@ import Logo from "../Logo";
  * (ChatsSplit). On a phone an open conversation IS the screen: its header is
  * the top bar — with the menu button in it, through useOpenMenu — and its
  * composer is the bottom bar. Neither of this shell's bars is drawn over it.
+ *
+ * The top bar is pinned to the top of every other screen. A screen can put
+ * its own things in it with <PageBar> — the search on "Providers for you",
+ * the way back on booking — and then the logo makes room for them. On a
+ * phone the menu button is always at its right; on a computer, where the
+ * rail is the menu, the bar is only drawn when a screen has something for it.
  */
 
 /** Opens the full menu on a phone — for a screen that draws its own top bar. */
 const OpenMenu = createContext<() => void>(() => {});
 export function useOpenMenu() {
   return useContext(OpenMenu);
+}
+
+/** Where a screen's own top-bar content goes (PageBar). */
+const PageBarSlot = createContext<{ slot: HTMLElement | null; register: () => () => void }>({
+  slot: null,
+  register: () => () => {},
+});
+
+/**
+ * This screen's own top bar: whatever it needs at the top while it scrolls —
+ * a search box, a way back, a title. Rendered into the shell's pinned bar.
+ */
+export function PageBar({ children }: { children: React.ReactNode }) {
+  const { slot, register } = useContext(PageBarSlot);
+  useEffect(() => register(), [register]);
+  return slot ? createPortal(children, slot) : null;
 }
 
 function inMessages(pathname: string) {
@@ -113,6 +136,14 @@ export default function AppShell({
   const router = useRouter();
   const { user, profile } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  // The pinned bar's slot, and how many screens have put something in it.
+  const [slot, setSlot] = useState<HTMLDivElement | null>(null);
+  const [bars, setBars] = useState(0);
+  const register = useCallback(() => {
+    setBars((n) => n + 1);
+    return () => setBars((n) => n - 1);
+  }, []);
+  const hasBar = bars > 0;
 
   const primary = nav.filter((item) => item.primary).slice(0, 5);
   const messages = inMessages(pathname);
@@ -160,39 +191,12 @@ export default function AppShell({
 
   return (
     <OpenMenu.Provider value={() => setMenuOpen(true)}>
+    <PageBarSlot.Provider value={{ slot, register }}>
     <div className="min-h-screen bg-[var(--background)]">
       {/* Desktop rail */}
       <aside className="hidden md:flex fixed inset-y-0 left-0 w-[264px] bg-[var(--dark)] px-6 py-8 flex-col z-30">
         {rail}
       </aside>
-
-      {/* Mobile top bar */}
-      {conversation ? null : (
-      <header className="md:hidden sticky top-0 z-30 bg-[var(--background)]/90 backdrop-blur-md border-b border-[var(--border)] px-4 h-16 flex items-center justify-between">
-        <Link href="/" aria-label="TALK — home">
-          <Logo height={32} />
-        </Link>
-        <div className="flex items-center gap-2">
-          {actions}
-          <motion.button
-            type="button"
-            aria-label="Menu"
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((v) => !v)}
-            whileHover={{ scale: 1.06, rotate: -8 }}
-            whileTap={{ scale: 0.94 }}
-            transition={SPRING_SNAP}
-            className="h-10 w-10 rounded-full border-[1.5px] border-[var(--dark)]/70 text-[var(--foreground)] flex items-center justify-center"
-          >
-            <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
-              <rect width="16" height="1.6" rx="0.8" fill="currentColor" />
-              <rect y="5.2" width="16" height="1.6" rx="0.8" fill="currentColor" />
-              <rect y="10.4" width="16" height="1.6" rx="0.8" fill="currentColor" />
-            </svg>
-          </motion.button>
-        </div>
-      </header>
-      )}
 
       {/* Mobile full menu — the complete nav, since the bottom bar shows five */}
       <AnimatePresence>
@@ -221,10 +225,52 @@ export default function AppShell({
       </AnimatePresence>
 
       {/* Content — Messages edge to edge, everything else in a column */}
-      {messages ? (
-        <div className="md:pl-[264px]">{children}</div>
-      ) : (
       <div className="md:pl-[264px]">
+        {/* The pinned top bar. On a phone: the screen's own bar (or the
+            logo) and the menu. On a computer: only when a screen has one. */}
+        {conversation ? null : (
+          <header
+            className={`sticky top-0 z-30 border-b border-[var(--border)] bg-[var(--background)]/92 backdrop-blur-md ${
+              hasBar ? "" : "md:hidden"
+            }`}
+          >
+            <div
+              className={`mx-auto flex h-16 items-center gap-3 px-4 sm:px-6 md:px-10 ${
+                messages ? "" : wide ? "max-w-[1400px]" : "max-w-[1100px]"
+              }`}
+            >
+              {hasBar ? null : (
+                <Link href="/" aria-label="TALK — home" className="md:hidden">
+                  <Logo height={32} />
+                </Link>
+              )}
+              <div ref={setSlot} className={hasBar ? "flex min-w-0 flex-1 items-center gap-3" : "hidden"} />
+              {hasBar ? null : <div className="flex-1" />}
+              <div className="flex shrink-0 items-center gap-2 md:hidden">
+                {actions}
+                <motion.button
+                  type="button"
+                  aria-label="Menu"
+                  aria-expanded={menuOpen}
+                  onClick={() => setMenuOpen((v) => !v)}
+                  whileTap={{ scale: 0.94 }}
+                  transition={SPRING_SNAP}
+                  className="h-10 w-10 rounded-full border-[1.5px] border-[var(--dark)]/70 text-[var(--foreground)] flex items-center justify-center"
+                >
+                  <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
+                    <rect width="16" height="1.6" rx="0.8" fill="currentColor" />
+                    <rect y="5.2" width="16" height="1.6" rx="0.8" fill="currentColor" />
+                    <rect y="10.4" width="16" height="1.6" rx="0.8" fill="currentColor" />
+                  </svg>
+                </motion.button>
+              </div>
+            </div>
+          </header>
+        )}
+
+      {messages ? (
+        children
+      ) : (
         <div
           className={`px-4 sm:px-6 md:px-10 pt-6 md:pt-10 pb-28 md:pb-16 mx-auto ${
             wide ? "max-w-[1400px]" : "max-w-[1100px]"
@@ -257,8 +303,8 @@ export default function AppShell({
 
           {children}
         </div>
-      </div>
       )}
+      </div>
 
       {/* Mobile bottom bar */}
       {conversation ? null : (
@@ -316,6 +362,7 @@ export default function AppShell({
       </nav>
       )}
     </div>
+    </PageBarSlot.Provider>
     </OpenMenu.Provider>
   );
 }

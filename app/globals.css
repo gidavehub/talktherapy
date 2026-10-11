@@ -76,7 +76,7 @@ html, body {
   color: var(--foreground);
   font-family: var(--font-poppins), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+  overflow-x: clip; /* not hidden: hidden makes the body a scroll container and sticky bars stop sticking */
 }
 
 /* Headlines: the soft serif. A second line in italic sage is the signature

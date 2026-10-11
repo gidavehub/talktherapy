@@ -45,7 +45,7 @@ export default function MeetProviders() {
           </p>
         </Reveal>
 
-        <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-10 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
           {providers === null
             ? Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="flex flex-col items-center rounded-[26px] bg-[var(--surface)] p-6 shadow-[var(--shadow-card)]">
@@ -63,10 +63,10 @@ export default function MeetProviders() {
                   viewport={{ once: true, amount: 0.3 }}
                   transition={{ ...SPRING_SOFT, delay: i * 0.06 }}
                   whileHover={{ y: -4 }}
-                  className="flex flex-col items-center rounded-[26px] bg-[var(--surface)] px-5 pb-6 pt-6 text-center shadow-[var(--shadow-card)]"
+                  className="flex flex-col items-center rounded-[22px] bg-[var(--surface)] px-3 pb-4 pt-4 text-center shadow-[var(--shadow-card)] sm:rounded-[26px] sm:px-5 sm:pb-6 sm:pt-6"
                 >
-                  <ProviderArch profile={p} index={i} className="h-[130px] w-[112px]" />
-                  <h3 className="font-display mt-5 text-[20px] font-medium leading-tight">{p.displayName}</h3>
+                  <ProviderArch profile={p} index={i} className="h-[112px] w-[96px] sm:h-[130px] sm:w-[112px]" />
+                  <h3 className="font-display mt-3 text-[17px] font-medium leading-tight sm:mt-5 sm:text-[20px]">{p.displayName}</h3>
                   <p className="mt-1 text-[12.5px] text-[var(--muted)]">
                     {p.headline.split(/\s[—–-]\s/)[0] || p.services.map((s) => SERVICE_LABELS[s]).join(", ") || "Provider"}
                   </p>
@@ -82,7 +82,7 @@ export default function MeetProviders() {
                   </p>
                   <Link
                     href={`/providers/${p.uid}`}
-                    className="mt-5 inline-flex h-10 items-center rounded-full border-[1.5px] border-[var(--dark)] px-6 text-[13.5px] font-medium transition-colors hover:bg-[var(--dark)] hover:text-[var(--cream)]"
+                    className="mt-4 inline-flex h-9 items-center rounded-full border-[1.5px] border-[var(--dark)] px-4 text-[13px] font-medium transition-colors hover:bg-[var(--dark)] hover:text-[var(--cream)] sm:mt-5 sm:h-10 sm:px-6"
                   >
                     View profile
                   </Link>

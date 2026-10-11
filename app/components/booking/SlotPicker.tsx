@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { SPRING_SNAP, SPRING_SOFT } from "../motion/primitives";
@@ -9,6 +10,7 @@ import { IconCalendar, IconSpeaker } from "../ui/icons";
 import GuardianConsentModal from "../therapy/GuardianConsentModal";
 import { useGuardianGate } from "../../lib/useGuardianGate";
 import Button from "../ui/Button";
+import { PageBar } from "../ui/AppShell";
 import { useAuth } from "../AuthProvider";
 import { useReadAloud } from "../../lib/useReadAloud";
 import { getProvider } from "../../lib/providers";
@@ -112,6 +114,30 @@ export default function SlotPicker({ providerId }: { providerId: string }) {
 
   return (
     <div className="max-w-[620px] space-y-5">
+      {/* The pinned bar: back to them, and who this is with. */}
+      <PageBar>
+        <Link
+          href={`/providers/${providerId}`}
+          aria-label="Back to their profile"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full hover:bg-[var(--sand)]"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+            <path d="M19 12H5M11 18l-6-6 6-6" />
+          </svg>
+        </Link>
+        {provider ? <ProviderAvatar photoPath={provider.photoPath} name={provider.displayName} size={34} /> : null}
+        <div className="min-w-0 flex-1">
+          <p className="font-display truncate text-[17px] font-medium leading-tight">
+            {provider ? `Book with ${provider.displayName}` : "Book a session"}
+          </p>
+          {provider ? (
+            <p className="truncate text-[12px] text-[var(--muted)]">
+              {formatDalasi(provider.sessionRateMinor)} · {SESSION_MINUTES} minutes · by video
+            </p>
+          ) : null}
+        </div>
+      </PageBar>
+
       {provider ? (
         <div className="flex items-center gap-3.5 rounded-[22px] bg-[var(--surface)] px-4 py-3.5">
           <ProviderAvatar photoPath={provider.photoPath} name={provider.displayName} size={46} />

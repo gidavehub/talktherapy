@@ -39,7 +39,7 @@ export type { TabItem } from "./Tabs";
 
 export { ToastProvider, useToast } from "./Toast";
 
-export { default as AppShell } from "./AppShell";
+export { default as AppShell, PageBar } from "./AppShell";
 export type { NavItem } from "./AppShell";
 
 export * from "./icons";

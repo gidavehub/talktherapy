@@ -120,7 +120,10 @@ export default function ProviderCard({
   onRead,
   speaking = false,
   onOpen,
+  tile = false,
 }: {
+  /** Always the compact tile, at every width (the dashboard's row of three). */
+  tile?: boolean;
   profile: ProviderProfile;
   index?: number;
   reasons?: string[];
@@ -149,14 +152,81 @@ export default function ProviderCard({
   const more = specialties.length - shown.length;
   const sessions = profile.formats.length ? profile.formats.map((f) => FORMAT_LABELS[f]).join(" or ") : "Video";
 
+  const speaker = onRead ? (
+    <button
+      type="button"
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] transition-colors hover:bg-[var(--sand)]"
+      aria-label={speaking ? `Stop reading ${profile.displayName} aloud` : `Read ${profile.displayName} aloud`}
+      onClick={() => onRead(profile.uid, providerSummary(profile, reasons))}
+    >
+      {speaking ? (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+          <rect x="6" y="5" width="4" height="14" rx="1" />
+          <rect x="14" y="5" width="4" height="14" rx="1" />
+        </svg>
+      ) : (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+          <path d="M4 9v6h4l5 4V5L8 9H4z" />
+          <path d="M17 8.5a5 5 0 0 1 0 7" strokeLinecap="round" />
+        </svg>
+      )}
+    </button>
+  ) : null;
+
+  const action = onOpen ? (
+    <button
+      type="button"
+      onClick={() => onOpen(profile)}
+      className="inline-flex items-center justify-center rounded-full bg-[var(--accent)] font-medium text-white transition-colors hover:bg-[var(--accent-deep)]"
+    >
+      Message
+    </button>
+  ) : (
+    <Link
+      href={`/book/${profile.uid}`}
+      className="inline-flex items-center justify-center rounded-full bg-[var(--accent)] font-medium text-white transition-colors hover:bg-[var(--accent-deep)]"
+    >
+      Book session
+    </Link>
+  );
+
+  // One detail for the tile: why they were suggested, or what they help with.
+  const highlight = reasons?.[0] ?? shown[0] ?? null;
+
   return (
     <motion.div
       initial={{ y: 24, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ ...SPRING_SOFT, delay: Math.min(index, 8) * 0.05 }}
       whileHover={{ y: -4 }}
-      className="relative flex flex-col rounded-[28px] bg-[var(--surface)] p-5 shadow-[var(--shadow-card)] md:p-6"
+      className="h-full"
     >
+      {/* Phone and tablet: a tile, two or three to a row, so several people
+          fit on one screen. */}
+      <div className={`relative flex h-full flex-col rounded-[22px] bg-[var(--surface)] p-3 pb-3.5 text-center shadow-[var(--shadow-card)] ${tile ? "" : "lg:hidden"}`}>
+        <Link href={`/providers/${profile.uid}`} aria-label={`${profile.displayName} — view profile`} className="block">
+          <ProviderArch profile={profile} index={index} className="mx-auto h-[118px] w-[96px]" />
+          <h3 className="font-display mt-3 line-clamp-1 text-[16.5px] font-medium leading-tight">{profile.displayName}</h3>
+        </Link>
+        <p className="mt-0.5 truncate text-[11.5px] text-[var(--muted)]">{role}</p>
+        <p className="mt-1.5 text-[12px] font-medium text-[var(--accent)]">From {formatDalasi(profile.sessionRateMinor)}</p>
+        {best || highlight ? (
+          <div className="mt-2 flex justify-center">
+            <span
+              className={`inline-flex h-6 max-w-full items-center truncate rounded-full px-2.5 text-[11px] ${
+                best ? "bg-[var(--accent)] text-white" : reasons?.length ? "bg-[var(--accent)]/12 text-[var(--accent-deep)]" : "bg-[var(--sand)]"
+              }`}
+            >
+              <span className="truncate">{best ? "Best fit" : highlight}</span>
+            </span>
+          </div>
+        ) : null}
+        <div className="mt-auto pt-3 [&>*]:h-9 [&>*]:w-full [&>*]:text-[13px]">{action}</div>
+        {speaker ? <div className="absolute right-2 top-2 [&>button]:h-8 [&>button]:w-8">{speaker}</div> : null}
+      </div>
+
+      {/* Computer: the full card. */}
+      <div className={`relative hidden h-full flex-col rounded-[28px] bg-[var(--surface)] p-5 shadow-[var(--shadow-card)] md:p-6 ${tile ? "" : "lg:flex"}`}>
       <div className="flex items-start gap-4">
         <ProviderArch
           profile={profile}
@@ -170,26 +240,7 @@ export default function ProviderCard({
                 {profile.displayName}
               </Link>
             </h3>
-            {onRead ? (
-              <button
-                type="button"
-                className="-mr-1 -mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--border)] transition-colors hover:bg-[var(--sand)]"
-                aria-label={speaking ? `Stop reading ${profile.displayName} aloud` : `Read ${profile.displayName} aloud`}
-                onClick={() => onRead(profile.uid, providerSummary(profile, reasons))}
-              >
-                {speaking ? (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                    <rect x="6" y="5" width="4" height="14" rx="1" />
-                    <rect x="14" y="5" width="4" height="14" rx="1" />
-                  </svg>
-                ) : (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-                    <path d="M4 9v6h4l5 4V5L8 9H4z" />
-                    <path d="M17 8.5a5 5 0 0 1 0 7" strokeLinecap="round" />
-                  </svg>
-                )}
-              </button>
-            ) : null}
+            {speaker ? <div className="-mr-1 -mt-1">{speaker}</div> : null}
           </div>
           <p className="mt-1 truncate text-[13px] text-[var(--muted)]">{role}</p>
           <div className="mt-2.5 flex flex-wrap gap-1.5">
@@ -253,22 +304,8 @@ export default function ProviderCard({
         >
           View profile
         </Link>
-        {onOpen ? (
-          <button
-            type="button"
-            onClick={() => onOpen(profile)}
-            className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--accent)] text-[14px] font-medium text-white transition-colors hover:bg-[var(--accent-deep)]"
-          >
-            Message
-          </button>
-        ) : (
-          <Link
-            href={`/book/${profile.uid}`}
-            className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--accent)] text-[14px] font-medium text-white transition-colors hover:bg-[var(--accent-deep)]"
-          >
-            Book session
-          </Link>
-        )}
+        <div className="[&>*]:h-11 [&>*]:w-full [&>*]:text-[14px]">{action}</div>
+      </div>
       </div>
     </motion.div>
   );
@@ -278,9 +315,16 @@ export default function ProviderCard({
  * A provider card that has not arrived yet — the same outline as the real
  * one, so the grid holds its shape while it loads.
  */
-export function ProviderCardSkeleton({ compact = false }: { compact?: boolean }) {
+export function ProviderCardSkeleton({ compact = false, tile = false }: { compact?: boolean; tile?: boolean }) {
   return (
-    <div aria-hidden className="flex flex-col rounded-[28px] bg-[var(--surface)] p-6 shadow-[var(--shadow-card)]">
+    <>
+    <div aria-hidden className={`flex flex-col items-center rounded-[22px] bg-[var(--surface)] p-3 shadow-[var(--shadow-card)] ${tile ? "" : "lg:hidden"}`}>
+      <Skeleton rounded="arch" className="h-[118px] w-[96px]" />
+      <Skeleton className="mt-3 h-4 w-3/4" />
+      <Skeleton className="mt-2 h-3 w-1/2" />
+      <Skeleton rounded="rounded-full" className="mt-4 h-9 w-full" />
+    </div>
+    <div aria-hidden className={`hidden flex-col rounded-[28px] bg-[var(--surface)] p-6 shadow-[var(--shadow-card)] ${tile ? "" : "lg:flex"}`}>
       <div className="flex items-start gap-4">
         <Skeleton rounded="arch" className={compact ? "h-[96px] w-[76px] shrink-0" : "h-[128px] w-[100px] shrink-0"} />
         <div className="min-w-0 flex-1 space-y-2.5 pt-2">
@@ -298,5 +342,6 @@ export function ProviderCardSkeleton({ compact = false }: { compact?: boolean })
         <Skeleton rounded="rounded-full" className="h-11" />
       </div>
     </div>
+    </>
   );
 }

@@ -2,16 +2,19 @@
 
 import Link from "next/link";
 import { voice } from "@/lib/audio/lines";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { SPRING_SOFT } from "@/components/motion/primitives";
 import { useAuth } from "@/components/AuthProvider";
 import ProviderCard, { ProviderCardSkeleton } from "@/components/providers/ProviderCard";
 import Button from "@/components/ui/Button";
 import { Alert, EmptyState, Pill } from "@/components/ui/Feedback";
+import { PageBar } from "@/components/ui/AppShell";
+import SearchField from "@/components/ui/SearchField";
 import GuardianConsentModal from "@/components/therapy/GuardianConsentModal";
 import { IconPeople } from "@/components/ui/icons";
-import { intakeChips } from "@/lib/matching";
+import { SERVICE_LABELS, SPECIALIZATION_LABELS, intakeChips, type Specialization } from "@/lib/matching";
+import { LOCALE_LABELS } from "@/lib/models";
 import { useMatches } from "@/lib/useMatches";
 import { useReadAloud } from "@/lib/useReadAloud";
 import { useOpenProvider } from "@/lib/useOpenProvider";
@@ -35,11 +38,37 @@ export default function ProvidersForYouPage() {
     () => typeof window !== "undefined" && new URLSearchParams(window.location.search).has("welcome"),
   );
 
+  // The search in the pinned bar: by name, what they do, what they help
+  // with, the languages they speak, or where they are.
+  const [query, setQuery] = useState("");
+  const shown = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    if (!term || !matches) return matches;
+    return matches.filter(({ profile: p }) =>
+      [
+        p.displayName,
+        p.headline,
+        p.location ?? "",
+        ...p.services.map((x) => SERVICE_LABELS[x]),
+        ...p.specializations.map((x) => SPECIALIZATION_LABELS[x as Specialization] ?? x),
+        ...p.languages.map((l) => LOCALE_LABELS[l]),
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(term),
+    );
+  }, [matches, query]);
+
   const chips = intakeChips(intake);
   const name = intake?.preferredName ?? profile?.displayName?.split(" ")[0] ?? null;
 
   return (
     <div className="space-y-8">
+      <PageBar>
+        <span className="font-display hidden shrink-0 text-[20px] font-medium sm:block">Providers for you</span>
+        <SearchField value={query} onChange={setQuery} placeholder="Search by name, specialty or language" />
+      </PageBar>
+
       <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={SPRING_SOFT}>
         <p className="eyebrow">For you</p>
         <h1 className="mt-2 font-display text-[30px] md:text-[40px] leading-[1.08] font-medium">
@@ -109,7 +138,7 @@ export default function ProvidersForYouPage() {
           role="status"
           aria-label="Finding providers for you"
           aria-busy="true"
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6"
+          className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-2 lg:gap-6 xl:grid-cols-3"
         >
           <ProviderCardSkeleton />
           <ProviderCardSkeleton />
@@ -122,6 +151,13 @@ export default function ProvidersForYouPage() {
           description="Please try again in a moment."
           action={<Button href="/support" variant="secondary">Contact support</Button>}
         />
+      ) : matches && matches.length > 0 && shown?.length === 0 ? (
+        <EmptyState
+          icon={<IconPeople />}
+          title={`No one matches “${query.trim()}”`}
+          description="Try a name, a language like Wolof, or what you want help with."
+          action={<Button variant="secondary" onClick={() => setQuery("")}>Clear the search</Button>}
+        />
       ) : !matches || matches.length === 0 ? (
         <EmptyState
           icon={<IconPeople />}
@@ -129,8 +165,8 @@ export default function ProvidersForYouPage() {
           description="Every provider is credential-checked before they appear here. We will show you who fits as soon as they are ready."
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-          {matches.map((m, i) => (
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-2 lg:gap-6 xl:grid-cols-3">
+          {(shown ?? matches).map((m, i) => (
             <ProviderCard
               key={m.profile.uid}
               profile={m.profile}

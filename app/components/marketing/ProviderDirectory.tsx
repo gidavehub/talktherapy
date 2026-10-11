@@ -8,6 +8,7 @@ import { EmptyState } from "../ui/Feedback";
 import Button from "../ui/Button";
 import { IconPeople } from "../ui/icons";
 import PageIntro from "./PageIntro";
+import SearchField from "../ui/SearchField";
 import { LOCALE_LABELS, type ProviderProfile, type Locale } from "../../lib/models";
 import { FORMAT_LABELS, type ProviderGender, type SessionFormat } from "../../lib/matching";
 import {
@@ -176,6 +177,41 @@ export default function ProviderDirectory() {
 
   const samples = visible.slice(0, shown).some((p) => p.sample);
 
+  const search = (value: string) => {
+    setQuery(value);
+    setFilters((f) => ({ ...f, search: value.trim() }));
+    setShown(PAGE);
+  };
+
+  const pills = (
+    <>
+      <FilterMenu
+        label="Language"
+        options={LANGUAGES.map((l) => ({ value: l, label: LOCALE_LABELS[l] }))}
+        selected={filters.languages}
+        onToggle={(l) => setFilters((f) => ({ ...f, languages: toggleIn(f.languages, l) }))}
+      />
+      <FilterMenu
+        label="Specialty"
+        options={SPECIALIZATIONS.map((s) => ({ value: s, label: SPECIALIZATION_LABELS[s] }))}
+        selected={filters.specializations}
+        onToggle={(s: Specialization) => setFilters((f) => ({ ...f, specializations: toggleIn(f.specializations, s) }))}
+      />
+      <FilterMenu label="Provider" options={GENDERS} selected={genders} onToggle={(g) => setGenders((all) => toggleIn(all, g))} />
+      <FilterMenu
+        label="Session type"
+        options={FORMATS.map((f) => ({ value: f, label: FORMAT_LABELS[f] }))}
+        selected={formats}
+        onToggle={(f) => setFormats((all) => toggleIn(all, f))}
+      />
+      {hasFilters ? (
+        <button type="button" onClick={clearAll} className="ml-2 text-[13.5px] font-medium text-[var(--accent)] hover:underline">
+          Clear all
+        </button>
+      ) : null}
+    </>
+  );
+
   return (
     <>
       <PageIntro
@@ -187,19 +223,15 @@ export default function ProviderDirectory() {
           role="search"
           onSubmit={(e) => {
             e.preventDefault();
-            setFilters((f) => ({ ...f, search: query.trim() }));
-            setShown(PAGE);
+            search(query);
+            document.getElementById("provider-results")?.scrollIntoView({ behavior: "smooth", block: "start" });
           }}
           className="flex h-[58px] max-w-[640px] items-center rounded-full bg-[var(--surface)] pl-6 pr-1.5 shadow-[var(--shadow-raised)]"
         >
           <input
             type="search"
             value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              // Clearing the box clears the search, without a second tap.
-              if (!e.target.value) setFilters((f) => ({ ...f, search: "" }));
-            }}
+            onChange={(e) => search(e.target.value)}
             placeholder="Search by name, specialty or language"
             aria-label="Search providers"
             className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-[var(--muted)]"
@@ -213,40 +245,26 @@ export default function ProviderDirectory() {
         </form>
       </PageIntro>
 
-      <section className="bg-[var(--background)] px-5 pb-16 pt-8 md:px-10 md:pb-20">
+      <section className="bg-[var(--background)] px-5 pb-16 pt-4 md:px-10 md:pb-20">
         <div className="mx-auto max-w-[1200px]">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <FilterMenu
-              label="Language"
-              options={LANGUAGES.map((l) => ({ value: l, label: LOCALE_LABELS[l] }))}
-              selected={filters.languages}
-              onToggle={(l) => setFilters((f) => ({ ...f, languages: toggleIn(f.languages, l) }))}
-            />
-            <FilterMenu
-              label="Specialty"
-              options={SPECIALIZATIONS.map((s) => ({ value: s, label: SPECIALIZATION_LABELS[s] }))}
-              selected={filters.specializations}
-              onToggle={(s: Specialization) => setFilters((f) => ({ ...f, specializations: toggleIn(f.specializations, s) }))}
-            />
-            <FilterMenu label="Provider" options={GENDERS} selected={genders} onToggle={(g) => setGenders((all) => toggleIn(all, g))} />
-            <FilterMenu
-              label="Session type"
-              options={FORMATS.map((f) => ({ value: f, label: FORMAT_LABELS[f] }))}
-              selected={formats}
-              onToggle={(f) => setFormats((all) => toggleIn(all, f))}
-            />
-            {hasFilters ? (
-              <button type="button" onClick={clearAll} className="ml-2 text-[13.5px] font-medium text-[var(--accent)] hover:underline">
-                Clear all
-              </button>
-            ) : null}
+          {/* Pinned under the header while you scroll: the search, and on a
+              computer the filters beside it. */}
+          <div
+            id="provider-results"
+            className="sticky top-[68px] z-20 -mx-5 scroll-mt-[72px] bg-[var(--background)]/92 px-5 py-3 backdrop-blur-md md:top-[72px] md:-mx-10 md:px-10"
+          >
+            <div className="flex items-center gap-2.5">
+              <SearchField value={query} onChange={search} placeholder="Search providers" className="lg:max-w-[300px]" />
+              <div className="hidden flex-wrap items-center gap-2.5 lg:flex">{pills}</div>
+            </div>
           </div>
+          <div className="mt-2 flex flex-wrap items-center gap-2.5 lg:hidden">{pills}</div>
 
           {samples ? <p className="mt-5 text-[12.5px] text-[var(--muted)]">Showing sample profiles, for layout only</p> : null}
 
           <div className="mt-6">
             {profiles === null ? (
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:gap-5">
                 {Array.from({ length: 3 }).map((_, i) => (
                   <ProviderCardSkeleton key={i} />
                 ))}
@@ -283,7 +301,7 @@ export default function ProviderDirectory() {
               />
             ) : (
               <>
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:gap-5">
                   {visible.slice(0, shown).map((profile, i) => (
                     <ProviderCard key={profile.uid} profile={profile} index={i} />
                   ))}
