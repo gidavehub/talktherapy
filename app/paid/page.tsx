@@ -24,7 +24,7 @@ export default function PaidPage() {
   useEffect(() => {
     const opener = window.opener as Window | null;
     if (!opener || opener.closed) {
-      router.replace("/therapy?paid=1");
+      router.replace("/talk?paid=1");
       return;
     }
     window.close();
@@ -45,7 +45,7 @@ export default function PaidPage() {
               close this one.
             </p>
             <Link
-              href="/therapy?paid=1"
+              href="/talk?paid=1"
               className="mt-6 inline-flex h-12 items-center rounded-full border border-white/25 px-6 text-[12px] uppercase tracking-[0.14em] hover:bg-white/10"
             >
               Or carry on here

@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { SPRING_SOFT, SPRING_SNAP } from "../motion/primitives";
 import { useAuth } from "../AuthProvider";
-import { signOut } from "../../lib/auth";
+import { signOutToHome } from "../../lib/signOutFlow";
 import { Avatar } from "./Feedback";
 
 /**
@@ -88,6 +88,7 @@ export default function AppShell({
   wide?: boolean;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, profile } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -124,7 +125,7 @@ export default function AppShell({
         </div>
         <button
           type="button"
-          onClick={() => void signOut()}
+          onClick={() => void signOutToHome(router)}
           className="mt-2 w-full h-10 rounded-full text-[11px] uppercase tracking-[0.18em] text-white/60 hover:text-white hover:bg-white/5 transition-colors"
         >
           Sign out

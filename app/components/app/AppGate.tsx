@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
+import { TALK, talkHref } from "../../lib/talkDoorway";
+import { isLeaving } from "../../lib/signOutFlow";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "../AuthProvider";
 import AppShell from "../ui/AppShell";
@@ -59,8 +61,12 @@ export default function AppGate({ children }: { children: React.ReactNode }) {
     if (!ready) return;
 
     if (!user) {
-      // Carry the attempted path so sign-in returns them here afterwards.
-      router.replace(`/sign-in?next=${encodeURIComponent(pathname)}`);
+      // Signing out leaves for the landing page by itself; do not chase it
+      // to the sign-in screen.
+      if (isLeaving()) return;
+      // To Talk, who signs them in, carrying the attempted path so a person
+      // who is already set up comes straight back here afterwards.
+      router.replace(talkHref({ signIn: true, next: pathname }));
       return;
     }
 
@@ -70,10 +76,10 @@ export default function AppGate({ children }: { children: React.ReactNode }) {
 
     // Onboarding is a conversation with Talk; no PATIENT reaches the app until
     // she has learned what they need. A provider has no intake to do — sending
-    // them to /therapy would ask a clinician what brings them here today, and
+    // them to /talk would ask a clinician what brings them here today, and
     // then file the answer as their own case notes.
     if (profile.role === "patient" && !profile.onboarded && !openBeforeOnboarding(pathname)) {
-      router.replace("/therapy");
+      router.replace(TALK);
     }
   }, [ready, user, profile, router, pathname]);
 

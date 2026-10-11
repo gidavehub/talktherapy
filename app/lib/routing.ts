@@ -4,7 +4,7 @@ import type { UserDoc } from "./models";
  * Where a person belongs right now. The one rule behind every "get started"
  * button, the sign-in page and the app gate, so they cannot disagree:
  *
- *   signed out               → create an account
+ *   signed out               → Talk, who brings sign-in up herself
  *   provider, not yet live   → their profile, which is what makes them live
  *   provider, verified       → their messages
  *   patient, new             → Talk, who does the onboarding by conversation
@@ -15,7 +15,7 @@ import type { UserDoc } from "./models";
  * pressing "Book session" was asked to log in again.
  */
 export function homeFor(profile: UserDoc | null): string {
-  if (!profile) return "/sign-up";
+  if (!profile) return "/talk";
 
   // A provider never does the patient intake — being asked "what brings you
   // here today?" on your first day at work is a bug, not an onboarding. An
@@ -26,7 +26,7 @@ export function homeFor(profile: UserDoc | null): string {
   // Staff have no intake either: their work is what is waiting for a person.
   if (profile.role === "admin") return "/admin/review";
 
-  return profile.onboarded ? "/dashboard" : "/therapy";
+  return profile.onboarded ? "/dashboard" : "/talk";
 }
 
 /** Past the setup step: onboarded, or a provider, for whom there isn't one. */
@@ -47,6 +47,6 @@ export function safeNext(raw: string | null | undefined): string | null {
 /** After sign-in: honour `next` for people who are set up; new people meet Talk first. */
 export function afterSignIn(profile: UserDoc | null, next: string | null): string {
   const home = homeFor(profile);
-  if (isSettled(profile) && next && next !== "/sign-in" && next !== "/sign-up") return next;
+  if (isSettled(profile) && next && !/^\/(sign-in|sign-up|talk)(\?|$)/.test(next)) return next;
   return home;
 }

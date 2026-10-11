@@ -51,7 +51,7 @@ export default function ProvidersForYouPage() {
               <Pill key={c}>{c}</Pill>
             ))}
             <Link
-              href="/therapy?intake"
+              href="/talk?intake"
               className="ml-1 text-[12px] uppercase tracking-[0.14em] text-[var(--muted)] underline underline-offset-4 hover:text-[var(--foreground)] transition-colors"
             >
               Change
@@ -69,7 +69,7 @@ export default function ProvidersForYouPage() {
       </motion.div>
 
       {/* Under 18: the second place somebody lands after the conversation, so
-          the guardian form is offered here too, not only on /therapy. */}
+          the guardian form is offered here too, not only on /talk. */}
       {guardian.needed ? (
         <Alert
           tone="warning"
@@ -89,7 +89,7 @@ export default function ProvidersForYouPage() {
       {/* No intake yet (an account from before onboarding was a conversation). */}
       {!intake ? (
         <Link
-          href="/therapy?intake"
+          href="/talk?intake"
           className="flex items-center justify-between gap-4 rounded-[28px] bg-[var(--dark)] text-white px-6 md:px-8 py-6 hover:bg-[var(--dark-soft)] transition-colors"
         >
           <span className="text-[16px] md:text-[18px] font-medium">Tell Talk what you need</span>

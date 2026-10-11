@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { SPRING_SOFT, SPRING_SNAP } from "@/components/motion/primitives";
 import TalkBlob from "@/components/voice/TalkBlob";
 import { useAuth } from "@/components/AuthProvider";
-import { updateUserProfile } from "@/lib/auth";
+import { signOut, updateUserProfile } from "@/lib/auth";
 import { recordConsent } from "@/lib/wellbeing";
 import { useConversation, type Line, type Phase } from "@/lib/ai/useConversation";
 import { INTAKE_BUDGET_SEC, LANGUAGE_LABEL, type Language } from "@/lib/ai/protocol";
@@ -35,7 +35,7 @@ import AuthCard from "@/components/AuthCard";
 import Modal from "@/components/ui/Modal";
 import { useVoice, voice } from "@/lib/audio/lines";
 import { useConsultation } from "@/lib/payments/consultation";
-import { afterSignIn, homeFor, isSettled } from "@/lib/routing";
+import { afterSignIn, homeFor, isSettled, safeNext } from "@/lib/routing";
 import { AI_TIERS } from "@/lib/models";
 
 /**
@@ -74,22 +74,41 @@ const STATUS: Record<Phase, string> = {
   speaking: "Tap to interrupt.",
 };
 
-export default function TherapyPage() {
+/**
+ * useSearchParams needs a Suspense boundary above it, or the build cannot
+ * prerender the page. Nothing in it waits on data, so this resolves at once.
+ */
+export default function TalkPage() {
+  return (
+    <Suspense fallback={null}>
+      <Talk />
+    </Suspense>
+  );
+}
+
+function Talk() {
   const router = useRouter();
   // Choosing a provider is gated for somebody under 18 (see useGuardianGate):
   // the guardian form first, then their conversation.
   const { open: openProvider, guardian } = useOpenProvider();
   const { user, profile, ready } = useAuth();
 
-  // Read once, lazily, from the URL: ?intake redoes the intake for someone
-  // already set up; ?debug shows capture diagnostics.
-  const [params] = useState(() =>
-    typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams(),
-  );
+  // From the URL: ?intake redoes the intake for someone already set up;
+  // ?debug shows capture diagnostics; ?signin came from a Sign in control
+  // (somebody returning); ?next is where a person who is already set up goes
+  // once they have signed in; ?paid is a checkout coming back.
+  //
+  // From Next, not window.location: after an in-app link the browser still
+  // shows the PREVIOUS address while this first renders, so ?signin from the
+  // header or ?intake from the dashboard was silently missed.
+  const params = useSearchParams();
   // Never for a provider: being asked "what brings you here today?" on your
   // first day at work is a bug, and the answer would be filed as their notes.
   const intakeMode =
-    profile?.role !== "provider" && (params.has("intake") || Boolean(profile && !profile.onboarded));
+    profile?.role !== "provider" &&
+    profile?.role !== "admin" &&
+    (params.has("intake") || Boolean(profile && !profile.onboarded));
+  const next = safeNext(params.get("next"));
   const showDebug = params.has("debug");
   const [showEnglish, setShowEnglish] = useState(true);
   const [typing, setTyping] = useState(false);
@@ -265,9 +284,9 @@ export default function TherapyPage() {
   const price = formatDalasi(AI_TIERS[tier].amountMinor);
   const { start } = talk;
 
-  // Providers are never put through the door: back to their own home.
+  // Providers and staff are never put through the door: back to their own home.
   useEffect(() => {
-    if (profile?.role !== "provider") return;
+    if (profile?.role !== "provider" && profile?.role !== "admin") return;
     voice.forget();
     router.replace(homeFor(profile));
   }, [profile, router]);
@@ -293,9 +312,16 @@ export default function TherapyPage() {
   const doorway = heard.spoken.length > 0;
   const recorded = Boolean(heard.saying) && !talk.active;
 
-  // Sign-in: up once she has asked for it, until they close it.
+  // Sign-in: up once she has asked for it, until they close it. Sent here
+  // to sign in (a Sign in control, or a page that needs an account) and she
+  // is not speaking — a redirect cannot start a sound — it is up at once.
   const [signInClosed, setSignInClosed] = useState(false);
-  const signInOpen = ready && !user && !signInClosed && heard.spoken.includes("sign-in");
+  const [askSignIn, setAskSignIn] = useState(() => params.has("signin") || params.has("next"));
+  const signInOpen =
+    ready &&
+    !user &&
+    !signInClosed &&
+    (heard.spoken.includes("sign-in") || (askSignIn && !heard.saying));
 
   // Payment: up once she has said the price, or when Start is pressed unpaid,
   // or by itself while a payment is on its way. Closing it only hides it —
@@ -428,12 +454,15 @@ export default function TherapyPage() {
     beginTalk(true);
   };
 
-  /** Signed in on this screen. Somebody already set up is taken home. */
+  /**
+   * Signed in on this screen. Somebody already set up goes where they were
+   * heading (?next), or home; somebody new stays, and Talk carries on.
+   */
   const onSignedIn = (signedIn: Parameters<typeof isSettled>[0]) => {
     voice.stop();
     if (isSettled(signedIn)) {
       voice.forget();
-      router.replace(afterSignIn(signedIn, null));
+      router.replace(afterSignIn(signedIn, next));
     }
   };
 
@@ -746,9 +775,20 @@ export default function TherapyPage() {
             {talk.error.kind === "auth" ? (
               <>
                 {" "}
-                <Link href="/sign-in?next=%2Ftherapy" className="underline underline-offset-4 text-white">
-                  Sign in
-                </Link>
+                {/* A sign-in that has gone stale: sign out, and sign in
+                    again right here, without leaving Talk. */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    void signOut().then(() => {
+                      setSignInClosed(false);
+                      setAskSignIn(true);
+                    });
+                  }}
+                  className="underline underline-offset-4 text-white"
+                >
+                  Sign in again
+                </button>
               </>
             ) : null}
           </div>
@@ -944,7 +984,10 @@ export default function TherapyPage() {
       <Modal open={signInOpen} onClose={() => setSignInClosed(true)} variant="responsive" label="Sign in to begin">
         <div className="space-y-5">
           <SpokenCaption saying={heard.saying} tone="light" />
-          <AuthCard mode="sign-up" onSignedIn={onSignedIn} />
+          {/* Somebody who pressed Sign in is returning: start on signing
+              in. Everybody else is new: start on creating an account. Both
+              switch in place. */}
+          <AuthCard mode={askSignIn ? "sign-in" : "sign-up"} onSignedIn={onSignedIn} />
         </div>
       </Modal>
 

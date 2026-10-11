@@ -159,7 +159,7 @@ export default function DashboardPage() {
         )}
         {!intake ? (
           <Link
-            href="/therapy?intake"
+            href="/talk?intake"
             className="mt-4 inline-block text-[12px] uppercase tracking-[0.14em] underline underline-offset-4 hover:text-[var(--accent)] transition-colors"
           >
             Tell Talk what you need for better matches
@@ -321,7 +321,7 @@ export default function DashboardPage() {
             Talk listens any time, in your language.
           </p>
           <Link
-            href="/therapy"
+            href="/talk"
             className="mt-4 inline-block text-[12px] uppercase tracking-[0.14em] underline underline-offset-4 hover:text-[var(--accent)] transition-colors"
           >
             Open Talk

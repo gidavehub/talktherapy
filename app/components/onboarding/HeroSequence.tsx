@@ -1,11 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { TALK, beginDoorway } from "../../lib/talkDoorway";
 import { useEffect, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { SPRING_SNAP } from "../motion/primitives";
 import { useAuth } from "../AuthProvider";
-import { voice } from "../../lib/audio/lines";
 import { isSettled } from "../../lib/routing";
 
 /**
@@ -33,16 +33,15 @@ export default function HeroSequence({ fallback }: { fallback: ReactNode }) {
   // The next screen is fetched ahead of the tap, so it is there the moment
   // she starts speaking.
   useEffect(() => {
-    router.prefetch("/therapy");
+    router.prefetch(TALK);
   }, [router]);
 
   if (ready && profile && isSettled(profile)) return <>{fallback}</>;
 
   // Synchronous on purpose — see above.
   const begin = () => {
-    voice.unlock();
-    voice.say(user ? ["welcome"] : ["welcome", "sign-in", "how"]);
-    router.push("/therapy");
+    beginDoorway(Boolean(user));
+    router.push(TALK);
   };
 
   return (

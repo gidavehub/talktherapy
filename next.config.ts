@@ -17,6 +17,10 @@ const nextConfig: NextConfig = {
       { source: "/therapists/:id", destination: "/providers/:id", permanent: true },
       { source: "/counsellors", destination: "/matches", permanent: true },
       { source: "/for-counsellors", destination: "/for-providers", permanent: true },
+      // Talk's screen moved from /therapy to /talk. Query strings carry over,
+      // so a checkout returning to /therapy?paid=1 and an old ?intake link
+      // still land where they meant to. Not permanent: browsers cache a 308.
+      { source: "/therapy", destination: "/talk", permanent: false },
     ];
   },
   images: {

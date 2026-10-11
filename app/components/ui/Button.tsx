@@ -4,6 +4,8 @@ import Link from "next/link";
 import { motion } from "motion/react";
 import { SPRING_SNAP } from "../motion/primitives";
 import { useStartHref } from "../StartLink";
+import { useAuth } from "../AuthProvider";
+import { beginDoorway, isTalk } from "../../lib/talkDoorway";
 
 /**
  * The button vocabulary from the landing page, factored out.
@@ -114,6 +116,7 @@ export default function Button({
   // "Create your account" must never ask a signed-in person to sign up
   // again: a plain /sign-up link resolves to where they actually belong.
   const startHref = useStartHref();
+  const { user } = useAuth();
   const href = rawHref === "/sign-up" ? startHref : rawHref;
   const sizing = SIZES[size];
   const styles = VARIANTS[variant];
@@ -171,7 +174,13 @@ export default function Button({
   if (href && !isDisabled) {
     return (
       <motion.div {...motionProps}>
-        <Link href={href} className={shell} {...rest}>
+        <Link
+          href={href}
+          className={shell}
+          // A button that leads to Talk starts her speaking inside the tap.
+          onClick={isTalk(href) ? () => beginDoorway(Boolean(user)) : undefined}
+          {...rest}
+        >
           {inner}
         </Link>
       </motion.div>

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { beginDoorway, talkHref } from "../../lib/talkDoorway";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { motion } from "motion/react";
@@ -282,7 +283,8 @@ export default function ProviderProfileView({ providerId }: { providerId: string
           {!user ? (
             <p className="text-[12px] text-[var(--muted)] leading-relaxed">
               <Link
-                href={`/sign-in?next=${encodeURIComponent("/providers/" + providerId)}`}
+                href={talkHref({ signIn: true, next: `/providers/${providerId}` })}
+                onClick={() => beginDoorway(false)}
                 className="underline underline-offset-4 text-[var(--foreground)]"
               >
                 Sign in

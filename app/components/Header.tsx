@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { beginDoorway, talkHref } from "../lib/talkDoorway";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { SPRING_SOFT, SPRING_SNAP } from "./motion/primitives";
@@ -112,7 +113,11 @@ export default function Header() {
 
             <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} transition={SPRING_SNAP}>
               <Link
-                href={user ? "/dashboard" : "/sign-in"}
+                href={user ? "/dashboard" : talkHref({ signIn: true })}
+                // Signing in is Talk's to do: she asks, and brings it up.
+                onClick={() => {
+                  if (!user) beginDoorway(false);
+                }}
                 className="h-11 inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-transparent px-5 text-[13px] font-medium tracking-wide uppercase hover:bg-black/5 transition-colors"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -220,8 +225,11 @@ export default function Header() {
                 className="mt-14 pt-8 border-t border-white/15 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6"
               >
                 <Link
-                  href={user ? "/dashboard" : "/sign-up"}
-                  onClick={() => setOpen(false)}
+                  href={user ? "/dashboard" : talkHref()}
+                  onClick={() => {
+                    if (!user) beginDoorway(false);
+                    setOpen(false);
+                  }}
                   className="inline-flex h-12 items-center gap-3 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-soft)] transition-colors text-white pl-6 pr-2 text-[12px] uppercase tracking-[0.14em] font-medium self-start"
                 >
                   {user ? "Go to dashboard" : "Get started"}

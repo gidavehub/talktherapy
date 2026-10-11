@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { beginDoorway, talkHref } from "./talkDoorway";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../components/AuthProvider";
 import { openChat } from "./chat";
@@ -36,7 +37,9 @@ export function useOpenProvider() {
   const go = useCallback(
     async (provider: Pick<ProviderProfile, "uid" | "displayName">) => {
       if (!user) {
-        router.push(`/sign-in?next=${encodeURIComponent(`/providers/${provider.uid}`)}`);
+        // Talk signs them in; somebody already set up comes back to this provider.
+        beginDoorway(false);
+        router.push(talkHref({ signIn: true, next: `/providers/${provider.uid}` }));
         return;
       }
 

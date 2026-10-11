@@ -35,7 +35,7 @@ export const PATIENT_NAV: NavItem[] = [
   // This takes the bottom bar to exactly five; anything added later has to
   // take a slot rather than extend the row.
   { href: "/chats", label: "Messages", icon: <IconChat />, primary: true },
-  { href: "/therapy", label: "Talk", icon: <IconMic />, primary: true },
+  { href: "/talk", label: "Talk", icon: <IconMic />, primary: true },
   // Took the fifth slot from Settings. A session you have booked is something
   // you will check; settings is something you change once.
   { href: "/sessions", label: "Sessions", icon: <IconCalendar />, primary: true },

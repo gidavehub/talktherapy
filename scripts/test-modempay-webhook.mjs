@@ -526,7 +526,7 @@ console.log("\nThe create-payment body is wrapped");
     customerName: "Fatou",
     paymentMethods: paymentMethodsFor(200_00),
     metadata: { uid: "user_fatou", purpose: "ai_initial", amount_minor: "20000" },
-    returnUrl: "https://talk.example/therapy?paid=1",
+    returnUrl: "https://talk.example/talk?paid=1",
     cancelUrl: "https://talk.example/plans?cancelled=1",
     callbackUrl: "https://us-east4-talk-therapy-509209.cloudfunctions.net/modemWebhook",
   });

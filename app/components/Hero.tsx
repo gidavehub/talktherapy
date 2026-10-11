@@ -160,9 +160,9 @@ export default function Hero() {
       >
         <div className="relative w-[88vw] max-w-[420px] sm:max-w-[480px] md:w-[760px] md:max-w-[760px] lg:w-[860px] lg:max-w-[860px] xl:w-[960px] xl:max-w-[960px]">
           <Image
-            src="/heroimage.png"
-            alt="A person wearing the Talk Therapy guided-listening device"
-            width={1033}
+            src="/hero-gambia.png"
+            alt="A Gambian woman in an indigo batik headwrap, eyes closed, at peace"
+            width={1024}
             height={1024}
             priority
             quality={95}
