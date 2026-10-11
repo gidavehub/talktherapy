@@ -6,7 +6,7 @@ import { isLeaving } from "../../lib/signOutFlow";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "../AuthProvider";
 import AppShell from "../ui/AppShell";
-import Orb from "../Orb";
+import LogoLoader from "../ui/LogoLoader";
 import { ADMIN_NAV, PATIENT_NAV, PROVIDER_NAV } from "../../lib/nav";
 import { useUnreadCount } from "../../lib/useUnread";
 
@@ -31,12 +31,7 @@ import { useUnreadCount } from "../../lib/useUnread";
 function Splash({ label }: { label: string }) {
   return (
     <div className="min-h-screen grid place-items-center bg-[var(--background)] px-6">
-      <div className="flex flex-col items-center gap-6">
-        <Orb size={110} />
-        <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">
-          {label}
-        </p>
-      </div>
+      <LogoLoader label={label} />
     </div>
   );
 }

@@ -11,7 +11,7 @@ import MinorFlag from "../ui/MinorFlag";
 import { useOpenMenu } from "../ui/AppShell";
 import Composer from "./Composer";
 import DateSeparator, { startsNewDay } from "./DateSeparator";
-import MessageBubble from "./MessageBubble";
+import MessageBubble, { type Upload } from "./MessageBubble";
 import TypingIndicator from "./TypingIndicator";
 import { useChatPeer } from "./useChatPeer";
 import ProviderAvatar from "../providers/ProviderAvatar";
@@ -27,15 +27,19 @@ import {
   isGroupChat,
   nameOf,
   otherParticipant,
-  sendImage,
+  chatMediaPath,
+  outgoingImage,
+  outgoingVoiceNote,
+  sendFailure,
+  sendMedia,
   sendText,
-  sendVoiceNote,
   setTyping,
   unreadFor,
   watchChat,
   watchMessages,
   watchTyping,
   type ChatTarget,
+  type OutgoingMedia,
 } from "../../lib/chat";
 import type { Chat, ChatMessage } from "../../lib/models";
 
@@ -52,7 +56,15 @@ import type { Chat, ChatMessage } from "../../lib/models";
  * Read-aloud is wired to every bubble. The language is the one the person
  * chose when they talked to Talk (`profile.intake.language`), not a guess from
  * the browser locale.
+ *
+ * A photo or voice note shows in the thread the moment it is sent, with its
+ * upload's progress, and turns into the real message under the same key when
+ * Firestore has it — so it never flickers out and back. If it fails it stays,
+ * red, with Retry and Delete (`sending`).
  */
+
+/** A photo or voice note from this device that is not in the thread yet. */
+type Sending = { media: OutgoingMedia; progress: number; failed: string | null; at: number };
 export default function ChatThread({ chatId }: { chatId: string }) {
   const { user, profile, role } = useAuth();
   const openMenu = useOpenMenu();
@@ -64,6 +76,11 @@ export default function ChatThread({ chatId }: { chatId: string }) {
   const [messages, setMessages] = useState<ChatMessage[] | null>(null);
   const [typingUids, setTypingUids] = useState<string[]>([]);
   const [groupInfoOpen, setGroupInfoOpen] = useState(false);
+  const [sending, setSending] = useState<Sending[]>([]);
+  /** The listener stopped: what is on screen stays, with a word about it. */
+  const [stale, setStale] = useState(false);
+  /** Messages from before this moment are history, and do not slide in. */
+  const [openedAt] = useState(() => Date.now());
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -88,7 +105,21 @@ export default function ChatThread({ chatId }: { chatId: string }) {
   );
 
   useEffect(() => watchChat(chatId, setChat), [chatId]);
-  useEffect(() => watchMessages(chatId, setMessages), [chatId]);
+  useEffect(
+    () =>
+      watchMessages(
+        chatId,
+        (next) => {
+          setStale(false);
+          setMessages(next);
+        },
+        () => {
+          setStale(true);
+          setMessages((current) => current ?? []);
+        },
+      ),
+    [chatId],
+  );
 
   useEffect(() => {
     if (!uid) return;
@@ -111,7 +142,7 @@ export default function ChatThread({ chatId }: { chatId: string }) {
     if (!messages) return;
     if (!atBottomRef.current) return;
     bottomRef.current?.scrollIntoView({ block: "end" });
-  }, [messages, typingUids]);
+  }, [messages, typingUids, sending]);
 
   const onScroll = useCallback(() => {
     const node = scrollRef.current;
@@ -144,23 +175,42 @@ export default function ChatThread({ chatId }: { chatId: string }) {
     [followOwnMessage, target],
   );
 
-  const handleSendVoice = useCallback(
-    async (recording: VoiceRecording) => {
+  /** Into the thread at once, then up; kept, red, if it fails. */
+  const send = useCallback(
+    (media: OutgoingMedia) => {
       if (!target) return;
       followOwnMessage();
-      await sendVoiceNote(target, recording.blob, recording.durationSec);
+      const id = media.messageId;
+      const update = (patch: Partial<Sending>) =>
+        setSending((all) => all.map((s) => (s.media.messageId === id ? { ...s, ...patch } : s)));
+      setSending((all) => {
+        const before = all.find((s) => s.media.messageId === id);
+        return [
+          ...all.filter((s) => s.media.messageId !== id),
+          { media, progress: media.uploaded ? 1 : 0, failed: null, at: before?.at ?? Date.now() },
+        ];
+      });
+      sendMedia(target, media, (progress) => update({ progress }))
+        // Written: Firestore already shows it in `messages`, under this id.
+        .then(() => setSending((all) => all.filter((s) => s.media.messageId !== id)))
+        .catch((error) => {
+          console.error(`send ${media.kind} ${id}`, error);
+          update({ failed: sendFailure(error) });
+        });
     },
     [followOwnMessage, target],
   );
 
-  const handleSendImage = useCallback(
-    async (file: File) => {
-      if (!target) return;
-      followOwnMessage();
-      await sendImage(target, file);
-    },
-    [followOwnMessage, target],
+  const handleSendVoice = useCallback(
+    (recording: VoiceRecording) => send(outgoingVoiceNote(chatId, recording.blob, recording.durationSec, recording.waveform)),
+    [chatId, send],
   );
+
+  const handleSendImage = useCallback((photo: Blob) => send(outgoingImage(chatId, photo)), [chatId, send]);
+
+  const discard = useCallback((id: string) => {
+    setSending((all) => all.filter((s) => s.media.messageId !== id));
+  }, []);
 
   const handleTyping = useCallback(() => {
     if (!uid) return;
@@ -177,6 +227,42 @@ export default function ChatThread({ chatId }: { chatId: string }) {
   }, [chatId, uid]);
 
   const loading = messages === null || chat === undefined;
+
+  // The thread as shown: what Firestore has, then what is still on its way
+  // from here. Each keeps its message id as its key, so a sent note becomes
+  // the real message in place.
+  const known = new Set((messages ?? []).map((m) => m.id));
+  const thread: { message: ChatMessage; upload: Upload | null }[] = [
+    ...(messages ?? []).map((message) => ({ message, upload: null })),
+    ...sending
+      .filter((s) => !known.has(s.media.messageId))
+      .map((s) => {
+        const id = s.media.messageId;
+        return {
+          message: {
+            id,
+            senderId: uid ?? "",
+            participants: chat?.participants ?? [],
+            kind: s.media.kind,
+            text: s.media.text,
+            mediaPath: chatMediaPath(chatId, id),
+            durationSec: s.media.durationSec,
+            waveform: s.media.waveform,
+            transcript: null,
+            createdAt: s.at,
+            readBy: uid ? [uid] : [],
+            pending: true,
+          } satisfies ChatMessage,
+          upload: {
+            progress: s.progress,
+            failed: s.failed !== null,
+            error: s.failed,
+            onRetry: () => send(s.media),
+            onDiscard: () => discard(id),
+          },
+        };
+      }),
+  ];
   // By the group having been set up as one, not by head count: a group
   // somebody has left can be down to two and is still a group.
   const isGroup = chat ? isGroupChat(chat) : false;
@@ -301,6 +387,11 @@ export default function ChatThread({ chatId }: { chatId: string }) {
         onScroll={onScroll}
         className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-4 md:px-[5%]"
       >
+        {stale ? (
+          <p role="status" className="mx-auto mb-3 w-fit rounded-full bg-[var(--warning-soft)] px-3 py-1 text-[12px] text-[var(--warning)]">
+            Not updating — check your connection, then open this conversation again.
+          </p>
+        ) : null}
         {loading ? (
           <div role="status" aria-label="Loading the conversation" aria-busy="true" className="space-y-2.5">
             {[
@@ -314,7 +405,7 @@ export default function ChatThread({ chatId }: { chatId: string }) {
               </div>
             ))}
           </div>
-        ) : messages.length === 0 ? (
+        ) : thread.length === 0 ? (
           <EmptyState
             icon={<IconChat />}
             title="Say hello"
@@ -323,8 +414,8 @@ export default function ChatThread({ chatId }: { chatId: string }) {
           />
         ) : (
           <div className="space-y-1.5">
-            {messages.map((message, index) => {
-              const previous = index > 0 ? messages[index - 1] : null;
+            {thread.map(({ message, upload }, index) => {
+              const previous = index > 0 ? thread[index - 1].message : null;
               const mine = message.senderId === uid;
 
               return (
@@ -344,6 +435,8 @@ export default function ChatThread({ chatId }: { chatId: string }) {
                     }
                     onRead={read}
                     speaking={speakingId === message.id}
+                    upload={upload}
+                    animateIn={upload !== null || message.createdAt > openedAt}
                   />
                 </div>
               );

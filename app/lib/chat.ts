@@ -41,9 +41,9 @@ import {
   writeBatch,
   type DocumentData,
 } from "firebase/firestore";
-import { getBlob, ref as storageRef, uploadBytes } from "firebase/storage";
+import { getBlob, ref as storageRef, uploadBytesResumable } from "firebase/storage";
 import { firebaseConfigured, firebaseStorage, firestore } from "./firebase";
-import { COLLECTIONS, type Chat, type ChatMessage, type ChatMessageKind } from "./models";
+import { COLLECTIONS, WAVEFORM_BARS, type Chat, type ChatMessage, type ChatMessageKind } from "./models";
 
 const CHATS = COLLECTIONS.chats;
 
@@ -140,6 +140,13 @@ function toChat(id: string, data: DocumentData): Chat {
   };
 }
 
+/** A voice note's stored shape: 0–100 per bar. Anything else is ignored. */
+function waveformOf(value: unknown): number[] | null {
+  if (!Array.isArray(value) || value.length === 0 || value.length > WAVEFORM_BARS) return null;
+  const bars = value.map((v) => (typeof v === "number" && Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : 0));
+  return bars;
+}
+
 function toMessage(id: string, data: DocumentData, pending: boolean): ChatMessage {
   const kind = MESSAGE_KINDS.includes(data.kind as ChatMessageKind)
     ? (data.kind as ChatMessageKind)
@@ -153,6 +160,7 @@ function toMessage(id: string, data: DocumentData, pending: boolean): ChatMessag
     text: typeof data.text === "string" ? data.text : "",
     mediaPath: typeof data.mediaPath === "string" ? data.mediaPath : null,
     durationSec: typeof data.durationSec === "number" ? data.durationSec : null,
+    waveform: waveformOf(data.waveform),
     transcript: typeof data.transcript === "string" ? data.transcript : null,
     createdAt: millis(data.createdAt),
     readBy: stringList(data.readBy),
@@ -366,6 +374,12 @@ export function watchChat(chatId: string, cb: (chat: Chat | null) => void): () =
 export function watchMessages(
   chatId: string,
   cb: (messages: ChatMessage[]) => void,
+  /**
+   * The listener failed (offline for too long, or refused). What is on screen
+   * stays on screen: emptying the thread here made messages "show briefly and
+   * then disappear", which reads as the conversation being lost.
+   */
+  onError: (error: Error) => void = () => {},
   max = 100,
 ): () => void {
   if (!firebaseConfigured()) {
@@ -383,7 +397,10 @@ export function watchMessages(
           .map((d) => toMessage(d.id, d.data(), d.metadata.hasPendingWrites))
           .reverse(),
       ),
-    () => cb([]),
+    (error) => {
+      console.error(`watchMessages(${chatId})`, error);
+      onError(error);
+    },
   );
 }
 
@@ -423,6 +440,7 @@ async function commitMessage(
     text: string;
     mediaPath?: string | null;
     durationSec?: number | null;
+    waveform?: number[] | null;
   },
 ): Promise<void> {
   const batch = writeBatch(firestore());
@@ -434,6 +452,9 @@ async function commitMessage(
     text: message.text,
     mediaPath: message.mediaPath ?? null,
     durationSec: message.durationSec ?? null,
+    // Voice notes only: what the bubble draws, so the other person sees the
+    // shape of what was said before playing it.
+    ...(message.waveform?.length ? { waveform: message.waveform } : {}),
     transcript: null,
     createdAt: serverTimestamp(),
     // The sender has obviously read their own message. Seeding it here keeps
@@ -481,37 +502,129 @@ export async function sendText(target: ChatTarget, text: string): Promise<void> 
  * a message whose media 404s; an upload that lands first and then fails to
  * write leaves an orphaned object, which costs a few KB and nothing else.
  */
-async function uploadThenCommit(
-  target: ChatTarget,
-  blob: Blob,
-  message: { kind: ChatMessageKind; text: string; durationSec?: number | null },
-): Promise<void> {
-  const messageId = doc(messagesRef(target.chatId)).id;
-  const path = `${CHAT_MEDIA}/${target.chatId}/${messageId}`;
-
-  await uploadBytes(storageRef(firebaseStorage(), path), blob, {
-    contentType: blob.type || "application/octet-stream",
-  });
-
-  await commitMessage(target, messageId, { ...message, mediaPath: path });
+/** A fresh message id, minted before anything is sent — see OutgoingMedia. */
+export function newMessageId(chatId: string): string {
+  return doc(messagesRef(chatId)).id;
 }
 
-export async function sendVoiceNote(
-  target: ChatTarget,
+/** Where a message's file lives. */
+export function chatMediaPath(chatId: string, messageId: string): string {
+  return `${CHAT_MEDIA}/${chatId}/${messageId}`;
+}
+
+/**
+ * Media this device sent, kept in memory by path. Your own voice note plays,
+ * and your own photo shows, the instant you send it — and without
+ * downloading back what you have just uploaded, on somebody's mobile data.
+ */
+const localMedia = new Map<string, Blob>();
+
+/** Keep a file this device has just made, under the path it is sent to. */
+export function keepLocalMedia(path: string, blob: Blob) {
+  localMedia.set(path, blob);
+}
+
+/**
+ * One photo or voice note on its way: everything needed to show it in the
+ * thread at once, and to send it again if it fails.
+ */
+export type OutgoingMedia = {
+  messageId: string;
+  kind: "voice" | "image";
+  blob: Blob;
+  text: string;
+  durationSec: number | null;
+  waveform: number[] | null;
+  /** The upload finished: a retry only writes the message (the file is create-only). */
+  uploaded: boolean;
+};
+
+export function outgoingVoiceNote(
+  chatId: string,
   audio: Blob,
   durationSec: number,
-): Promise<void> {
-  await uploadThenCommit(target, audio, {
+  waveform: number[] | null,
+): OutgoingMedia {
+  return {
+    messageId: newMessageId(chatId),
     kind: "voice",
+    blob: audio,
     // Readable stand-in wherever the player cannot run — a notification, the
     // chat list, or a screen reader reaching the bubble before the audio.
     text: `Voice note · ${formatDuration(durationSec)}`,
     durationSec: Math.max(1, Math.round(durationSec)),
+    waveform,
+    uploaded: false,
+  };
+}
+
+export function outgoingImage(chatId: string, image: Blob): OutgoingMedia {
+  return {
+    messageId: newMessageId(chatId),
+    kind: "image",
+    blob: image,
+    text: "Photo",
+    durationSec: null,
+    waveform: null,
+    uploaded: false,
+  };
+}
+
+/**
+ * Upload the file, then write the message that points at it, reporting the
+ * upload's progress (0–1) as it goes.
+ *
+ * The message id is minted locally first so the Storage path can contain it:
+ * `chat-media/{chatId}/{messageId}` makes every object traceable to exactly
+ * one message, which is what lets the chat's participant list be the only
+ * thing that governs access to the file.
+ *
+ * Upload before write, never the reverse. A write that lands first would show
+ * a message whose media 404s; an upload that lands first and then fails to
+ * write leaves an orphaned object, which costs a few KB and nothing else. A
+ * retry after that skips the upload — the object is create-only — and only
+ * writes the message.
+ */
+export async function sendMedia(
+  target: ChatTarget,
+  media: OutgoingMedia,
+  onProgress: (fraction: number) => void = () => {},
+): Promise<void> {
+  const path = chatMediaPath(target.chatId, media.messageId);
+  keepLocalMedia(path, media.blob);
+
+  if (!media.uploaded) {
+    const task = uploadBytesResumable(storageRef(firebaseStorage(), path), media.blob, {
+      contentType: media.blob.type || "application/octet-stream",
+    });
+    await new Promise<void>((resolve, reject) => {
+      task.on(
+        "state_changed",
+        (snap) => onProgress(snap.totalBytes ? snap.bytesTransferred / snap.totalBytes : 0),
+        reject,
+        () => resolve(),
+      );
+    });
+    media.uploaded = true;
+  }
+  onProgress(1);
+
+  await commitMessage(target, media.messageId, {
+    kind: media.kind,
+    text: media.text,
+    mediaPath: path,
+    durationSec: media.durationSec,
+    waveform: media.waveform,
   });
 }
 
-export async function sendImage(target: ChatTarget, image: Blob): Promise<void> {
-  await uploadThenCommit(target, image, { kind: "image", text: "Photo" });
+/** Why a send failed, in words — and the code, so a report can say which. */
+export function sendFailure(error: unknown): string {
+  const code = (error as { code?: string } | null)?.code ?? "";
+  if (code === "storage/unauthorized" || code === "permission-denied") return `Not allowed (${code})`;
+  if (code === "storage/retry-limit-exceeded" || code === "unavailable") return "No connection";
+  if (code === "storage/canceled") return "Cancelled";
+  return code ? `Failed (${code})` : "Failed";
 }
 
 /**
@@ -534,7 +647,7 @@ export async function sendImage(target: ChatTarget, image: Blob): Promise<void> 
  * Callers must revoke the URL they get back; see VoiceNotePlayer.
  */
 export async function chatMediaUrl(mediaPath: string): Promise<string> {
-  const blob = await getBlob(storageRef(firebaseStorage(), mediaPath));
+  const blob = localMedia.get(mediaPath) ?? (await getBlob(storageRef(firebaseStorage(), mediaPath)));
   return URL.createObjectURL(blob);
 }
 

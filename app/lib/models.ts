@@ -866,6 +866,9 @@ export type ChatMessageKind = "text" | "voice" | "image" | "file";
  * the parent chat — bills a document read per message, and a conversation that
  * is actually working produces hundreds against a 50k/day free quota.
  */
+/** Bars in a voice note's stored waveform. */
+export const WAVEFORM_BARS = 48;
+
 export type ChatMessage = {
   id: string;
   senderId: string;
@@ -882,6 +885,8 @@ export type ChatMessage = {
   mediaPath: string | null;
   /** Voice notes only. */
   durationSec: number | null;
+  /** Voice notes only: the shape of what was said, 0–100 per bar (WAVEFORM_BARS). */
+  waveform?: number[] | null;
   /**
    * Set once a voice note has been transcribed, so it can be read aloud or
    * read as text. Nothing writes it yet — transcription is a later phase — but

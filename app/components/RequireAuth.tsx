@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "./AuthProvider";
 import type { AppRole } from "../lib/models";
-import Orb from "./Orb";
+import LogoLoader from "./ui/LogoLoader";
 
 /**
  * Client-side route guards.
@@ -22,12 +22,7 @@ import Orb from "./Orb";
 function GuardSplash({ label }: { label: string }) {
   return (
     <div className="min-h-screen grid place-items-center bg-[var(--background)] px-6">
-      <div className="flex flex-col items-center gap-6">
-        <Orb size={120} />
-        <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">
-          {label}
-        </p>
-      </div>
+      <LogoLoader label={label} />
     </div>
   );
 }
