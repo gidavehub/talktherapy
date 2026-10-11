@@ -42,7 +42,7 @@ export function providerSummary(profile: ProviderProfile, reasons?: string[]): s
  * Chosen from the faces of their gender by a well-mixed hash of their id;
  * the salt is the one that gives each of the ten samples its own face.
  */
-const WOMEN = ["provider-2", "provider-4", "provider-5", "mind-woman", "hero-woman-sage", "hero-woman-terracotta"];
+const WOMEN = ["provider-2", "provider-4", "provider-5", "mind-woman", "provider-7", "hero-woman-terracotta"];
 const MEN = ["provider-1", "provider-3", "provider-6", "mind-man", "hero-man"];
 const FACE_SALT = 129;
 

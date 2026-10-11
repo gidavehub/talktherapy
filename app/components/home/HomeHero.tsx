@@ -83,11 +83,11 @@ export default function HomeHero() {
           {/* Three arches, standing on the brown band. */}
           <div className="relative mx-auto flex h-[360px] w-full max-w-[560px] items-end justify-center gap-3 sm:h-[440px] lg:h-[500px]">
             <motion.div {...rise(0.15)} className="relative h-[78%] w-[31%]">
-              <ArchPortrait src="/people/hero-man.webp" alt="A man in a terracotta shirt, smiling, his phone in his hand" tone="var(--sage-soft)" className="h-full w-full" sizes="(min-width: 1024px) 260px, 45vw" scale={1.6} priority />
+              <ArchPortrait src="/people/hero-man.webp" alt="A young man in a sage t-shirt, smiling, at ease" tone="var(--sage-soft)" className="h-full w-full" sizes="(min-width: 1024px) 260px, 45vw" scale={1.6} priority />
               <span className="absolute left-[18%] top-[16%] h-5 w-5 rounded-full bg-[var(--surface)]/80" aria-hidden />
             </motion.div>
             <motion.div {...rise(0.05)} className="relative h-full w-[33%]">
-              <ArchPortrait src="/people/hero-woman-sage.webp" alt="A woman in a sage headwrap, smiling" tone="var(--peach)" className="h-full w-full" sizes="(min-width: 1024px) 280px, 48vw" scale={1.6} priority />
+              <ArchPortrait src="/people/hero-couple.webp" alt="Two friends, a young woman and man, laughing together" tone="var(--peach)" className="h-full w-full" sizes="(min-width: 1024px) 280px, 48vw" scale={1.6} priority />
               <motion.div
                 initial={{ scale: 0, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
@@ -106,7 +106,7 @@ export default function HomeHero() {
               </motion.div>
             </motion.div>
             <motion.div {...rise(0.25)} className="relative h-[86%] w-[31%]">
-              <ArchPortrait src="/people/hero-woman-terracotta.webp" alt="A woman in a terracotta headwrap, smiling" tone="var(--sage)" className="h-full w-full" sizes="(min-width: 1024px) 260px, 45vw" scale={1.6} priority />
+              <ArchPortrait src="/people/hero-woman-terracotta.webp" alt="A woman with a natural afro in a terracotta cardigan, smiling" tone="var(--sage)" className="h-full w-full" sizes="(min-width: 1024px) 260px, 45vw" scale={1.6} priority />
               <span className="absolute left-[16%] top-[13%] h-6 w-6 rounded-full bg-[var(--cream)]" aria-hidden />
             </motion.div>
           </div>

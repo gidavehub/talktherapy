@@ -1,6 +1,6 @@
 """Strip the magenta backdrop off the OptiQ portraits: transparent WebP, 640px.
 
-The portraits are rendered by OptiQ (C:/Projects/optiq/scratch/talk-redesign-v2.mjs:
+The portraits are rendered by OptiQ (C:/Projects/optiq/scratch/talk-redesign-v3.mjs:
 gemini-3-pro-image on flat magenta), then cut out here into public/people/.
 
 Keys on each image's OWN backdrop colour (sampled from the top corners — the
@@ -50,9 +50,11 @@ for f in sorted(src.glob("*.png")) + sorted(src.glob("*.jpg")):
     # Un-mix the backdrop from the edges, then take any magenta cast off.
     a = np.maximum(alpha, 1e-3)[..., None]
     rgb = np.clip((im - (1 - a) * bg) / a, 0, 255)
+    # Fully: a magenta cast (red AND blue above green) is never in skin,
+    # hair, terracotta or sage — only in what the backdrop left on an edge.
     spill = np.clip(np.minimum(rgb[..., 0], rgb[..., 2]) - rgb[..., 1], 0, None)
-    rgb[..., 0] -= spill * 0.6
-    rgb[..., 2] -= spill * 0.9
+    rgb[..., 0] -= spill
+    rgb[..., 2] -= spill
     rgb = np.clip(rgb, 0, 255)
 
     rgba = Image.fromarray(np.dstack([rgb, alpha * 255]).astype(np.uint8), "RGBA")
