@@ -150,12 +150,95 @@ async function ensureUserDoc(user: User, role: SignUpRole): Promise<UserDoc> {
   };
 }
 
+/** True when `host` is `domain` or one of its subdomains — Firebase's rule. */
+function hostMatches(host: string, domain: string): boolean {
+  const d = domain.toLowerCase();
+  return host === d || host.endsWith(`.${d}`);
+}
+
+/**
+ * Turn `auth/unauthorized-domain` into something that says what to change.
+ *
+ * Firebase's own message says "add the domain to the list", which is no help
+ * once it is already there. The list the SDK checks is not necessarily the
+ * one on screen in the console: it is fetched with the API key this build was
+ * compiled with, so it belongs to whichever project owns that key. It is
+ * matched against the hostname the browser is actually on, and the result —
+ * a failure included — is cached until the page reloads.
+ *
+ * Asking the same endpoint the SDK asked tells those cases apart.
+ */
+async function explainUnauthorizedDomain(): Promise<string> {
+  const host = window.location.hostname.toLowerCase();
+  const { apiKey, projectId, messagingSenderId } = firebaseAuth().app.options;
+
+  let allowed: string[] | null = null;
+  let keyProject: string | null = null;
+  try {
+    const res = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/projects?key=${encodeURIComponent(apiKey ?? "")}`,
+    );
+    if (res.ok) {
+      const body = (await res.json()) as {
+        authorizedDomains?: string[];
+        projectId?: string;
+      };
+      allowed = body.authorizedDomains ?? null;
+      keyProject = body.projectId ?? null;
+    }
+  } catch {
+    // Offline or blocked — fall through to the general explanation.
+  }
+
+  if (allowed?.some((d) => hostMatches(host, d))) {
+    return `Sign-in has just been allowed on ${host}. Reload the page and try again.`;
+  }
+
+  // The lookup reports the key's project by number, which is also what
+  // messagingSenderId is. Matching neither means the key came from elsewhere.
+  if (keyProject && keyProject !== messagingSenderId && keyProject !== projectId) {
+    return (
+      `Google sign-in is blocked on ${host}: this site was built with an API key ` +
+      `from a different Firebase project (#${keyProject}) than the rest of its ` +
+      `settings (${projectId}). Set NEXT_PUBLIC_FIREBASE_API_KEY on your host to ` +
+      `the key from ${projectId}, then redeploy.`
+    );
+  }
+
+  if (allowed) {
+    return (
+      `Google sign-in isn't allowed on ${host}. The Firebase project this site ` +
+      `was built with (${projectId}) only allows: ${allowed.join(", ")}. ` +
+      `Add ${host} under Authentication → Settings → Authorized domains, ` +
+      `then reload this page.`
+    );
+  }
+
+  return (
+    `Google sign-in isn't allowed on ${host}. Add it under Authentication → ` +
+    `Settings → Authorized domains in the project that owns this site's API key ` +
+    `(built for ${projectId}), then reload this page.`
+  );
+}
+
 export async function signInWithGoogle(
   role: SignUpRole = "patient",
 ): Promise<AppUser> {
   const provider = new GoogleAuthProvider();
-  const cred = await signInWithPopup(firebaseAuth(), provider);
-  return ensureUserDoc(cred.user, role);
+  try {
+    const cred = await signInWithPopup(firebaseAuth(), provider);
+    return ensureUserDoc(cred.user, role);
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code: unknown }).code === "auth/unauthorized-domain"
+    ) {
+      throw new Error(await explainUnauthorizedDomain());
+    }
+    throw error;
+  }
 }
 
 export async function signUpWithEmail(
