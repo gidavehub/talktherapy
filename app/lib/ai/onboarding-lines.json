@@ -30,6 +30,20 @@
       "woBack": "For us to continue, the consultation is two hundred dalasis."
     },
     {
+      "id": "why",
+      "en": "This first consultation helps me understand what you are going through, so I can find the right person to help you.",
+      "wo": "Jokkale bu jëkk bii day ma dimbali ma xam li ngay dundu, ngir ma mën la gisal nit ki la mën a dimbali.",
+      "woDraft": true,
+      "woBack": "This first contact helps me know what you are going through, so I can find you someone who can help you."
+    },
+    {
+      "id": "pay-how",
+      "en": "Tap Pay, then choose Wave or your card. Approve it on your phone, and come back here.",
+      "wo": "Bës-al ci Pay, bi loolu weesoo nga tànn Wave walla sa card. Konfirmaar ko ci sa phone, daal di délsi fii.",
+      "woDraft": true,
+      "woBack": "Click on Pay, after that select Wave or your card. Confirm it on your phone, then come back here."
+    },
+    {
       "id": "paid",
       "en": "Thank you. Now, let us begin.",
       "wo": "Jërëjëf. Léegi nag, nanu tàmbli.",

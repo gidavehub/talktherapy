@@ -78,6 +78,9 @@ const STATUS: Record<Phase, string> = {
  * useSearchParams needs a Suspense boundary above it, or the build cannot
  * prerender the page. Nothing in it waits on data, so this resolves at once.
  */
+/** What Talk says to walk somebody through paying for the D200 consultation. */
+const PAY_LINES = ["price", "why", "pay-how"];
+
 export default function TalkPage() {
   return (
     <Suspense fallback={<TalkShell />}>
@@ -444,7 +447,10 @@ function Talk() {
     if (heard.saying || paid === null || talk.active || isSettled(profile)) return;
     decided.current = true;
     if (paid) voice.say(["welcome-back"], { onDone: () => beginTalk(false) });
-    else if (tier === "initial") voice.say(["price"]);
+    // The way to paying, as the way in: the price (the sheet opens as she
+    // says it), why this first consultation matters, then exactly what to
+    // tap — English, then Wolof, each on the sheet as she says it.
+    else if (tier === "initial") voice.say(PAY_LINES);
   });
 
   // Paid, in this visit. The checkout is in another tab; the moment the
@@ -483,6 +489,13 @@ function Talk() {
     if (!paid) {
       setPayClosed(false);
       setPayOpen(true);
+      // Inside this tap, so she can be heard: she walks them through paying,
+      // unless she is already talking or already has. Only for the D200 —
+      // the lines name its price and speak of a FIRST consultation.
+      if (tier === "initial" && !heard.saying && !heard.spoken.includes("pay-how")) {
+        voice.unlock();
+        voice.say(heard.spoken.includes("price") ? PAY_LINES.slice(1) : PAY_LINES);
+      }
       return;
     }
     decided.current = true;

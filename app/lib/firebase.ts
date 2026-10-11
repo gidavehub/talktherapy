@@ -33,7 +33,12 @@ import { getFunctions, type Functions } from "firebase/functions";
  * list), accounts and data went to the wrong database, and the Cloud
  * Functions — which belong to talk-therapy-509209 — refused its sign-ins.
  *
- * The host's values are still used, but only when they are for THIS project.
+ * The host's values are NOT used for this project at all. A copy pasted into
+ * Vercel from a screen that masks it arrived as "AIzaSyDj••••••••" — right
+ * project, broken key — and every sign-in failed with "api-key-not-valid".
+ * Nothing the host could set would be better than these, so they win. The
+ * host's values only ever matter for a DIFFERENT project, and then they are
+ * ignored too: this build is Talk's.
  */
 const PROJECT = {
   apiKey: "AIzaSyDjSiKg6fjzJ4JTEviu7IT5lb7wL7itfQE",
@@ -56,11 +61,14 @@ const fromHost = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-const hostIsThisProject = fromHost.projectId === PROJECT.projectId && Boolean(fromHost.apiKey);
+// Only the Realtime Database URL may come from the host — PROJECT has none,
+// because Talk does not use one — and only if it is a real https URL.
+const hostDatabaseURL =
+  fromHost.projectId === PROJECT.projectId && /^https:\/\/[\w.-]+$/.test(fromHost.databaseURL ?? "")
+    ? fromHost.databaseURL
+    : undefined;
 
-const config: typeof fromHost = hostIsThisProject
-  ? { ...PROJECT, databaseURL: undefined, ...Object.fromEntries(Object.entries(fromHost).filter(([, v]) => v)) }
-  : { ...PROJECT, databaseURL: undefined };
+const config: typeof fromHost = { ...PROJECT, databaseURL: hostDatabaseURL };
 
 let app: FirebaseApp | null = null;
 

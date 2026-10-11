@@ -82,6 +82,46 @@
       }
     },
     {
+      "id": "why",
+      "clips": {
+        "en": {
+          "src": "/voice/onboarding/why.en.9970cd3998.mp3",
+          "text": "This first consultation helps me understand what you are going through, so I can find the right person to help you.",
+          "seconds": 8.67,
+          "bytes": 52416,
+          "sha256": "9970cd3998d4eefeaceb8f88023cbf1097a3d2c439311bb56fad108e9260f88e"
+        },
+        "wo": {
+          "src": "/voice/onboarding/why.wo.618982abfc.mp3",
+          "text": "Jokkale bu jëkk bii day ma dimbali ma xam li ngay dundu, ngir ma mën la gisal nit ki la mën a dimbali.",
+          "seconds": 6.57,
+          "bytes": 39744,
+          "sha256": "618982abfcf56ca5e0b997ba2a543e1d80d07c727b64eb4c87c384f26b6a6553",
+          "draft": true
+        }
+      }
+    },
+    {
+      "id": "pay-how",
+      "clips": {
+        "en": {
+          "src": "/voice/onboarding/pay-how.en.29c568dde7.mp3",
+          "text": "Tap Pay, then choose Wave or your card. Approve it on your phone, and come back here.",
+          "seconds": 7.84,
+          "bytes": 47376,
+          "sha256": "29c568dde753b22a9d4d3b8f19467222e58b88467e33f5e53df0a621516f1c78"
+        },
+        "wo": {
+          "src": "/voice/onboarding/pay-how.wo.fb812f64d3.mp3",
+          "text": "Bës-al ci Pay, bi loolu weesoo nga tànn Wave walla sa card. Konfirmaar ko ci sa phone, daal di délsi fii.",
+          "seconds": 8.25,
+          "bytes": 49824,
+          "sha256": "fb812f64d33db85511fa72e32d25c2431c7f7548bc271530cbcb45693984954b",
+          "draft": true
+        }
+      }
+    },
+    {
       "id": "paid",
       "clips": {
         "en": {
