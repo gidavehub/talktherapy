@@ -48,6 +48,7 @@ export function ArchPortrait({
   sizes = "200px",
   cutout = true,
   scale = 1.18,
+  aspect = 1,
   priority = false,
 }: {
   src: string;
@@ -59,6 +60,8 @@ export function ArchPortrait({
   cutout?: boolean;
   /** How wide a cut-out stands, against the arch's width. */
   scale?: number;
+  /** The image's height over its width: 1 for a portrait, 4/3 for a scene. */
+  aspect?: number;
   priority?: boolean;
 }) {
   return (
@@ -68,7 +71,7 @@ export function ArchPortrait({
           src={src}
           alt={alt}
           width={640}
-          height={640}
+          height={Math.round(640 * aspect)}
           sizes={sizes}
           priority={priority}
           className="absolute bottom-0 left-1/2 h-auto max-w-none -translate-x-1/2"

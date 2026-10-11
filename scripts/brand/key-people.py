@@ -1,6 +1,6 @@
-"""Strip the magenta backdrop off the OptiQ portraits: transparent WebP, 640px.
+"""Strip the magenta backdrop off the OptiQ portraits: transparent WebP, 640px wide.
 
-The portraits are rendered by OptiQ (C:/Projects/optiq/scratch/talk-redesign-v3.mjs:
+The portraits are rendered by OptiQ (C:/Projects/optiq/scratch/talk-redesign-v3.mjs (portraits) and talk-redesign-v4.mjs (scenes):
 gemini-3-pro-image on flat magenta), then cut out here into public/people/.
 
 Keys on each image's OWN backdrop colour (sampled from the top corners — the
@@ -58,7 +58,8 @@ for f in sorted(src.glob("*.png")) + sorted(src.glob("*.jpg")):
     rgb = np.clip(rgb, 0, 255)
 
     rgba = Image.fromarray(np.dstack([rgb, alpha * 255]).astype(np.uint8), "RGBA")
-    rgba = rgba.resize((640, 640), Image.LANCZOS)
+    # 640 wide, its own shape kept: portraits are square, scenes 3:4.
+    rgba = rgba.resize((640, round(640 * rgba.height / rgba.width)), Image.LANCZOS)
     dest = out / f"{f.stem}.webp"
     rgba.save(dest, "WEBP", quality=80, method=6)
     print(f"{f.stem}: backdrop {bg.round().astype(int).tolist()} -> {dest.name} {dest.stat().st_size // 1024} KB")

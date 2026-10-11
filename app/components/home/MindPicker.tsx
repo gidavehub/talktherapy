@@ -39,11 +39,11 @@ export default function MindPicker() {
   return (
     <section className="relative overflow-hidden bg-[var(--cream)] py-16 md:py-20">
       <div className="pointer-events-none absolute bottom-0 left-[4%] hidden h-[250px] w-[150px] xl:block">
-        <ArchPortrait src="/people/mind-man.webp" alt="" tone="var(--sage-soft)" className="h-full w-full" sizes="150px" />
+        <ArchPortrait src="/people/mind-journal.webp" alt="" tone="var(--sage-soft)" className="h-full w-full" sizes="180px" scale={1.1} aspect={4 / 3} />
         <span className="absolute right-[18%] top-[12%] h-5 w-5 rounded-full bg-[var(--surface)]/85" aria-hidden />
       </div>
       <div className="pointer-events-none absolute bottom-0 right-[4%] hidden h-[250px] w-[150px] xl:block">
-        <ArchPortrait src="/people/mind-woman.webp" alt="" tone="var(--peach)" className="h-full w-full" sizes="150px" />
+        <ArchPortrait src="/people/mind-tea.webp" alt="" tone="var(--peach)" className="h-full w-full" sizes="180px" scale={1.1} aspect={4 / 3} />
         <span className="absolute right-[16%] top-[12%] h-5 w-5 rounded-full bg-[var(--surface)]/85" aria-hidden />
       </div>
 

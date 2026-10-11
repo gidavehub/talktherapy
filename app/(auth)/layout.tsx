@@ -26,10 +26,10 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       </header>
 
       <div className="pointer-events-none absolute bottom-0 left-[3%] hidden h-[340px] w-[200px] xl:block">
-        <ArchPortrait src="/people/mind-man.webp" alt="" tone="var(--sage-soft)" className="h-full w-full" sizes="200px" scale={1.35} />
+        <ArchPortrait src="/people/mind-journal.webp" alt="" tone="var(--sage-soft)" className="h-full w-full" sizes="220px" scale={1.1} aspect={4 / 3} />
       </div>
       <div className="pointer-events-none absolute bottom-0 right-[3%] hidden h-[340px] w-[200px] xl:block">
-        <ArchPortrait src="/people/mind-woman.webp" alt="" tone="var(--peach)" className="h-full w-full" sizes="200px" scale={1.35} />
+        <ArchPortrait src="/people/mind-tea.webp" alt="" tone="var(--peach)" className="h-full w-full" sizes="220px" scale={1.1} aspect={4 / 3} />
       </div>
 
       <main className="relative z-[1] flex min-h-screen items-center justify-center px-4 py-28 sm:px-6">{children}</main>
