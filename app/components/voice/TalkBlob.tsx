@@ -115,6 +115,15 @@ vec3 curlNoise(vec3 p){
  * long thread wound round it like a ball of yarn, and the embers were worms.
  * It only became obvious at 80,000 particles.
  */
+/*
+ * EVERY shader that includes this declares `precision highp int`. A fragment
+ * shader's ints default to MEDIUMP, which on a desktop GPU is 32 bits and on
+ * a phone (Apple, Mali, Adreno) is 16 bits. At 16 bits the constants below
+ * are truncated and rnd() returns ~0 for every particle: all 50,000 get the
+ * same direction and depth and collapse into one glowing dot that wanders
+ * about. That is exactly what shipped to phones until 2026-10-11, while every
+ * desktop looked right.
+ */
 const HASH_GLSL = `
 uint hashU(uint x){
   x ^= x >> 16; x *= 0x7feb352dU;
@@ -136,7 +145,7 @@ vec3 sphereDir(uint id){
 float isFree(uint id){ return step(0.965, rnd(id, 11u)); }`;
 
 const FS_SIM = `#version 300 es
-precision highp float; precision highp sampler2D;
+precision highp float; precision highp int; precision highp sampler2D;
 #define BANDS ${BAND_COUNT}
 uniform sampler2D uPos, uVel;
 uniform float uDt, uTime, uSpring, uDamp, uFlow, uNoiseScale;
@@ -257,7 +266,7 @@ void main(){
 }`;
 
 const VS_PARTICLE = `#version 300 es
-precision highp float; precision highp sampler2D;
+precision highp float; precision highp int; precision highp sampler2D;
 uniform sampler2D uPos, uVel;
 uniform vec2 uTexSize, uRes;
 uniform float uFocal, uPointScale, uStretch, uAlpha, uSpin, uPitch;
@@ -328,7 +337,7 @@ void main(){
 }`;
 
 const FS_PARTICLE = `#version 300 es
-precision highp float;
+precision highp float; precision highp int;
 in vec2 vUv; in vec4 vCol;
 uniform float uCore;
 out vec4 frag;
