@@ -29,7 +29,7 @@ const KEY = process.env.TALK_ADMIN_CREDENTIALS || "./secrets/talk-admin-sa.json"
 const PROJECT = process.env.GOOGLE_CLOUD_PROJECT || "talk-therapy-509209";
 
 /** The one account this script will touch. */
-const OWNER = "davelabs01@gmail.com";
+const OWNER = "godswilldave1@gmail.com";
 
 // Mirrors AI_TIERS and AI_ENTITLEMENT_VALID_MS in app/lib/models.ts.
 const TIERS = {
