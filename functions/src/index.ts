@@ -132,6 +132,10 @@ async function modemPay(path: string, init: RequestInit = {}) {
 
   const res = await fetch(`${MODEM_PAY_BASE_URL}${path}`, {
     ...init,
+    // Never wait on Modem Pay for ever. Its API was seen to hang a full minute
+    // on a transaction it does not know; a webhook held that long times out
+    // anyway, and a checkout button would just spin.
+    signal: init.signal ?? AbortSignal.timeout(20_000),
     headers: {
       Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
@@ -155,6 +159,8 @@ async function modemPay(path: string, init: RequestInit = {}) {
 /** What Modem Pay calls a payment that has gone through. One list, for the
  *  webhook and the return page alike. */
 const PAID_STATUSES = ["completed", "successful", "success", "succeeded", "paid"];
+/** ...and one that never will. Anything else (pending, processing) may yet. */
+const FAILED_STATUSES = ["failed", "failure", "cancelled", "canceled", "declined", "expired", "reversed", "refunded"];
 
 async function fetchTransaction(id: string) {
   try {
@@ -890,10 +896,19 @@ export const modemWebhook = onRequest(
         return;
       }
       if (!PAID_STATUSES.includes(authoritative.status)) {
+        // Definitely not paid: say so and stop. Not paid YET (pending, or a
+        // status we do not know): ask the gateway to send it again later,
+        // rather than drop a real payment that is a moment behind its own
+        // announcement. A forged delivery gains nothing either way.
+        const final = FAILED_STATUSES.includes(authoritative.status);
         console.warn(
-          `modemWebhook: ${event.paymentIntentId} delivered as succeeded, but Modem Pay reports "${authoritative.status}" — not acted on`,
+          `modemWebhook: ${event.paymentIntentId} delivered as succeeded, but Modem Pay reports "${authoritative.status}" — ${final ? "not acted on" : "asked to retry"}`,
         );
-        res.status(200).json({ received: true, acted: false, reason: "Modem Pay does not report this payment as paid" });
+        if (final) {
+          res.status(200).json({ received: true, acted: false, reason: "Modem Pay does not report this payment as paid" });
+        } else {
+          res.status(500).json({ error: "Modem Pay does not report this payment as paid yet. Please retry." });
+        }
         return;
       }
     }
