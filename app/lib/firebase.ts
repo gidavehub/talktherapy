@@ -20,7 +20,32 @@ import { getDatabase, type Database } from "firebase/database";
 import { getStorage, type FirebaseStorage } from "firebase/storage";
 import { getFunctions, type Functions } from "firebase/functions";
 
-const config = {
+/**
+ * Talk's Firebase project: the PUBLIC web config — exactly what every
+ * visitor's browser receives in the page anyway. None of it is a secret;
+ * what protects the data is firestore.rules and the Cloud Functions.
+ *
+ * Pinned here, not left to the host's NEXT_PUBLIC_FIREBASE_* variables alone,
+ * because the live site was once built with ANOTHER project's values
+ * (talktherapy-1f581). Everything then quietly pointed at the wrong project:
+ * Google sign-in checked that project's authorized domains ("unauthorized
+ * domain" on www.talktherapy.gm, though it was on talk-therapy-509209's
+ * list), accounts and data went to the wrong database, and the Cloud
+ * Functions — which belong to talk-therapy-509209 — refused its sign-ins.
+ *
+ * The host's values are still used, but only when they are for THIS project.
+ */
+const PROJECT = {
+  apiKey: "AIzaSyDjSiKg6fjzJ4JTEviu7IT5lb7wL7itfQE",
+  authDomain: "talk-therapy-509209.firebaseapp.com",
+  projectId: "talk-therapy-509209",
+  storageBucket: "talk-therapy-509209.firebasestorage.app",
+  messagingSenderId: "566898355406",
+  appId: "1:566898355406:web:04cad649164149b513349f",
+  measurementId: "G-KRQVWG8ZXJ",
+};
+
+const fromHost = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
@@ -30,6 +55,12 @@ const config = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
+
+const hostIsThisProject = fromHost.projectId === PROJECT.projectId && Boolean(fromHost.apiKey);
+
+const config: typeof fromHost = hostIsThisProject
+  ? { ...PROJECT, databaseURL: undefined, ...Object.fromEntries(Object.entries(fromHost).filter(([, v]) => v)) }
+  : { ...PROJECT, databaseURL: undefined };
 
 let app: FirebaseApp | null = null;
 
