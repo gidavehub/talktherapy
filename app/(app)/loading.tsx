@@ -18,7 +18,7 @@ export default function AppLoading() {
       </div>
       <div className="space-y-2">
         {[0, 1, 2].map((i) => (
-          <div key={i} className="flex items-center gap-3.5 rounded-[22px] bg-white px-4 py-3.5">
+          <div key={i} className="flex items-center gap-3.5 rounded-[22px] bg-[var(--surface)] px-4 py-3.5">
             <Skeleton rounded="rounded-full" className="h-11 w-11 shrink-0" />
             <div className="min-w-0 flex-1 space-y-2">
               <Skeleton className="h-3.5 w-1/3" />

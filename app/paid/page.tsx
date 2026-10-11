@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import Logo from "@/components/Logo";
 
 /**
  * Where Modem Pay's checkout sends somebody after they pay for a conversation.
@@ -34,9 +35,10 @@ export default function PaidPage() {
   }, [router]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[var(--dark)] px-6 text-white">
-      <div className="max-w-[420px] text-center">
-        <p className="text-[11px] uppercase tracking-[0.22em] text-white/50">Payment received</p>
+    <main className="flex min-h-screen items-center justify-center bg-[var(--stage)] px-6 text-[var(--cream)]">
+      <div className="flex max-w-[420px] flex-col items-center text-center">
+        <Logo height={40} light />
+        <p className="mt-8 text-[11px] uppercase tracking-[0.3em] text-[var(--peach)]">Payment received</p>
         <h1 className="mt-3 text-[28px] leading-tight font-display font-medium">Thank you.</h1>
         {stayed ? (
           <>

@@ -84,7 +84,7 @@ export default function TechnologyPage() {
             </ul>
           </div>
 
-          <div className="rounded-[28px] bg-[var(--dark)] text-white p-6 md:p-8">
+          <div className="rounded-[28px] bg-[var(--sage)] text-[var(--cream)] p-6 md:p-8">
             <p className="text-[11px] uppercase tracking-[0.22em] text-white/65">
               What it will never do
             </p>

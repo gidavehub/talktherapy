@@ -149,8 +149,8 @@ export default function MoodPage() {
                       aria-label={MOOD_LABELS[s]}
                       className={`rounded-2xl border py-4 px-2 flex flex-col items-center gap-2 transition-colors ${
                         active
-                          ? "bg-[var(--dark)] text-white border-[var(--dark)]"
-                          : "bg-[var(--background)] border-[var(--border)] hover:bg-black/[.04]"
+                          ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                          : "bg-[var(--background)] border-[var(--border)] hover:bg-[var(--dark)]/[.04]"
                       }`}
                     >
                       <MoodFace score={s} />
@@ -172,7 +172,7 @@ export default function MoodPage() {
                     className="overflow-hidden"
                   >
                     <div className="pt-8">
-                      <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--muted)] mb-3">
+                      <p className="text-[10.5px] uppercase tracking-[0.28em] font-medium text-[var(--sage)] mb-3">
                         What is contributing? (optional)
                       </p>
                       <div className="flex flex-wrap gap-2">
@@ -263,7 +263,7 @@ export default function MoodPage() {
               {list.slice(0, 10).map((entry) => (
                 <li
                   key={entry.id}
-                  className="rounded-2xl bg-white px-5 py-4 flex items-start gap-4 group"
+                  className="rounded-2xl bg-[var(--surface)] px-5 py-4 flex items-start gap-4 group"
                 >
                   <span className="mt-0.5 text-[var(--accent)] shrink-0">
                     <MoodFace score={entry.score} size={24} />
@@ -295,7 +295,7 @@ export default function MoodPage() {
                     type="button"
                     onClick={() => user && deleteMoodEntry(user.uid, entry.id)}
                     aria-label="Delete this check-in"
-                    className="shrink-0 h-8 w-8 rounded-full flex items-center justify-center text-[var(--muted)] hover:text-[var(--danger)] hover:bg-black/5 transition-colors md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
+                    className="shrink-0 h-8 w-8 rounded-full flex items-center justify-center text-[var(--muted)] hover:text-[var(--danger)] hover:bg-[var(--dark)]/5 transition-colors md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />

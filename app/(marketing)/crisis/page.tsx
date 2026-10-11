@@ -108,7 +108,7 @@ export default function CrisisPage() {
             <a
               key={item.number}
               href={`tel:${item.number}`}
-              className="rounded-[28px] bg-[var(--accent)] text-white px-6 py-7 block hover:bg-[var(--accent-soft)] transition-colors"
+              className="rounded-[28px] bg-[var(--accent)] text-white px-6 py-7 block hover:bg-[var(--accent-deep)] transition-colors"
             >
               <span className="block text-[11px] uppercase tracking-[0.18em] text-white/80">
                 {item.label}
@@ -148,7 +148,7 @@ export default function CrisisPage() {
             {CHILD_SERVICES.map((service) => (
               <li
                 key={service.name}
-                className="rounded-2xl bg-white shadow-[0_18px_40px_-22px_rgba(0,0,0,0.25)] px-6 py-5"
+                className="rounded-2xl bg-[var(--surface)] shadow-[0_18px_40px_-22px_rgba(74,53,48,0.25)] px-6 py-5"
               >
                 <p className="text-[15px] md:text-[16px] font-medium leading-snug">
                   {service.name}
@@ -176,7 +176,7 @@ export default function CrisisPage() {
           {SERVICES.map((service) => (
             <li
               key={service.name}
-              className="rounded-2xl bg-white shadow-[0_18px_40px_-22px_rgba(0,0,0,0.25)] px-6 py-5"
+              className="rounded-2xl bg-[var(--surface)] shadow-[0_18px_40px_-22px_rgba(74,53,48,0.25)] px-6 py-5"
             >
               <p className="text-[15px] md:text-[16px] font-medium leading-snug">
                 {service.name}
@@ -210,13 +210,13 @@ export default function CrisisPage() {
         <div className="mt-8 flex flex-col sm:flex-row gap-3">
           <Link
             href="/providers"
-            className="inline-flex h-12 items-center justify-center rounded-full bg-[var(--dark)] text-white px-7 text-[14px] font-medium hover:bg-[var(--dark-soft)] transition-colors"
+            className="inline-flex h-12 items-center justify-center rounded-full bg-[var(--accent)] text-white px-7 text-[14px] font-medium hover:bg-[var(--accent-deep)] transition-colors"
           >
             Find a provider
           </Link>
           <Link
             href="/resources"
-            className="inline-flex h-12 items-center justify-center rounded-full border border-[var(--foreground)] px-7 text-[14px] font-medium hover:bg-[var(--dark)] hover:text-white hover:border-[var(--dark)] transition-colors"
+            className="inline-flex h-12 items-center justify-center rounded-full border-[1.5px] border-[var(--dark)] px-7 text-[14px] font-medium hover:bg-[var(--dark)] hover:text-white hover:border-[var(--dark)] transition-colors"
           >
             Wellbeing resources
           </Link>

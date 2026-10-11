@@ -289,10 +289,10 @@ export function Alert({
   className?: string;
 }) {
   const tones = {
-    info: "bg-black/[.03] border-[var(--border)]",
+    info: "bg-[var(--dark)]/[.03] border-[var(--border)]",
     warning: "bg-amber-500/10 border-amber-500/30",
     crisis: "bg-[var(--accent)] text-white border-[var(--accent)]",
-    success: "bg-emerald-600/10 border-emerald-600/25",
+    success: "bg-[var(--success-soft)] border-emerald-600/25",
   } as const;
 
   return (

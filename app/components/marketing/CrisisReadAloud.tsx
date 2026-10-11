@@ -36,7 +36,7 @@ export default function CrisisReadAloud() {
         className={`inline-flex h-11 items-center gap-2 rounded-full border px-5 text-[14px] font-medium transition-colors ${
           reading
             ? "border-[var(--accent)] bg-[var(--accent)] text-white"
-            : "border-[var(--foreground)]/30 hover:bg-black/5"
+            : "border-[var(--foreground)]/30 hover:bg-[var(--dark)]/5"
         }`}
       >
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>

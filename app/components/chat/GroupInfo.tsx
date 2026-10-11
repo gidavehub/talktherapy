@@ -54,7 +54,7 @@ function Member({
       <div className="min-w-0 flex-1">
         <p className="truncate text-[14px]">{uid === selfUid ? "You" : person.name}</p>
         {chat.createdBy === uid ? (
-          <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--muted)]">
+          <p className="text-[10.5px] uppercase tracking-[0.28em] font-medium text-[var(--sage)]">
             {chat.group === "peer" ? "Set the group up" : "Leads the group"}
           </p>
         ) : null}
@@ -74,7 +74,7 @@ function Member({
             type="button"
             onClick={() => setConfirming(true)}
             aria-label={`Take ${person.name} out of the group`}
-            className="rounded-full px-3 py-1.5 text-[12px] text-[var(--muted)] hover:bg-black/5 hover:text-[var(--foreground)] transition-colors"
+            className="rounded-full px-3 py-1.5 text-[12px] text-[var(--muted)] hover:bg-[var(--dark)]/5 hover:text-[var(--foreground)] transition-colors"
           >
             Take out
           </button>
@@ -170,7 +170,7 @@ export default function GroupInfo({
             <button
               type="button"
               onClick={() => setConfirmLeave(true)}
-              className="rounded-full px-4 py-2 text-[12.5px] text-[var(--muted)] hover:bg-black/5 hover:text-[var(--foreground)] transition-colors"
+              className="rounded-full px-4 py-2 text-[12.5px] text-[var(--muted)] hover:bg-[var(--dark)]/5 hover:text-[var(--foreground)] transition-colors"
             >
               Leave this group
             </button>

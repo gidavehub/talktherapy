@@ -36,7 +36,7 @@ export default function SpokenCaption({
                 ? "bg-[var(--background)]"
                 : tone === "dark"
                   ? "bg-white/[0.06] border border-white/10"
-                  : "bg-white/80 backdrop-blur-sm shadow-[0_12px_30px_-18px_rgba(0,0,0,0.35)]"
+                  : "bg-white/80 backdrop-blur-sm shadow-[0_12px_30px_-18px_rgba(74,53,48,0.35)]"
             }`}
           >
             <Bars />

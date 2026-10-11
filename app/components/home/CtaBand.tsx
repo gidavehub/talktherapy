@@ -36,7 +36,7 @@ export default function CtaBand({
           <StartLink
             className={`mt-8 inline-flex h-12 items-center rounded-full px-8 text-[14.5px] font-medium transition-colors ${
               terracotta
-                ? "bg-[var(--cream)] text-[var(--foreground)] hover:bg-white"
+                ? "bg-[var(--cream)] text-[var(--foreground)] hover:bg-[var(--surface)]"
                 : "bg-[var(--accent)] text-white hover:bg-[var(--accent-deep)]"
             }`}
           >

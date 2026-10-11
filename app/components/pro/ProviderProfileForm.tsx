@@ -89,8 +89,8 @@ function Choices<T extends string>({
               aria-pressed={on}
               className={`rounded-full px-3.5 py-2 text-[12.5px] transition-colors ${
                 on
-                  ? "bg-[var(--dark)] text-white"
-                  : "bg-white text-[var(--muted)] hover:text-[var(--foreground)]"
+                  ? "bg-[var(--accent)] text-white"
+                  : "bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--foreground)]"
               }`}
             >
               {labels[value]}
@@ -307,7 +307,7 @@ export default function ProviderProfileForm() {
           <div className="flex items-center gap-4">
             <ProviderAvatar photoPath={photoPath} name={displayName} size={72} />
             <div className="min-w-0">
-              <label className="inline-flex items-center rounded-full bg-[var(--background)] px-4 py-2 text-[12.5px] cursor-pointer hover:bg-black/[.06] transition-colors">
+              <label className="inline-flex items-center rounded-full bg-[var(--background)] px-4 py-2 text-[12.5px] cursor-pointer hover:bg-[var(--dark)]/[.06] transition-colors">
                 <input
                   type="file"
                   accept="image/*"

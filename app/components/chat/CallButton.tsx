@@ -55,7 +55,7 @@ export default function CallButton({
         <Link
           href={`/call/${next.id}`}
           aria-label="Join your session now"
-          className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent)] px-3.5 text-[12px] font-medium text-white shadow-[var(--shadow-accent)] hover:bg-[var(--accent-soft)] transition-colors"
+          className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent)] px-3.5 text-[12px] font-medium text-white shadow-[var(--shadow-accent)] hover:bg-[var(--accent-deep)] transition-colors"
         >
           <IconVideo size={15} />
           Join
@@ -69,7 +69,7 @@ export default function CallButton({
       <Link
         href="/sessions"
         aria-label={`Your next session is at ${timeLabel(next.startsAt)}`}
-        className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] tabular-nums text-[var(--muted)] hover:bg-black/5 hover:text-[var(--foreground)] transition-colors"
+        className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] tabular-nums text-[var(--muted)] hover:bg-[var(--dark)]/5 hover:text-[var(--foreground)] transition-colors"
       >
         <IconVideo size={14} />
         {timeLabel(next.startsAt)}
@@ -83,7 +83,7 @@ export default function CallButton({
     <Link
       href={`/book/${peerUid}`}
       aria-label="Book a session to call"
-      className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] text-[var(--muted)] hover:bg-black/5 hover:text-[var(--foreground)] transition-colors"
+      className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] text-[var(--muted)] hover:bg-[var(--dark)]/5 hover:text-[var(--foreground)] transition-colors"
     >
       <IconCalendar size={14} />
       Book

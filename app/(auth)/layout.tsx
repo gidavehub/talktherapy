@@ -1,28 +1,38 @@
 import Link from "next/link";
+import Logo from "@/components/Logo";
+import { ArchPortrait } from "@/components/ui/Arch";
 
+/**
+ * Sign in and sign up, standing alone: the TALK mark, the card in the middle,
+ * and — on a wide screen — somebody in an arch either side, as on the home
+ * page's "What's on your mind?".
+ */
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-[var(--background)] relative overflow-hidden">
-      <header className="absolute top-0 left-0 right-0 z-10 px-4 sm:px-6 md:px-10 pt-5 md:pt-8 flex items-start justify-between">
-        <Link href="/" className="leading-[0.85] text-[15px] font-medium tracking-tight">
-          <span className="block">TALK</span>
-          <span className="block">THERAPY</span>
-        </Link>
-        <Link
-          href="/"
-          className="h-11 px-5 rounded-full border border-[var(--border)] text-[14px] font-medium flex items-center hover:bg-black/5 transition-colors"
-        >
-          Back
-        </Link>
+    <div className="relative min-h-screen overflow-hidden bg-[var(--cream)]">
+      <header className="absolute left-0 right-0 top-0 z-10">
+        <div className="mx-auto flex h-[84px] max-w-[1200px] items-center justify-between px-5 md:h-[92px] md:px-10">
+          <Link href="/" aria-label="TALK — home">
+            <Logo height={38} priority />
+          </Link>
+          <Link
+            href="/"
+            className="flex h-11 items-center rounded-full border-[1.5px] border-[var(--dark)] px-6 text-[14px] font-medium transition-colors hover:bg-[var(--dark)] hover:text-[var(--cream)]"
+          >
+            Back
+          </Link>
+        </div>
+        <div className="zigzag bg-[var(--cream)]" aria-hidden />
       </header>
 
-      <main className="relative z-[1] flex items-center justify-center min-h-screen px-4 sm:px-6 py-24 sm:py-28">
-        {children}
-      </main>
-
-      <div className="stamp absolute left-0 right-0 -bottom-6 text-center text-[var(--foreground)]/10 text-[28vw] leading-[0.85] select-none pointer-events-none whitespace-nowrap">
-        TALK THERAPY
+      <div className="pointer-events-none absolute bottom-0 left-[3%] hidden h-[340px] w-[200px] xl:block">
+        <ArchPortrait src="/people/mind-man.webp" alt="" tone="var(--sage-soft)" className="h-full w-full" sizes="200px" scale={1.35} />
       </div>
+      <div className="pointer-events-none absolute bottom-0 right-[3%] hidden h-[340px] w-[200px] xl:block">
+        <ArchPortrait src="/people/mind-woman.webp" alt="" tone="var(--peach)" className="h-full w-full" sizes="200px" scale={1.35} />
+      </div>
+
+      <main className="relative z-[1] flex min-h-screen items-center justify-center px-4 py-28 sm:px-6">{children}</main>
     </div>
   );
 }

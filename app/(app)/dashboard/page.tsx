@@ -120,7 +120,7 @@ export default function DashboardPage() {
           <h2 className="text-[20px] md:text-[24px] font-display font-medium">Providers for you</h2>
           <Link
             href="/matches"
-            className="text-[12px] uppercase tracking-[0.14em] text-[var(--muted)] underline underline-offset-4 hover:text-[var(--foreground)] transition-colors shrink-0"
+            className="text-[13.5px] font-medium text-[var(--accent)] underline-offset-4 hover:underline transition-colors shrink-0"
           >
             View all
           </Link>
@@ -162,7 +162,7 @@ export default function DashboardPage() {
           <Link
             href="/talk?intake"
             onClick={() => voice.unlock()}
-            className="mt-4 inline-block text-[12px] uppercase tracking-[0.14em] underline underline-offset-4 hover:text-[var(--accent)] transition-colors"
+            className="mt-4 inline-block text-[13.5px] font-medium text-[var(--accent)] underline-offset-4 hover:underline transition-colors"
           >
             Tell Talk what you need for better matches
           </Link>
@@ -230,10 +230,10 @@ export default function DashboardPage() {
 
           <Card radius="md" padding="p-6 md:p-8" reveal={false}>
             <div className="flex items-center justify-between gap-4 mb-2">
-              <h2 className="text-[16px] font-medium">Your mood</h2>
+              <h2 className="font-display text-[20px] font-medium">Your mood</h2>
               <Link
                 href="/mood"
-                className="text-[12px] uppercase tracking-[0.14em] text-[var(--muted)] underline underline-offset-4 hover:text-[var(--foreground)] transition-colors"
+                className="text-[13.5px] font-medium text-[var(--accent)] underline-offset-4 hover:underline transition-colors"
               >
                 All check-ins
               </Link>
@@ -252,7 +252,7 @@ export default function DashboardPage() {
             </h2>
             <Link
               href="/journal"
-              className="text-[12px] uppercase tracking-[0.14em] text-[var(--muted)] underline underline-offset-4 hover:text-[var(--foreground)] transition-colors"
+              className="text-[13.5px] font-medium text-[var(--accent)] underline-offset-4 hover:underline transition-colors"
             >
               All entries
             </Link>
@@ -262,7 +262,7 @@ export default function DashboardPage() {
               <li key={entry.id}>
                 <Link
                   href={`/journal/${entry.id}`}
-                  className="block rounded-2xl bg-white px-5 py-4 hover:bg-black/[.02] transition-colors"
+                  className="block rounded-2xl bg-[var(--surface)] px-5 py-4 hover:bg-[var(--dark)]/[.02] transition-colors"
                 >
                   <p className="text-[14px] font-medium">
                     {entry.title || "Untitled entry"}
@@ -283,49 +283,49 @@ export default function DashboardPage() {
       {/* Next steps */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card hover radius="md" padding="p-6" delay={0}>
-          <span className="h-10 w-10 rounded-full bg-[var(--dark)] text-white flex items-center justify-center">
+          <span className="arch h-11 w-10 rounded-b-lg bg-[var(--sage)] text-[var(--cream)] flex items-center justify-center">
             <IconJournal />
           </span>
-          <h3 className="mt-5 text-[16px] font-medium">Write something</h3>
+          <h3 className="font-display mt-5 text-[20px] font-medium">Write something</h3>
           <p className="mt-2 text-[13px] text-[var(--muted)] leading-relaxed">
             Private, and there are prompts if you are stuck.
           </p>
           <Link
             href="/journal/new"
-            className="mt-4 inline-block text-[12px] uppercase tracking-[0.14em] underline underline-offset-4 hover:text-[var(--accent)] transition-colors"
+            className="mt-4 inline-block text-[13.5px] font-medium text-[var(--accent)] underline-offset-4 hover:underline transition-colors"
           >
             Open journal
           </Link>
         </Card>
 
         <Card hover radius="md" padding="p-6" delay={0.05}>
-          <span className="h-10 w-10 rounded-full bg-[var(--dark)] text-white flex items-center justify-center">
+          <span className="arch h-11 w-10 rounded-b-lg bg-[var(--sage)] text-[var(--cream)] flex items-center justify-center">
             <IconResources />
           </span>
-          <h3 className="mt-5 text-[16px] font-medium">{suggested.title}</h3>
+          <h3 className="font-display mt-5 text-[20px] font-medium">{suggested.title}</h3>
           <p className="mt-2 text-[13px] text-[var(--muted)] leading-relaxed">
             {suggested.summary}
           </p>
           <Link
             href={`/resources/${suggested.slug}`}
-            className="mt-4 inline-block text-[12px] uppercase tracking-[0.14em] underline underline-offset-4 hover:text-[var(--accent)] transition-colors"
+            className="mt-4 inline-block text-[13.5px] font-medium text-[var(--accent)] underline-offset-4 hover:underline transition-colors"
           >
             Read it
           </Link>
         </Card>
 
         <Card hover radius="md" padding="p-6" delay={0.1}>
-          <span className="h-10 w-10 rounded-full bg-[var(--dark)] text-white flex items-center justify-center">
+          <span className="arch h-11 w-10 rounded-b-lg bg-[var(--sage)] text-[var(--cream)] flex items-center justify-center">
             <IconMic />
           </span>
-          <h3 className="mt-5 text-[16px] font-medium">Talk it through</h3>
+          <h3 className="font-display mt-5 text-[20px] font-medium">Talk it through</h3>
           <p className="mt-2 text-[13px] text-[var(--muted)] leading-relaxed">
             Talk listens any time, in your language.
           </p>
           <Link
             href="/talk"
             onClick={() => voice.unlock()}
-            className="mt-4 inline-block text-[12px] uppercase tracking-[0.14em] underline underline-offset-4 hover:text-[var(--accent)] transition-colors"
+            className="mt-4 inline-block text-[13.5px] font-medium text-[var(--accent)] underline-offset-4 hover:underline transition-colors"
           >
             Open Talk
           </Link>

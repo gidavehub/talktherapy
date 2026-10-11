@@ -210,9 +210,9 @@ export default function ProviderProfileView({ providerId }: { providerId: string
         initial={{ y: 30, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ ...SPRING_SOFT, delay: 0.12 }}
-        className="lg:sticky lg:top-28 rounded-[28px] bg-white shadow-[0_18px_40px_-22px_rgba(0,0,0,0.25)] p-6 md:p-8"
+        className="lg:sticky lg:top-28 rounded-[28px] bg-[var(--surface)] shadow-[0_18px_40px_-22px_rgba(74,53,48,0.25)] p-6 md:p-8"
       >
-        <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--muted)]">
+        <p className="text-[10.5px] uppercase tracking-[0.28em] font-medium text-[var(--sage)]">
           Session fee
         </p>
         <p className="mt-3 text-[38px] leading-none font-medium tracking-tight">
@@ -267,7 +267,7 @@ export default function ProviderProfileView({ providerId }: { providerId: string
           {canMessage ? (
             <Link
               href={`/book/${providerId}`}
-              className="w-full h-12 rounded-full border border-[var(--border)] text-[14px] font-medium flex items-center justify-center gap-2.5 hover:bg-black/[.03] transition-colors"
+              className="w-full h-12 rounded-full border border-[var(--border)] text-[14px] font-medium flex items-center justify-center gap-2.5 hover:bg-[var(--dark)]/[.03] transition-colors"
             >
               <IconCalendar size={15} />
               Book a session

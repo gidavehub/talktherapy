@@ -84,9 +84,9 @@ export default function JournalPage() {
               animate={{ y: 0, opacity: 1 }}
               transition={{ ...SPRING_SOFT, delay: Math.min(i, 8) * 0.04 }}
               whileHover={{ y: -3 }}
-              className="relative rounded-[28px] bg-white shadow-[0_18px_40px_-22px_rgba(0,0,0,0.25)] p-6 flex flex-col"
+              className="relative rounded-[28px] bg-[var(--surface)] shadow-[0_18px_40px_-22px_rgba(74,53,48,0.25)] p-6 flex flex-col"
             >
-              <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--muted)]">
+              <p className="text-[10.5px] uppercase tracking-[0.28em] font-medium text-[var(--sage)]">
                 {new Date(entry.createdAt).toLocaleDateString("en-GB", {
                   day: "numeric",
                   month: "long",
@@ -119,7 +119,7 @@ export default function JournalPage() {
                   type="button"
                   onClick={() => setPendingDelete(entry)}
                   aria-label={`Delete ${entry.title || "untitled entry"}`}
-                  className="relative z-10 h-8 w-8 rounded-full flex items-center justify-center text-[var(--muted)] hover:text-[var(--danger)] hover:bg-black/5 transition-colors"
+                  className="relative z-10 h-8 w-8 rounded-full flex items-center justify-center text-[var(--muted)] hover:text-[var(--danger)] hover:bg-[var(--dark)]/5 transition-colors"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />

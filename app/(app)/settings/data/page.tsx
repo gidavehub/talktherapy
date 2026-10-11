@@ -94,7 +94,7 @@ export default function DataSettingsPage() {
         <p className="eyebrow">
           Export
         </p>
-        <h2 className="mt-3 text-[20px] leading-tight font-medium">
+        <h2 className="font-display mt-3 text-[20px] leading-tight font-medium">
           Download everything we hold
         </h2>
         <p className="mt-2 text-[13px] text-[var(--muted)] leading-relaxed">
@@ -112,7 +112,7 @@ export default function DataSettingsPage() {
         <p className="eyebrow">
           Delete
         </p>
-        <h2 className="mt-3 text-[20px] leading-tight font-medium">
+        <h2 className="font-display mt-3 text-[20px] leading-tight font-medium">
           Clear your wellbeing data
         </h2>
         <p className="mt-2 text-[13px] text-[var(--muted)] leading-relaxed">
@@ -130,7 +130,7 @@ export default function DataSettingsPage() {
         <p className="eyebrow">
           Close account
         </p>
-        <h2 className="mt-3 text-[20px] leading-tight font-medium">
+        <h2 className="font-display mt-3 text-[20px] leading-tight font-medium">
           Delete my account
         </h2>
         <p className="mt-2 text-[13px] text-[var(--muted)] leading-relaxed">

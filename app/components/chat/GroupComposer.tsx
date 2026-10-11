@@ -74,7 +74,7 @@ function Person({
       transition={SPRING_SNAP}
       aria-pressed={picked}
       className={`flex w-full items-center gap-3 rounded-[22px] px-3.5 py-3 text-left transition-colors ${
-        picked ? "bg-[var(--dark)] text-white" : "bg-[var(--background)] hover:bg-black/[.06]"
+        picked ? "bg-[var(--accent)] text-white" : "bg-[var(--background)] hover:bg-[var(--dark)]/[.06]"
       }`}
     >
       <ProviderAvatar photoPath={peer.photoPath} name={peer.name} size={38} />
@@ -82,7 +82,7 @@ function Person({
       {chat.minor ? <MinorFlag size="row" className="text-[11px]" /> : null}
       <span
         className={`h-6 w-6 shrink-0 rounded-full flex items-center justify-center border transition-colors ${
-          picked ? "border-white bg-white text-[var(--dark)]" : "border-[var(--border)]"
+          picked ? "border-white bg-[var(--surface)] text-[var(--dark)]" : "border-[var(--border)]"
         }`}
       >
         {picked ? <IconCheck size={13} /> : null}
@@ -170,7 +170,7 @@ export default function GroupComposer({
                 whileTap={{ scale: 0.98 }}
                 transition={SPRING_SNAP}
                 className={`rounded-[22px] px-4 py-3.5 text-left transition-colors ${
-                  on ? "bg-[var(--dark)] text-white" : "bg-[var(--background)] hover:bg-black/[.06]"
+                  on ? "bg-[var(--accent)] text-white" : "bg-[var(--background)] hover:bg-[var(--dark)]/[.06]"
                 }`}
               >
                 <span className="block text-[14px] font-medium">{k.label}</span>
@@ -253,7 +253,7 @@ export default function GroupComposer({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full px-4 py-2 text-[12.5px] text-[var(--muted)] hover:bg-black/5"
+            className="rounded-full px-4 py-2 text-[12.5px] text-[var(--muted)] hover:bg-[var(--dark)]/5"
           >
             Cancel
           </button>

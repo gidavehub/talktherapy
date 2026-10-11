@@ -75,7 +75,7 @@ function SessionRow({
       initial={{ y: 14, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={SPRING_SOFT}
-      className={`rounded-[22px] bg-white px-4 py-3.5 ${cancelled || past ? "opacity-60" : ""}`}
+      className={`rounded-[22px] bg-[var(--surface)] px-4 py-3.5 ${cancelled || past ? "opacity-60" : ""}`}
     >
       <div className="flex items-center gap-3.5">
         <ProviderAvatar photoPath={peer.photoPath} name={peer.name} size={44} />
@@ -85,7 +85,7 @@ function SessionRow({
           <p className="mt-0.5 text-[12.5px] text-[var(--muted)] leading-snug">
             {when(booking)}
           </p>
-          <p className="mt-0.5 flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-[var(--muted)]">
+          <p className="mt-0.5 flex items-center gap-2 text-[10.5px] uppercase tracking-[0.28em] font-medium text-[var(--sage)]">
             {minor ? <MinorFlag size="row" /> : null}
             {cancelled
               ? "Cancelled"
@@ -105,7 +105,7 @@ function SessionRow({
           className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center transition-colors ${
             speaking
               ? "bg-[var(--accent)] text-white"
-              : "text-[var(--muted)] hover:bg-black/5 hover:text-[var(--foreground)]"
+              : "text-[var(--muted)] hover:bg-[var(--dark)]/5 hover:text-[var(--foreground)]"
           }`}
         >
           <IconSpeaker size={15} />
@@ -127,7 +127,7 @@ function SessionRow({
           {joinWindow(booking.startsAt, booking.endsAt, now) ? (
             <Link
               href={`/call/${booking.id}`}
-              className="inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2 text-[12.5px] text-white hover:bg-[var(--accent-soft)] transition-colors"
+              className="inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2 text-[12.5px] text-white hover:bg-[var(--accent-deep)] transition-colors"
             >
               <IconVideo size={14} />
               Join
@@ -143,7 +143,7 @@ function SessionRow({
               type="button"
               onClick={() => onPay(booking.id)}
               disabled={paying}
-              className="rounded-full bg-[var(--dark)] px-4 py-2 text-[12.5px] text-white hover:bg-[var(--dark-soft)] transition-colors disabled:opacity-60"
+              className="rounded-full bg-[var(--accent)] px-4 py-2 text-[13px] font-medium text-white hover:bg-[var(--accent-deep)] transition-colors disabled:opacity-60"
             >
               {paying ? "Opening…" : `Pay ${formatDalasi(booking.amountMinor)}`}
             </button>
@@ -151,7 +151,7 @@ function SessionRow({
           {otherUid ? (
             <Link
               href={`/chats/${directChatId(selfUid, otherUid)}`}
-              className="inline-flex items-center gap-2 rounded-full bg-[var(--background)] px-4 py-2 text-[12.5px] hover:bg-black/[.06] transition-colors"
+              className="inline-flex items-center gap-2 rounded-full bg-[var(--background)] px-4 py-2 text-[12.5px] hover:bg-[var(--dark)]/[.06] transition-colors"
             >
               <IconChat size={14} />
               Message
@@ -170,7 +170,7 @@ function SessionRow({
               type="button"
               onClick={() => onCancel(booking.id)}
               disabled={cancelling}
-              className="rounded-full px-4 py-2 text-[12.5px] text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-black/5 transition-colors disabled:opacity-50"
+              className="rounded-full px-4 py-2 text-[12.5px] text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--dark)]/5 transition-colors disabled:opacity-50"
             >
               {cancelling ? "Cancelling…" : "Cancel"}
             </button>
@@ -231,7 +231,7 @@ function MissedSession({ booking, now }: { booking: Booking; now: number }) {
               if (result.ok) setSent(true);
               else setError(result.error);
             }}
-            className="rounded-full bg-[var(--dark)] px-4 py-2 text-white disabled:opacity-60"
+            className="rounded-full bg-[var(--accent)] px-4 py-2 font-medium text-white hover:bg-[var(--accent-deep)] disabled:opacity-60"
           >
             {sending ? "Sending…" : "Yes, tell Talk"}
           </button>
@@ -243,7 +243,7 @@ function MissedSession({ booking, now }: { booking: Booking; now: number }) {
         <button
           type="button"
           onClick={() => setAsking(true)}
-          className="rounded-full px-4 py-2 text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-black/5 transition-colors"
+          className="rounded-full px-4 py-2 text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--dark)]/5 transition-colors"
         >
           They didn&apos;t come
         </button>
@@ -292,7 +292,7 @@ export default function SessionList() {
   if (!user || bookings === null) {
     return (
       <SkeletonList count={3} label="Loading your sessions">
-        <div className="rounded-[22px] bg-white px-4 py-3.5">
+        <div className="rounded-[22px] bg-[var(--surface)] px-4 py-3.5">
           <div className="flex items-center gap-3.5">
             <Skeleton rounded="rounded-full" className="h-11 w-11 shrink-0" />
             <div className="min-w-0 flex-1 space-y-2">

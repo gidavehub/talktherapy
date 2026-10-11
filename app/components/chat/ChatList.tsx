@@ -88,7 +88,7 @@ function ChatRow({
       initial={{ y: 18, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ ...SPRING_SOFT, delay: Math.min(index * 0.04, 0.24) }}
-      className={`flex items-center pr-2 transition-colors ${open ? "bg-black/[.06]" : "hover:bg-black/[.03]"}`}
+      className={`flex items-center pr-2 transition-colors ${open ? "bg-[var(--dark)]/[.06]" : "hover:bg-[var(--dark)]/[.03]"}`}
     >
       <Link
         href={`/chats/${chat.id}`}
@@ -134,7 +134,7 @@ function ChatRow({
         className={`h-10 w-10 shrink-0 rounded-full flex items-center justify-center transition-colors ${
           speaking
             ? "bg-[var(--accent)] text-white"
-            : "text-[var(--muted)] hover:bg-black/5 hover:text-[var(--foreground)]"
+            : "text-[var(--muted)] hover:bg-[var(--dark)]/5 hover:text-[var(--foreground)]"
         }`}
       >
         <IconSpeaker size={16} />

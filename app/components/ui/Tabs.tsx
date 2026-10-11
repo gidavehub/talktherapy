@@ -15,7 +15,7 @@ import { SPRING_SNAP } from "../motion/primitives";
  */
 
 const BASE =
-  "relative h-10 px-4 rounded-full text-[12px] uppercase tracking-[0.14em] font-medium transition-colors whitespace-nowrap";
+  "relative h-10 px-4 rounded-full text-[14px] font-medium transition-colors whitespace-nowrap";
 
 export type TabItem<T extends string = string> = {
   id: T;

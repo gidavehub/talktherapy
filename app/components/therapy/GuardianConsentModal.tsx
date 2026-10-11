@@ -152,7 +152,7 @@ export default function GuardianConsentModal({
           className={`inline-flex h-9 items-center gap-2 rounded-full border px-4 text-[12px] tracking-wide transition-colors ${
             reading
               ? "border-[var(--accent)] bg-[var(--accent)] text-white"
-              : "border-[var(--border)] hover:bg-black/5"
+              : "border-[var(--border)] hover:bg-[var(--dark)]/5"
           }`}
         >
           <IconSpeaker size={15} />
@@ -164,13 +164,13 @@ export default function GuardianConsentModal({
           <span className="mt-1 flex flex-wrap items-center gap-2">
             <a
               href="tel:117"
-              className="inline-flex h-9 items-center gap-2 rounded-full bg-white px-4 text-[13px] font-medium text-[var(--accent)]"
+              className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--surface)] px-4 text-[13px] font-medium text-[var(--accent)]"
             >
               <IconPhone size={14} /> 117 Police
             </a>
             <a
               href="tel:116"
-              className="inline-flex h-9 items-center gap-2 rounded-full bg-white px-4 text-[13px] font-medium text-[var(--accent)]"
+              className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--surface)] px-4 text-[13px] font-medium text-[var(--accent)]"
             >
               <IconPhone size={14} /> 116 Ambulance
             </a>

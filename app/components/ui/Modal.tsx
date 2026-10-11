@@ -104,7 +104,7 @@ export default function Modal({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={onClose}
-            className="absolute inset-0 bg-black/45 backdrop-blur-sm"
+            className="absolute inset-0 bg-[var(--dark)]/45 backdrop-blur-sm"
           />
 
           <motion.div
@@ -117,7 +117,7 @@ export default function Modal({
             animate={{ y: 0, opacity: 1, scale: 1 }}
             exit={{ y: asSheet || responsive ? 60 : 20, opacity: 0, scale: 0.98 }}
             transition={SPRING_SOFT}
-            className={`relative z-10 w-full bg-white shadow-[0_30px_80px_-30px_rgba(0,0,0,0.45)] max-h-[92vh] overflow-y-auto
+            className={`relative z-10 w-full bg-[var(--surface)] shadow-[0_30px_80px_-30px_rgba(74,53,48,0.45)] max-h-[92vh] overflow-y-auto
               ${
                 asSheet
                   ? "rounded-t-[28px] max-w-[640px]"
@@ -155,7 +155,7 @@ export default function Modal({
                 whileHover={{ scale: 1.06, rotate: -8 }}
                 whileTap={{ scale: 0.94 }}
                 transition={SPRING_SNAP}
-                className="h-9 w-9 shrink-0 rounded-full border border-[var(--border)] flex items-center justify-center hover:bg-black/5 transition-colors"
+                className="h-9 w-9 shrink-0 rounded-full border border-[var(--border)] flex items-center justify-center hover:bg-[var(--dark)]/5 transition-colors"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
                   <path d="M6 6l12 12M18 6L6 18" />

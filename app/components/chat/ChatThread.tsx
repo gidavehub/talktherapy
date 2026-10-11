@@ -275,7 +275,7 @@ export default function ChatThread({ chatId }: { chatId: string }) {
     <Link
       href="/chats"
       aria-label="Back to all conversations"
-      className="h-10 w-10 shrink-0 rounded-full flex items-center justify-center text-[var(--foreground)] hover:bg-black/5 transition-colors md:hidden"
+      className="h-10 w-10 shrink-0 rounded-full flex items-center justify-center text-[var(--foreground)] hover:bg-[var(--dark)]/5 transition-colors md:hidden"
     >
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
         <path d="M19 12H5M11 18l-6-6 6-6" />
@@ -289,7 +289,7 @@ export default function ChatThread({ chatId }: { chatId: string }) {
       type="button"
       aria-label="Menu"
       onClick={openMenu}
-      className="h-10 w-10 shrink-0 rounded-full bg-[var(--dark)] text-white flex items-center justify-center md:hidden"
+      className="h-10 w-10 shrink-0 rounded-full border-[1.5px] border-[var(--dark)]/70 text-[var(--foreground)] flex items-center justify-center md:hidden"
     >
       <svg width="16" height="12" viewBox="0 0 16 12" fill="none" aria-hidden>
         <rect width="16" height="1.6" rx="0.8" fill="currentColor" />
@@ -317,7 +317,7 @@ export default function ChatThread({ chatId }: { chatId: string }) {
         action={
           <Link
             href="/chats"
-            className="inline-flex h-10 items-center rounded-full bg-[var(--dark)] px-5 text-[12.5px] text-white"
+            className="inline-flex h-10 items-center rounded-full bg-[var(--accent)] px-5 text-[13.5px] font-medium text-white hover:bg-[var(--accent-deep)]"
           >
             Your conversations
           </Link>
@@ -356,7 +356,7 @@ export default function ChatThread({ chatId }: { chatId: string }) {
             <p className="truncate text-[14px] font-medium leading-tight">{peer.name}</p>
           )}
           <div className="flex items-center gap-2">
-            <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--muted)]">
+            <p className="text-[10.5px] uppercase tracking-[0.28em] font-medium text-[var(--sage)]">
               {typingUids.length > 0
                 ? "Typing"
                 : isGroup

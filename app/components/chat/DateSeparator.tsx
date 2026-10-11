@@ -45,7 +45,7 @@ export default function DateSeparator({ timestamp }: { timestamp: number }) {
   return (
     <div className="flex items-center gap-4 py-3">
       <span className="h-px flex-1 bg-[var(--border)]" />
-      <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--muted)]">
+      <span className="text-[10.5px] uppercase tracking-[0.28em] font-medium text-[var(--sage)]">
         {dayLabel(timestamp)}
       </span>
       <span className="h-px flex-1 bg-[var(--border)]" />

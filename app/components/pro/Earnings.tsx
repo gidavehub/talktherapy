@@ -44,9 +44,9 @@ import { PAYOUT_NETWORKS, type PayoutNetwork } from "../../lib/payments/modempay
 
 const STATUS_COPY: Record<PayoutStatus, { label: string; tone: string }> = {
   initiating: { label: "Sending", tone: "text-[var(--muted)]" },
-  pending: { label: "On its way", tone: "text-amber-700" },
-  uncertain: { label: "Not confirmed yet", tone: "text-amber-700" },
-  completed: { label: "Sent", tone: "text-emerald-700" },
+  pending: { label: "On its way", tone: "text-[var(--warning)]" },
+  uncertain: { label: "Not confirmed yet", tone: "text-[var(--warning)]" },
+  completed: { label: "Sent", tone: "text-[var(--success)]" },
   failed: { label: "Did not go through", tone: "text-[var(--accent)]" },
   reversed: { label: "Came back", tone: "text-[var(--accent)]" },
 };
@@ -275,7 +275,7 @@ export default function Earnings() {
       </Card>
 
       <section aria-label="Payouts">
-        <p className="mb-3 text-[11px] uppercase tracking-[0.18em] text-[var(--muted)]">Payouts</p>
+        <p className="mb-3 text-[10.5px] uppercase tracking-[0.28em] font-medium text-[var(--sage)]">Payouts</p>
         {payouts === null ? (
           <Skeleton className="h-16" />
         ) : payouts.length === 0 ? (
@@ -401,7 +401,7 @@ function PayoutRow({ payout }: { payout: Payout }) {
       initial={{ y: 10, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={SPRING_SOFT}
-      className="rounded-[22px] bg-white px-4 py-3.5"
+      className="rounded-[22px] bg-[var(--surface)] px-4 py-3.5"
     >
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">

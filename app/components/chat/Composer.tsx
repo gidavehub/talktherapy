@@ -460,7 +460,7 @@ export default function Composer({
                   type="button"
                   onClick={toggleDraft}
                   aria-label={draftPlaying ? "Pause" : "Listen back"}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[var(--foreground)] hover:bg-black/5"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[var(--foreground)] hover:bg-[var(--dark)]/5"
                 >
                   {draftPlaying ? <IconPause size={17} /> : <IconPlay size={17} />}
                 </button>
@@ -491,7 +491,7 @@ export default function Composer({
               whileTap={{ scale: 0.9 }}
               transition={SPRING_SNAP}
               aria-label="Bin this recording"
-              className="flex h-12 w-12 items-center justify-center rounded-full text-[var(--muted)] hover:bg-black/5"
+              className="flex h-12 w-12 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--dark)]/5"
             >
               <IconTrash size={21} />
             </motion.button>

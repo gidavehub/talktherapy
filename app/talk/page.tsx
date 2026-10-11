@@ -932,7 +932,7 @@ function Talk() {
             </div>
             <Link
               href={minor ? "/crisis#under-18" : "/crisis"}
-              className="mt-3 inline-block text-[11px] uppercase tracking-[0.18em] text-white/70 underline underline-offset-4"
+              className="mt-3 inline-block text-[13.5px] font-medium text-[var(--accent)] underline-offset-4 hover:underline"
             >
               {minor ? "Help for young people" : "More urgent help"}
             </Link>
@@ -1002,7 +1002,7 @@ function Talk() {
               <button
                 type="submit"
                 aria-label="Send"
-                className="h-12 w-12 shrink-0 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-soft)] flex items-center justify-center transition-colors"
+                className="h-12 w-12 shrink-0 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-deep)] flex items-center justify-center transition-colors"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
                   <path d="M5 12h14M13 6l6 6-6 6" />
@@ -1038,7 +1038,7 @@ function Talk() {
               aria-label={typing ? "Hide keyboard" : "Type instead"}
               aria-pressed={typing}
               className={`h-12 w-12 rounded-full border flex items-center justify-center transition-colors ${
-                typing ? "bg-white text-[var(--dark)] border-white" : "border-white/20 hover:bg-white/10"
+                typing ? "bg-[var(--surface)] text-[var(--dark)] border-white" : "border-white/20 hover:bg-white/10"
               }`}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>

@@ -21,7 +21,7 @@ export default function TypingIndicator({ name }: { name?: string | null }) {
       <div
         role="status"
         aria-label={name ? `${name} is typing` : "Typing"}
-        className="rounded-[22px] rounded-bl-[8px] bg-white px-4 py-3.5 shadow-[0_8px_24px_-12px_rgba(0,0,0,0.18)]"
+        className="rounded-[22px] rounded-bl-[8px] bg-[var(--surface)] px-4 py-3.5 shadow-[0_8px_24px_-12px_rgba(74,53,48,0.18)]"
       >
         <span className="flex items-center gap-1.5">
           {[0, 1, 2].map((index) => (

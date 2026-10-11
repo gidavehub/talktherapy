@@ -73,7 +73,7 @@ export default function MeetLink({
             type="button"
             onClick={() => void save(draft.trim() || null)}
             disabled={saving}
-            className="rounded-full bg-[var(--dark)] px-4 py-2 text-[12.5px] text-white disabled:opacity-60"
+            className="rounded-full bg-[var(--accent)] px-4 py-2 text-[13px] font-medium text-white hover:bg-[var(--accent-deep)] disabled:opacity-60"
           >
             {saving ? "Saving…" : "Save"}
           </button>
@@ -84,7 +84,7 @@ export default function MeetLink({
               setDraft(meetUrl ?? "");
               setError(null);
             }}
-            className="rounded-full px-3 py-2 text-[12.5px] text-[var(--muted)] hover:bg-black/5"
+            className="rounded-full px-3 py-2 text-[12.5px] text-[var(--muted)] hover:bg-[var(--dark)]/5"
           >
             Cancel
           </button>
@@ -111,7 +111,7 @@ export default function MeetLink({
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="rounded-full px-4 py-2 text-[12.5px] text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-black/5 transition-colors"
+        className="rounded-full px-4 py-2 text-[12.5px] text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--dark)]/5 transition-colors"
       >
         Add Google Meet link
       </button>
@@ -124,7 +124,7 @@ export default function MeetLink({
         href={meetUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 rounded-full bg-[var(--background)] px-4 py-2 text-[12.5px] hover:bg-black/[.06] transition-colors"
+        className="inline-flex items-center gap-1.5 rounded-full bg-[var(--background)] px-4 py-2 text-[12.5px] hover:bg-[var(--dark)]/[.06] transition-colors"
       >
         Open in Google Meet
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
@@ -136,7 +136,7 @@ export default function MeetLink({
           type="button"
           onClick={() => setEditing(true)}
           aria-label="Change the Google Meet link"
-          className="rounded-full px-2.5 py-2 text-[12px] text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-black/5"
+          className="rounded-full px-2.5 py-2 text-[12px] text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--dark)]/5"
         >
           Change
         </button>

@@ -142,7 +142,7 @@ export default function AvailabilityEditor() {
 
       <div className="space-y-3">
         {days().map((day) => (
-          <div key={day} className="rounded-[22px] bg-white px-4 py-3.5">
+          <div key={day} className="rounded-[22px] bg-[var(--surface)] px-4 py-3.5">
             <p className="text-[13px] font-medium">{dayLabel(day)}</p>
             <div className="mt-2.5 flex flex-wrap gap-1.5">
               {HOURS.map((hour) => {
@@ -172,7 +172,7 @@ export default function AvailabilityEditor() {
                       isBooked
                         ? "bg-[var(--accent)] text-white"
                         : isOpen
-                          ? "bg-[var(--dark)] text-white"
+                          ? "bg-[var(--accent)] text-white"
                           : past
                             ? "text-[var(--muted)] opacity-35"
                             : "bg-[var(--background)] text-[var(--muted)] hover:text-[var(--foreground)]"

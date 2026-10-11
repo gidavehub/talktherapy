@@ -45,13 +45,13 @@ export default function MarketingError({
           <button
             type="button"
             onClick={retry}
-            className="inline-flex h-12 items-center justify-center rounded-full bg-[var(--accent)] hover:bg-[var(--accent-soft)] transition-colors text-white px-7 text-[14px] font-medium"
+            className="inline-flex h-12 items-center justify-center rounded-full bg-[var(--accent)] hover:bg-[var(--accent-deep)] transition-colors text-white px-7 text-[14px] font-medium"
           >
             Try again
           </button>
           <Link
             href="/"
-            className="inline-flex h-12 items-center justify-center rounded-full border border-[var(--foreground)] px-7 text-[14px] font-medium hover:bg-[var(--dark)] hover:text-white hover:border-[var(--dark)] transition-colors"
+            className="inline-flex h-12 items-center justify-center rounded-full border-[1.5px] border-[var(--dark)] px-7 text-[14px] font-medium hover:bg-[var(--dark)] hover:text-white hover:border-[var(--dark)] transition-colors"
           >
             Back home
           </Link>

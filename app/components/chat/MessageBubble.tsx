@@ -107,7 +107,7 @@ function ChatImage({ mediaPath, upload }: { mediaPath: string; upload?: Upload |
       {sending ? (
         <div className="absolute inset-0 flex items-center justify-center" role="progressbar" aria-label="Sending" aria-valuenow={Math.round(upload.progress * 100)}>
           <svg width="52" height="52" viewBox="0 0 52 52" className="-rotate-90">
-            <circle cx="26" cy="26" r="22" fill="rgba(0,0,0,0.45)" stroke="rgba(255,255,255,0.3)" strokeWidth="3" />
+            <circle cx="26" cy="26" r="22" fill="rgba(74,53,48,0.45)" stroke="rgba(255,255,255,0.3)" strokeWidth="3" />
             <motion.circle
               cx="26"
               cy="26"
@@ -183,7 +183,7 @@ export default function MessageBubble({
           className={`min-w-0 px-3.5 py-2.5 ${
             mine
               ? "rounded-[22px] rounded-br-[8px] bg-[var(--dark)] text-white"
-              : "rounded-[22px] rounded-bl-[8px] bg-white shadow-[0_8px_24px_-14px_rgba(0,0,0,0.2)]"
+              : "rounded-[22px] rounded-bl-[8px] bg-[var(--surface)] shadow-[0_8px_24px_-14px_rgba(74,53,48,0.2)]"
           } ${
             // A ring rather than a different fill: the bubble keeps its
             // identity while it is speaking.
@@ -268,7 +268,7 @@ export default function MessageBubble({
             className={`mb-1 h-8 w-8 shrink-0 rounded-full flex items-center justify-center transition-colors ${
               speaking
                 ? "bg-[var(--accent)] text-white"
-                : "bg-white text-[var(--muted)] shadow-[0_6px_16px_-10px_rgba(0,0,0,0.3)] hover:text-[var(--foreground)]"
+                : "bg-[var(--surface)] text-[var(--muted)] shadow-[0_6px_16px_-10px_rgba(74,53,48,0.3)] hover:text-[var(--foreground)]"
             }`}
           >
             <IconSpeaker size={14} />

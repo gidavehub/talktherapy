@@ -95,7 +95,7 @@ export default function SlotPicker({ providerId }: { providerId: string }) {
   if (slots === null) {
     return (
       <SkeletonList count={3} label="Loading the free times" className="max-w-[620px] space-y-3">
-        <div className="rounded-[22px] bg-white px-4 py-3.5">
+        <div className="rounded-[22px] bg-[var(--surface)] px-4 py-3.5">
           <Skeleton className="h-3.5 w-40" />
           <div className="mt-3 flex gap-2">
             <Skeleton rounded="rounded-full" className="h-11 w-[84px]" />
@@ -113,7 +113,7 @@ export default function SlotPicker({ providerId }: { providerId: string }) {
   return (
     <div className="max-w-[620px] space-y-5">
       {provider ? (
-        <div className="flex items-center gap-3.5 rounded-[22px] bg-white px-4 py-3.5">
+        <div className="flex items-center gap-3.5 rounded-[22px] bg-[var(--surface)] px-4 py-3.5">
           <ProviderAvatar photoPath={provider.photoPath} name={provider.displayName} size={46} />
           <div className="min-w-0">
             <p className="truncate text-[15px] font-medium leading-tight">
@@ -147,7 +147,7 @@ export default function SlotPicker({ providerId }: { providerId: string }) {
               initial={{ y: 16, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ ...SPRING_SOFT, delay: Math.min(index * 0.05, 0.25) }}
-              className="rounded-[22px] bg-white px-4 py-3.5"
+              className="rounded-[22px] bg-[var(--surface)] px-4 py-3.5"
             >
               <div className="flex items-center justify-between gap-3">
                 <p className="text-[13px] font-medium">{day}</p>
@@ -167,7 +167,7 @@ export default function SlotPicker({ providerId }: { providerId: string }) {
                   className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center transition-colors ${
                     speakingId === day
                       ? "bg-[var(--accent)] text-white"
-                      : "text-[var(--muted)] hover:bg-black/5 hover:text-[var(--foreground)]"
+                      : "text-[var(--muted)] hover:bg-[var(--dark)]/5 hover:text-[var(--foreground)]"
                   }`}
                 >
                   <IconSpeaker size={15} />
@@ -191,8 +191,8 @@ export default function SlotPicker({ providerId }: { providerId: string }) {
                       aria-label={spokenSlot(slot.startsAt, slot.endsAt)}
                       className={`min-w-[84px] rounded-full px-4 py-3 text-[14px] tabular-nums transition-colors ${
                         on
-                          ? "bg-[var(--dark)] text-white"
-                          : "bg-[var(--background)] text-[var(--foreground)] hover:bg-black/[.06]"
+                          ? "bg-[var(--accent)] text-white"
+                          : "bg-[var(--background)] text-[var(--foreground)] hover:bg-[var(--dark)]/[.06]"
                       }`}
                     >
                       {timeLabel(slot.startsAt)}
@@ -210,7 +210,7 @@ export default function SlotPicker({ providerId }: { providerId: string }) {
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={SPRING_SOFT}
-          className="rounded-[22px] bg-white px-4 py-4 space-y-3"
+          className="rounded-[22px] bg-[var(--surface)] px-4 py-4 space-y-3"
         >
           <div className="flex items-start justify-between gap-3">
             <p className="text-[14px] leading-snug">
@@ -231,7 +231,7 @@ export default function SlotPicker({ providerId }: { providerId: string }) {
               className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center transition-colors ${
                 speakingId === picked.id
                   ? "bg-[var(--accent)] text-white"
-                  : "text-[var(--muted)] hover:bg-black/5"
+                  : "text-[var(--muted)] hover:bg-[var(--dark)]/5"
               }`}
             >
               <IconSpeaker size={15} />

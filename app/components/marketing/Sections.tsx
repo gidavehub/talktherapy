@@ -30,7 +30,8 @@ export function Section({
   const tones = {
     light: "bg-[var(--background)]",
     surface: "bg-[var(--cream)]",
-    dark: "bg-[var(--dark)] text-[var(--cream)]",
+    // The big coloured band: sage, as the mockups have it.
+    dark: "bg-[var(--sage)] text-[var(--cream)]",
   } as const;
 
   return (

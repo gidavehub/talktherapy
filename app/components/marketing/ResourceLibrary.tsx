@@ -82,7 +82,7 @@ export default function ResourceLibrary({
             animate={{ y: 0, opacity: 1 }}
             transition={{ ...SPRING_SOFT, delay: Math.min(i, 8) * 0.05 }}
             whileHover={{ y: -4 }}
-            className="relative rounded-[28px] bg-white shadow-[0_18px_40px_-22px_rgba(0,0,0,0.25)] p-6 flex flex-col"
+            className="relative rounded-[28px] bg-[var(--surface)] shadow-[0_18px_40px_-22px_rgba(74,53,48,0.25)] p-6 flex flex-col"
           >
             <div className="flex items-center gap-2">
               <Badge tone={resource.format === "exercise" ? "accent" : "neutral"}>

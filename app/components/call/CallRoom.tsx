@@ -186,7 +186,7 @@ export default function CallRoom({ bookingId }: { bookingId: string }) {
         initial={{ y: 18, opacity: 0, scale: 0.985 }}
         animate={{ y: 0, opacity: 1, scale: 1 }}
         transition={SPRING_SOFT}
-        className="relative overflow-hidden rounded-[28px] bg-[var(--dark)] aspect-[3/4] sm:aspect-video"
+        className="relative overflow-hidden rounded-[28px] bg-[var(--stage)] aspect-[3/4] sm:aspect-video"
       >
         {/*
           Always mounted while there is a remote stream, visible or not: on a
@@ -267,7 +267,7 @@ export default function CallRoom({ bookingId }: { bookingId: string }) {
               aria-pressed={!micOn}
               aria-label={micOn ? "Turn your microphone off" : "Turn your microphone on"}
               className={`h-[52px] w-[52px] rounded-full flex items-center justify-center transition-colors ${
-                micOn ? "bg-white/15 text-white hover:bg-white/25" : "bg-white text-[var(--dark)]"
+                micOn ? "bg-white/15 text-white hover:bg-white/25" : "bg-[var(--surface)] text-[var(--dark)]"
               }`}
             >
               <IconMic size={19} />
@@ -299,7 +299,7 @@ export default function CallRoom({ bookingId }: { bookingId: string }) {
                 aria-pressed={!cameraOn}
                 aria-label={cameraOn ? "Turn your camera off" : "Turn your camera on"}
                 className={`h-[52px] w-[52px] rounded-full flex items-center justify-center transition-colors ${
-                  cameraOn ? "bg-white/15 text-white hover:bg-white/25" : "bg-white text-[var(--dark)]"
+                  cameraOn ? "bg-white/15 text-white hover:bg-white/25" : "bg-[var(--surface)] text-[var(--dark)]"
                 }`}
               >
                 <IconVideo size={19} />
@@ -365,7 +365,7 @@ export default function CallRoom({ bookingId }: { bookingId: string }) {
             {otherUid ? (
               <Link
                 href={`/chats/${[uid, otherUid].sort().join("__")}`}
-                className="rounded-full px-4 py-2 text-[12.5px] text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-black/5 transition-colors"
+                className="rounded-full px-4 py-2 text-[12.5px] text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--dark)]/5 transition-colors"
               >
                 Message instead
               </Link>
@@ -385,7 +385,7 @@ export default function CallRoom({ bookingId }: { bookingId: string }) {
           <Button onClick={() => void join(!audioOnly)}>Rejoin</Button>
           <Link
             href="/sessions"
-            className="rounded-full px-4 py-2 text-[12.5px] text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-black/5 transition-colors"
+            className="rounded-full px-4 py-2 text-[12.5px] text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--dark)]/5 transition-colors"
           >
             Back to sessions
           </Link>

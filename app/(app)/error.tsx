@@ -47,13 +47,13 @@ export default function AppError({
           <button
             type="button"
             onClick={retry}
-            className="inline-flex h-12 items-center justify-center rounded-full bg-[var(--accent)] hover:bg-[var(--accent-soft)] transition-colors text-white px-7 text-[14px] font-medium"
+            className="inline-flex h-12 items-center justify-center rounded-full bg-[var(--accent)] hover:bg-[var(--accent-deep)] transition-colors text-white px-7 text-[14px] font-medium"
           >
             Try again
           </button>
           <Link
             href="/dashboard"
-            className="inline-flex h-12 items-center justify-center rounded-full border border-[var(--border)] px-7 text-[14px] font-medium hover:bg-black/[.03] transition-colors"
+            className="inline-flex h-12 items-center justify-center rounded-full border border-[var(--border)] px-7 text-[14px] font-medium hover:bg-[var(--dark)]/[.03] transition-colors"
           >
             Go home
           </Link>

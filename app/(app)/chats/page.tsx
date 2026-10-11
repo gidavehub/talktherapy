@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 export default function ChatsPage() {
   return (
     <div className="flex flex-1 flex-col items-center justify-center bg-[var(--background)] px-10 text-center">
-      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--dark)] text-white">
+      <span className="arch flex h-16 w-14 items-center justify-center rounded-b-xl bg-[var(--sage)] text-[var(--cream)]">
         <IconChat />
       </span>
       <h1 className="font-display mt-5 text-[24px] font-medium">Your conversations</h1>

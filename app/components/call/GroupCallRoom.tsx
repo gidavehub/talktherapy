@@ -189,7 +189,7 @@ function RoundButton({
       aria-pressed={!on}
       aria-label={label}
       className={`h-[52px] w-[52px] rounded-full flex items-center justify-center transition-colors ${
-        on ? "bg-white/15 text-white hover:bg-white/25" : "bg-white text-[var(--dark)]"
+        on ? "bg-white/15 text-white hover:bg-white/25" : "bg-[var(--surface)] text-[var(--dark)]"
       }`}
     >
       {children}
@@ -396,15 +396,15 @@ export default function GroupCallRoom({ chatId }: { chatId: string }) {
         <Link
           href={`/chats/${chatId}`}
           aria-label="Back to the group's conversation"
-          className="h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-[var(--muted)] hover:bg-black/5 hover:text-[var(--foreground)] transition-colors"
+          className="h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-[var(--muted)] hover:bg-[var(--dark)]/5 hover:text-[var(--foreground)] transition-colors"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
             <path d="M19 12H5M11 18l-6-6 6-6" />
           </svg>
         </Link>
         <div className="min-w-0">
-          <h1 className="truncate text-[18px] font-medium leading-tight">{title}</h1>
-          <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--muted)]">
+          <h1 className="font-display truncate text-[18px] font-medium leading-tight">{title}</h1>
+          <p className="text-[10.5px] uppercase tracking-[0.28em] font-medium text-[var(--sage)]">
             {chat.participants.length} people in the group
           </p>
         </div>
@@ -414,7 +414,7 @@ export default function GroupCallRoom({ chatId }: { chatId: string }) {
         initial={{ y: 18, opacity: 0, scale: 0.985 }}
         animate={{ y: 0, opacity: 1, scale: 1 }}
         transition={SPRING_SOFT}
-        className="relative overflow-hidden rounded-[28px] bg-[var(--dark)] p-3 sm:p-4"
+        className="relative overflow-hidden rounded-[28px] bg-[var(--stage)] p-3 sm:p-4"
       >
         {joined ? (
           <>

@@ -54,7 +54,7 @@ export default function ProvidersForYouPage() {
             <Link
               href="/talk?intake"
             onClick={() => voice.unlock()}
-              className="ml-1 text-[12px] uppercase tracking-[0.14em] text-[var(--muted)] underline underline-offset-4 hover:text-[var(--foreground)] transition-colors"
+              className="ml-1 text-[13.5px] font-medium text-[var(--accent)] underline-offset-4 hover:underline transition-colors"
             >
               Change
             </Link>
@@ -93,7 +93,7 @@ export default function ProvidersForYouPage() {
         <Link
           href="/talk?intake"
             onClick={() => voice.unlock()}
-          className="flex items-center justify-between gap-4 rounded-[28px] bg-[var(--dark)] text-white px-6 md:px-8 py-6 hover:bg-[var(--dark-soft)] transition-colors"
+          className="flex items-center justify-between gap-4 rounded-[28px] bg-[var(--sage)] text-[var(--cream)] px-6 md:px-8 py-6 hover:bg-[var(--sage-deep)] transition-colors"
         >
           <span className="text-[16px] md:text-[18px] font-medium">Tell Talk what you need</span>
           <span className="h-10 w-10 rounded-full bg-[var(--accent)] flex items-center justify-center shrink-0">

@@ -148,13 +148,13 @@ export default function AuthCard({
         transition={{ ...SPRING_SOFT, delay: 0.3 }}
         whileHover={{ y: -2, scale: 1.01 }}
         whileTap={{ scale: 0.98 }}
-        className="mt-7 w-full h-12 rounded-full border border-[var(--border)] flex items-center justify-center gap-3 text-[14px] font-medium hover:bg-black/[.03] transition-colors disabled:opacity-50"
+        className="mt-7 w-full h-12 rounded-full border border-[var(--border)] flex items-center justify-center gap-3 text-[14px] font-medium hover:bg-[var(--dark)]/[.03] transition-colors disabled:opacity-50"
       >
         <GoogleGlyph />
         Continue with Google
       </motion.button>
 
-      <div className="my-6 flex items-center gap-3 text-[11px] uppercase tracking-[0.18em] text-[var(--muted)]">
+      <div className="my-6 flex items-center gap-3 text-[10.5px] uppercase tracking-[0.28em] font-medium text-[var(--sage)]">
         <span className="flex-1 h-px bg-[var(--border)]" />
         Or
         <span className="flex-1 h-px bg-[var(--border)]" />

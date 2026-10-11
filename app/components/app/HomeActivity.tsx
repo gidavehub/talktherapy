@@ -34,7 +34,7 @@ function MessagesCard({ chat, selfUid, unread }: { chat: Chat; selfUid: string; 
   return (
     <Link
       href={`/chats/${chat.id}`}
-      className="group flex items-center gap-3.5 rounded-[22px] bg-white px-4 py-4 hover:bg-black/[.02] transition-colors"
+      className="group flex items-center gap-3.5 rounded-[22px] bg-[var(--surface)] px-4 py-4 hover:bg-[var(--dark)]/[.02] transition-colors"
     >
       <span
         className={`h-10 w-10 shrink-0 rounded-full flex items-center justify-center ${
@@ -44,7 +44,7 @@ function MessagesCard({ chat, selfUid, unread }: { chat: Chat; selfUid: string; 
         <IconChat size={17} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[11px] uppercase tracking-[0.18em] text-[var(--muted)]">
+        <span className="block text-[10.5px] uppercase tracking-[0.28em] font-medium text-[var(--sage)]">
           {unread > 0 ? `${unread} new` : "Conversation"}
         </span>
         <span className="mt-0.5 block truncate text-[14.5px] font-medium leading-tight">
@@ -64,7 +64,7 @@ function SessionCard({ booking, selfUid, now }: { booking: Booking; selfUid: str
   const open = joinWindow(booking.startsAt, booking.endsAt, now);
 
   return (
-    <div className="rounded-[22px] bg-white px-4 py-4">
+    <div className="rounded-[22px] bg-[var(--surface)] px-4 py-4">
       <div className="flex items-center gap-3.5">
         <span
           className={`h-10 w-10 shrink-0 rounded-full flex items-center justify-center ${
@@ -74,7 +74,7 @@ function SessionCard({ booking, selfUid, now }: { booking: Booking; selfUid: str
           <IconVideo size={17} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--muted)]">
+          <p className="text-[10.5px] uppercase tracking-[0.28em] font-medium text-[var(--sage)]">
             {open ? "Now" : "Next session"}
           </p>
           <p className="mt-0.5 truncate text-[14.5px] font-medium leading-tight">{peer.name}</p>
@@ -88,7 +88,7 @@ function SessionCard({ booking, selfUid, now }: { booking: Booking; selfUid: str
         {open ? (
           <Link
             href={`/call/${booking.id}`}
-            className="inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2 text-[12.5px] text-white hover:bg-[var(--accent-soft)] transition-colors"
+            className="inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2 text-[12.5px] text-white hover:bg-[var(--accent-deep)] transition-colors"
           >
             <IconVideo size={14} />
             Join
@@ -96,7 +96,7 @@ function SessionCard({ booking, selfUid, now }: { booking: Booking; selfUid: str
         ) : null}
         <Link
           href="/sessions"
-          className="rounded-full px-4 py-2 text-[12.5px] text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-black/5 transition-colors"
+          className="rounded-full px-4 py-2 text-[12.5px] text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--dark)]/5 transition-colors"
         >
           All sessions
         </Link>

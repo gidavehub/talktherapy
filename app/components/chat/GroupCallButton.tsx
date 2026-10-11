@@ -36,7 +36,7 @@ export default function GroupCallButton({ chat, selfUid }: { chat: Chat; selfUid
         <Link
           href={`/call/group/${chat.id}`}
           aria-label={`A call is on with ${count} ${count === 1 ? "person" : "people"} — join it`}
-          className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent)] px-3.5 text-[12px] font-medium text-white shadow-[var(--shadow-accent)] hover:bg-[var(--accent-soft)] transition-colors"
+          className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--accent)] px-3.5 text-[12px] font-medium text-white shadow-[var(--shadow-accent)] hover:bg-[var(--accent-deep)] transition-colors"
         >
           <IconVideo size={15} />
           Join · {count}
@@ -50,7 +50,7 @@ export default function GroupCallButton({ chat, selfUid }: { chat: Chat; selfUid
       <Link
         href={`/call/group/${chat.id}`}
         aria-label={`A call is on with ${count} ${count === 1 ? "person" : "people"}; it opens to you when the person leading the group is in it`}
-        className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] text-[var(--muted)] hover:bg-black/5 hover:text-[var(--foreground)] transition-colors"
+        className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] text-[var(--muted)] hover:bg-[var(--dark)]/5 hover:text-[var(--foreground)] transition-colors"
       >
         <IconVideo size={14} />
         On · {count}
@@ -64,7 +64,7 @@ export default function GroupCallButton({ chat, selfUid }: { chat: Chat; selfUid
     <Link
       href={`/call/group/${chat.id}`}
       aria-label="Start a call with the group"
-      className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] text-[var(--muted)] hover:bg-black/5 hover:text-[var(--foreground)] transition-colors"
+      className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] text-[var(--muted)] hover:bg-[var(--dark)]/5 hover:text-[var(--foreground)] transition-colors"
     >
       <IconVideo size={14} />
       Call

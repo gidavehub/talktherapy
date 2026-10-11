@@ -220,7 +220,7 @@ export default function VoiceNotePlayer({
         transition={SPRING_SNAP}
         aria-label={playing ? "Pause voice note" : "Play voice note"}
         className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors ${
-          onDark ? "bg-white text-[var(--dark)]" : "bg-[var(--dark)] text-white"
+          onDark ? "bg-[var(--surface)] text-[var(--dark)]" : "bg-[var(--dark)] text-white"
         }`}
       >
         {loading ? <Spinner size={16} /> : playing ? <IconPause size={17} /> : <IconPlay size={17} />}
@@ -290,7 +290,7 @@ export default function VoiceNotePlayer({
               type="button"
               onClick={cycleSpeed}
               aria-label={`Playback speed ${speed} times. Change it`}
-              className={`rounded-full px-1.5 py-px text-[10.5px] font-medium ${onDark ? "bg-white/15 text-white" : "bg-black/[.07] text-[var(--foreground)]"}`}
+              className={`rounded-full px-1.5 py-px text-[10.5px] font-medium ${onDark ? "bg-white/15 text-white" : "bg-[var(--dark)]/[.07] text-[var(--foreground)]"}`}
             >
               {speed}×
             </button>

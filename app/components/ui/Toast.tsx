@@ -105,7 +105,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: 60, opacity: 0 }}
               transition={SPRING_SOFT}
-              className={`pointer-events-auto rounded-2xl px-5 py-4 shadow-[0_18px_40px_-18px_rgba(0,0,0,0.4)] ${TONES[t.tone]}`}
+              className={`pointer-events-auto rounded-2xl px-5 py-4 shadow-[0_18px_40px_-18px_rgba(74,53,48,0.4)] ${TONES[t.tone]}`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">

@@ -24,7 +24,7 @@ export default async function ProviderPage(
       <div className="px-4 sm:px-6 md:px-10 max-w-[1400px] mx-auto">
         <Link
           href="/providers"
-          className="inline-flex items-center gap-2 text-[12px] uppercase tracking-[0.14em] text-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
+          className="inline-flex items-center gap-2 text-[13.5px] font-medium text-[var(--accent)] hover:text-[var(--accent-deep)] transition-colors"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
             <path d="M19 12H5M11 18l-6-6 6-6" />

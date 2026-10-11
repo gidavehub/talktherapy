@@ -182,7 +182,7 @@ export default function AppShell({
             whileHover={{ scale: 1.06, rotate: -8 }}
             whileTap={{ scale: 0.94 }}
             transition={SPRING_SNAP}
-            className="h-10 w-10 rounded-full bg-[var(--dark)] text-white flex items-center justify-center"
+            className="h-10 w-10 rounded-full border-[1.5px] border-[var(--dark)]/70 text-[var(--foreground)] flex items-center justify-center"
           >
             <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
               <rect width="16" height="1.6" rx="0.8" fill="currentColor" />
@@ -204,7 +204,7 @@ export default function AppShell({
             className="md:hidden fixed inset-0 z-40"
           >
             <div
-              className="absolute inset-0 bg-black/50"
+              className="absolute inset-0 bg-[var(--dark)]/50"
               onClick={() => setMenuOpen(false)}
             />
             <motion.div

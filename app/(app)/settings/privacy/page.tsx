@@ -63,7 +63,7 @@ export default function PrivacySettingsPage() {
         <p className="eyebrow">
           Optional
         </p>
-        <h2 className="mt-3 text-[20px] leading-tight font-medium">
+        <h2 className="font-display mt-3 text-[20px] leading-tight font-medium">
           Things you can turn off
         </h2>
         <p className="mt-2 text-[13px] text-[var(--muted)] leading-relaxed">
@@ -92,7 +92,7 @@ export default function PrivacySettingsPage() {
         <p className="eyebrow">
           Required
         </p>
-        <h2 className="mt-3 text-[20px] leading-tight font-medium">
+        <h2 className="font-display mt-3 text-[20px] leading-tight font-medium">
           What you agreed to
         </h2>
         <p className="mt-2 text-[13px] text-[var(--muted)] leading-relaxed">

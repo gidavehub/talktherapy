@@ -154,7 +154,7 @@ export default function JournalEditor({ entryId }: { entryId?: string }) {
     >
       {!entryId ? (
         <div className="mb-8">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--muted)] mb-3">
+          <p className="text-[10.5px] uppercase tracking-[0.28em] font-medium text-[var(--sage)] mb-3">
             Need a starting point?
           </p>
           <div className="flex flex-wrap gap-2">

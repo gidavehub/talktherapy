@@ -119,7 +119,7 @@ export default function MoodTrendChart({
         <button
           type="button"
           onClick={() => setShowTable((v) => !v)}
-          className="text-[11px] uppercase tracking-[0.14em] text-[var(--muted)] underline underline-offset-4 hover:text-[var(--foreground)] transition-colors"
+          className="text-[13.5px] font-medium text-[var(--accent)] underline-offset-4 hover:underline transition-colors"
         >
           {showTable ? "Show chart" : "Show table"}
         </button>
@@ -277,7 +277,7 @@ export default function MoodTrendChart({
 
           {active ? (
             <div
-              className="pointer-events-none absolute -translate-x-1/2 -translate-y-full rounded-xl bg-[var(--dark)] text-white px-3 py-2 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]"
+              className="pointer-events-none absolute -translate-x-1/2 -translate-y-full rounded-xl bg-[var(--dark)] text-white px-3 py-2 shadow-[0_10px_30px_-10px_rgba(74,53,48,0.5)]"
               style={{
                 left: `${(active.x / WIDTH) * 100}%`,
                 top: `${(active.y / HEIGHT) * 100}%`,

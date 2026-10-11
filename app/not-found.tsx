@@ -38,13 +38,13 @@ export default function NotFound() {
           <div className="mt-10 flex flex-col sm:flex-row gap-3 justify-center">
             <Link
               href="/"
-              className="inline-flex h-12 items-center justify-center rounded-full bg-[var(--accent)] hover:bg-[var(--accent-soft)] transition-colors text-white px-7 text-[14px] font-medium"
+              className="inline-flex h-12 items-center justify-center rounded-full bg-[var(--accent)] hover:bg-[var(--accent-deep)] transition-colors text-white px-7 text-[14px] font-medium"
             >
               Back home
             </Link>
             <Link
               href="/support"
-              className="inline-flex h-12 items-center justify-center rounded-full border border-[var(--foreground)] px-7 text-[14px] font-medium hover:bg-[var(--dark)] hover:text-white hover:border-[var(--dark)] transition-colors"
+              className="inline-flex h-12 items-center justify-center rounded-full border-[1.5px] border-[var(--dark)] px-7 text-[14px] font-medium hover:bg-[var(--dark)] hover:text-white hover:border-[var(--dark)] transition-colors"
             >
               Get help
             </Link>
