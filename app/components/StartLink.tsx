@@ -23,14 +23,16 @@ export function useStartHref(): string {
 
 export default function StartLink({ onClick, ...props }: Omit<ComponentProps<typeof Link>, "href">) {
   const href = useStartHref();
-  const { user } = useAuth();
+  const { user, ready } = useAuth();
   return (
     <Link
       {...props}
       href={href}
       onClick={(e) => {
         // Inside the tap: that is what lets her be heard on the next screen.
-        if (isTalk(href)) beginDoorway(Boolean(user));
+        // Not before the session is known: a returning person must not be
+        // greeted with "please sign in" while their sign-in is restoring.
+        if (ready && isTalk(href)) beginDoorway(Boolean(user), e);
         onClick?.(e);
       }}
     />

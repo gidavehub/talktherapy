@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/Input";
 import { Alert } from "@/components/ui/Feedback";
 import { useToast } from "@/components/ui/Toast";
 import { deleteAccount } from "@/lib/auth";
+import { markLeaving } from "@/lib/signOutFlow";
 import { deleteWellbeingData, exportUserData } from "@/lib/wellbeing";
 
 /**
@@ -77,6 +78,8 @@ export default function DataSettingsPage() {
     setBusy(true);
     setError(null);
     try {
+      // Leaving on purpose: the gate must not send them to sign in again.
+      markLeaving();
       await deleteAccount(deleteWellbeingData);
       router.replace("/");
     } catch (e) {

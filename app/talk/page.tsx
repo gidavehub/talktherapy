@@ -35,7 +35,7 @@ import AuthCard from "@/components/AuthCard";
 import Modal from "@/components/ui/Modal";
 import { useVoice, voice } from "@/lib/audio/lines";
 import { useConsultation } from "@/lib/payments/consultation";
-import { afterSignIn, homeFor, isSettled, safeNext } from "@/lib/routing";
+import { afterSignIn, isSettled, safeNext } from "@/lib/routing";
 import { AI_TIERS } from "@/lib/models";
 
 /**
@@ -80,9 +80,27 @@ const STATUS: Record<Phase, string> = {
  */
 export default function TalkPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<TalkShell />}>
       <Talk />
     </Suspense>
+  );
+}
+
+/**
+ * What a full page load shows before the script has run: the dark screen,
+ * and the urgent-help line — never a blank page, on the screen most likely
+ * to be open when someone is struggling.
+ */
+function TalkShell() {
+  return (
+    <div className="relative flex min-h-screen flex-col items-center justify-end bg-[var(--dark)] px-4 pb-10 text-white">
+      <p className="text-center text-[11px] uppercase leading-relaxed tracking-[0.18em] text-white/45 max-w-[460px]">
+        Talk is an AI, not a therapist, and cannot respond to an emergency.{" "}
+        <Link href="/crisis" className="underline underline-offset-4 text-white/70">
+          Urgent help
+        </Link>
+      </p>
+    </div>
   );
 }
 
@@ -284,12 +302,14 @@ function Talk() {
   const price = formatDalasi(AI_TIERS[tier].amountMinor);
   const { start } = talk;
 
-  // Providers and staff are never put through the door: back to their own home.
+  // Providers and staff are never put through the door: on to where they
+  // were going (?next), or their own home. The same rule as onSignedIn, so
+  // whichever of the two runs last, they agree.
   useEffect(() => {
     if (profile?.role !== "provider" && profile?.role !== "admin") return;
     voice.forget();
-    router.replace(homeFor(profile));
-  }, [profile, router]);
+    router.replace(afterSignIn(profile, next));
+  }, [next, profile, router]);
 
   // ---- the doorway --------------------------------------------------------
   // Talk runs the way in, from this screen, in her recorded voice (English,
@@ -311,6 +331,21 @@ function Talk() {
   const heard = useVoice();
   const doorway = heard.spoken.length > 0;
   const recorded = Boolean(heard.saying) && !talk.active;
+
+  // Came to sign in, but already signed in — their session was still being
+  // restored when they tapped, or an old sign-in link. Somebody set up is
+  // sent on (?next, or home) rather than left on a screen asking them to
+  // sign in. Decided once, on arrival: never after they sign in here.
+  const arrival = useRef(false);
+  useEffect(() => {
+    if (!ready || arrival.current) return;
+    if (user && !profile) return; // their profile is still loading
+    arrival.current = true;
+    if (!profile || !isSettled(profile)) return;
+    if (!params.has("signin") && !params.has("next")) return;
+    voice.forget();
+    router.replace(afterSignIn(profile, next));
+  }, [next, params, profile, ready, router, user]);
 
   // Sign-in: up once she has asked for it, until they close it. Sent here
   // to sign in (a Sign in control, or a page that needs an account) and she
@@ -457,9 +492,15 @@ function Talk() {
   /**
    * Signed in on this screen. Somebody already set up goes where they were
    * heading (?next), or home; somebody new stays, and Talk carries on.
+   * Signing in AGAIN (a sign-in that went stale mid-conversation) stays.
    */
+  const reauth = useRef(false);
   const onSignedIn = (signedIn: Parameters<typeof isSettled>[0]) => {
     voice.stop();
+    if (reauth.current) {
+      reauth.current = false;
+      return;
+    }
     if (isSettled(signedIn)) {
       voice.forget();
       router.replace(afterSignIn(signedIn, next));
@@ -780,6 +821,7 @@ function Talk() {
                 <button
                   type="button"
                   onClick={() => {
+                    reauth.current = true;
                     void signOut().then(() => {
                       setSignInClosed(false);
                       setAskSignIn(true);

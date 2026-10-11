@@ -284,7 +284,7 @@ export default function ProviderProfileView({ providerId }: { providerId: string
             <p className="text-[12px] text-[var(--muted)] leading-relaxed">
               <Link
                 href={talkHref({ signIn: true, next: `/providers/${providerId}` })}
-                onClick={() => beginDoorway(false)}
+                onClick={(e) => beginDoorway(false, e)}
                 className="underline underline-offset-4 text-[var(--foreground)]"
               >
                 Sign in

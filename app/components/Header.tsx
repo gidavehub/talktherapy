@@ -33,7 +33,7 @@ const SECONDARY_LINKS = [
 
 export default function Header() {
   const [open, setOpen] = useState(false);
-  const { user } = useAuth();
+  const { user, ready } = useAuth();
 
   useEffect(() => {
     if (!open) return;
@@ -115,8 +115,8 @@ export default function Header() {
               <Link
                 href={user ? "/dashboard" : talkHref({ signIn: true })}
                 // Signing in is Talk's to do: she asks, and brings it up.
-                onClick={() => {
-                  if (!user) beginDoorway(false);
+                onClick={(e) => {
+                  if (ready && !user) beginDoorway(false, e);
                 }}
                 className="h-11 inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-transparent px-5 text-[13px] font-medium tracking-wide uppercase hover:bg-black/5 transition-colors"
               >
@@ -226,8 +226,8 @@ export default function Header() {
               >
                 <Link
                   href={user ? "/dashboard" : talkHref()}
-                  onClick={() => {
-                    if (!user) beginDoorway(false);
+                  onClick={(e) => {
+                    if (ready && !user) beginDoorway(false, e);
                     setOpen(false);
                   }}
                   className="inline-flex h-12 items-center gap-3 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-soft)] transition-colors text-white pl-6 pr-2 text-[12px] uppercase tracking-[0.14em] font-medium self-start"

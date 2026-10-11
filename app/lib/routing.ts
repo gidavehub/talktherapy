@@ -40,8 +40,21 @@ export function isSettled(profile: UserDoc | null): boolean {
  * and is ignored.
  */
 export function safeNext(raw: string | null | undefined): string | null {
-  if (!raw || !raw.startsWith("/") || raw.startsWith("//") || raw.startsWith("/\\")) return null;
-  return raw;
+  if (!raw || !raw.startsWith("/")) return null;
+  // Control characters and backslashes first: a browser strips a tab or a
+  // newline when it parses a URL, so "/<TAB>/evil.example" becomes
+  // "//evil.example" — another site — after every prefix check has passed.
+  if (/[\\\u0000-\u001f\u007f]/.test(raw)) return null;
+  // Then resolve it the way the browser will, and keep it only if it stays
+  // on this site.
+  try {
+    const base = "https://talk.invalid";
+    const url = new URL(raw, base);
+    if (url.origin !== base) return null;
+    return url.pathname + url.search + url.hash;
+  } catch {
+    return null;
+  }
 }
 
 /** After sign-in: honour `next` for people who are set up; new people meet Talk first. */

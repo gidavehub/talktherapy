@@ -116,7 +116,7 @@ export default function Button({
   // "Create your account" must never ask a signed-in person to sign up
   // again: a plain /sign-up link resolves to where they actually belong.
   const startHref = useStartHref();
-  const { user } = useAuth();
+  const { user, ready } = useAuth();
   const href = rawHref === "/sign-up" ? startHref : rawHref;
   const sizing = SIZES[size];
   const styles = VARIANTS[variant];
@@ -178,7 +178,7 @@ export default function Button({
           href={href}
           className={shell}
           // A button that leads to Talk starts her speaking inside the tap.
-          onClick={isTalk(href) ? () => beginDoorway(Boolean(user)) : undefined}
+          onClick={isTalk(href) && ready ? (e) => beginDoorway(Boolean(user), e) : undefined}
           {...rest}
         >
           {inner}

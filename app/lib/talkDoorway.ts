@@ -20,6 +20,16 @@ import { voice } from "./audio/lines";
 
 export const TALK = "/talk";
 
+/** The parts of a click that say whether it navigates this tab. */
+export type DoorwayClick = {
+  button: number;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  shiftKey: boolean;
+  altKey: boolean;
+  defaultPrevented: boolean;
+};
+
 /**
  * Talk's screen. `signIn` opens it ready to sign in rather than to create an
  * account (somebody returning); `next` is where a person who is already set
@@ -43,8 +53,13 @@ export function isTalk(href: string): boolean {
  * the way in ("Welcome… please sign in… you can use your email, or Google");
  * signed in but new, she says welcome and the screen carries on from there.
  */
-export function beginDoorway(signedIn: boolean): void {
+export function beginDoorway(signedIn: boolean, click?: DoorwayClick): void {
   if (typeof window === "undefined") return;
+  // Ctrl/Cmd/Shift-click or a middle click opens Talk in ANOTHER tab: this
+  // one stays where it is, and must not start talking to nobody.
+  if (click && (click.defaultPrevented || click.button !== 0 || click.metaKey || click.ctrlKey || click.shiftKey || click.altKey)) {
+    return;
+  }
   voice.unlock();
   voice.say(signedIn ? ["welcome"] : ["welcome", "sign-in", "how"]);
 }

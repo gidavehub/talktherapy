@@ -61,9 +61,14 @@ export default function AppGate({ children }: { children: React.ReactNode }) {
     if (!ready) return;
 
     if (!user) {
-      // Signing out leaves for the landing page by itself; do not chase it
-      // to the sign-in screen.
-      if (isLeaving()) return;
+      // Signing out (or deleting the account) leaves for the landing page;
+      // do not chase it to the sign-in screen. Said again here rather than
+      // just returning: a person who pressed Back straight after signing out
+      // would otherwise sit on this splash for good.
+      if (isLeaving()) {
+        router.replace("/");
+        return;
+      }
       // To Talk, who signs them in, carrying the attempted path so a person
       // who is already set up comes straight back here afterwards.
       router.replace(talkHref({ signIn: true, next: pathname }));

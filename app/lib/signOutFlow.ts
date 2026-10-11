@@ -15,16 +15,20 @@ export function isLeaving(): boolean {
   return leaving;
 }
 
-export async function signOutToHome(router: { replace: (href: string) => void }): Promise<void> {
+/**
+ * About to stop being signed in on purpose — signing out, deleting the
+ * account. Long enough for the landing page to take over; short enough that
+ * a later visit to an app page while signed out is still sent to sign in.
+ */
+export function markLeaving(): void {
   leaving = true;
+  setTimeout(() => {
+    leaving = false;
+  }, 4000);
+}
+
+export async function signOutToHome(router: { replace: (href: string) => void }): Promise<void> {
+  markLeaving();
   router.replace("/");
-  try {
-    await signOut();
-  } finally {
-    // Long enough for the landing page to take over; short enough that a
-    // later visit to an app page while signed out is still sent to sign in.
-    setTimeout(() => {
-      leaving = false;
-    }, 4000);
-  }
+  await signOut();
 }
