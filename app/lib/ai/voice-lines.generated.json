@@ -122,6 +122,46 @@
       }
     },
     {
+      "id": "more-price",
+      "clips": {
+        "en": {
+          "src": "/voice/onboarding/more-price.en.bb99bed0d2.mp3",
+          "text": "Welcome back. To talk with me again, a session is five hundred dalasi, for twenty minutes.",
+          "seconds": 8.27,
+          "bytes": 49968,
+          "sha256": "bb99bed0d237af8b586ccd3f59e2cbf35aad015cf50c5fc8eca9e47428e65227"
+        },
+        "wo": {
+          "src": "/voice/onboarding/more-price.wo.0685b9d513.mp3",
+          "text": "Dalal jàmm. Ngir nu waxtaanaat, session bi five hundred dalasi la, ci twenty minutes.",
+          "seconds": 9.59,
+          "bytes": 57888,
+          "sha256": "0685b9d5138476e9bf74f7bef319f8c65c4434930094cf7545c2526a2334ec4b",
+          "draft": true
+        }
+      }
+    },
+    {
+      "id": "more-why",
+      "clips": {
+        "en": {
+          "src": "/voice/onboarding/more-why.en.f6f1e672b1.mp3",
+          "text": "Your first consultation is done. This time is just for you, to talk through what is on your mind, at your own pace.",
+          "seconds": 10.08,
+          "bytes": 60768,
+          "sha256": "f6f1e672b1779fa3bce8359a554a0f255b53dc5abcab12f8940c7c90ce3dfcb6"
+        },
+        "wo": {
+          "src": "/voice/onboarding/more-why.wo.cee358f7a7.mp3",
+          "text": "Sa consultation bu njëkk bi jeex na. Waxtu wii, yaw rekk la, ngir nga wax li nekk ci sa xel, ndànk-ndànk.",
+          "seconds": 11.17,
+          "bytes": 67392,
+          "sha256": "cee358f7a78aa1282e0c5628075e3c43cb83cae0f42d10caf86209bff83a1e9e",
+          "draft": true
+        }
+      }
+    },
+    {
       "id": "paid",
       "clips": {
         "en": {

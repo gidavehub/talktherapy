@@ -129,7 +129,7 @@ export default function Composer({
   const canSendText = text.trim().length > 0;
 
   return (
-    <div className="border-t border-[var(--border)] bg-[var(--background)]/95 backdrop-blur-md px-3 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))]">
+    <div className="shrink-0 border-t border-[var(--border)] bg-[var(--surface)] px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:px-4">
       <AnimatePresence>
         {notice ? (
           <motion.button
@@ -158,7 +158,7 @@ export default function Composer({
             <IconTrash size={18} />
           </motion.button>
 
-          <div className="flex h-12 flex-1 items-center gap-3 rounded-full bg-white px-5">
+          <div className="flex h-12 flex-1 items-center gap-3 rounded-full bg-[var(--background)] px-5">
             <motion.span
               aria-hidden
               className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--accent)]"
@@ -215,7 +215,7 @@ export default function Composer({
             <IconImage size={19} />
           </motion.button>
 
-          <div className="flex-1 min-w-0 rounded-[24px] bg-white px-4 py-[11px]">
+          <div className="flex-1 min-w-0 rounded-[24px] bg-[var(--background)] px-4 py-[11px]">
             <textarea
               ref={textareaRef}
               value={text}

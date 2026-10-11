@@ -52,7 +52,9 @@ const draftWolof = args.includes("--draft-wolof");
 const FRENCH_IN_WOLOF = [
   /\bkontin\w*/i, /\bkonfirm\w*/i, /\bmerci\b/i, /\bparce que\b/i, /\bmaintenant\b/i, /\bvraiment\b/i,
   /\bd'accord\b/i, /\ben tout cas\b/i, /\bportable\b/i, /\bt[ée]l[ée]phone\b/i, /\brendez-vous\b/i,
-  /\bcarte\b/i, /\bl?opitaan\b/i, /\bdonc\b/i, /\bmais\b/i, /\bça va\b/i,
+  /\bcarte\b/i, /\bl?opitaan\b/i, /\bdonc\b/i, /\bmais\b/i, /\bça va\b/i, /\bnim[ée]ro\b/i, /\bpou?r\b/i,
+  // French numbers: Gambians say them in English.
+  /\b(deux|trois|quatre|cinq|sept|huit|neuf|dix|onze|douze|quinze|vingt|trente|cent|cents|mille)\b/i,
 ];
 function assertGambianWolof(id, text) {
   const hit = FRENCH_IN_WOLOF.find((re) => re.test(text));

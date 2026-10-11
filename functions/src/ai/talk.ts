@@ -97,7 +97,7 @@ Talk is a Gambian platform, and The Gambia is English-speaking. Its Wolof, Mandi
 - English: plain English as spoken in The Gambia.
 - Wolof: GAMBIAN Wolof — as people speak it in Banjul, Serrekunda and the Kombos, and on Gambian radio. Never Senegalese or Dakar Wolof: Gambian listeners hear Dakar Wolof and French words at once, and it makes Talk sound foreign to them. Gambians mix ENGLISH into their Wolof, never French. So:
   - For modern and everyday things use the English word, as a Gambian says it: phone (never portable or téléphone), card (never carte), confirm (never konfirme, konfirmeer or konfirmaar), appointment (never rendez-vous), hospital, doctor, school, transport, money app, Wave, online, session, provider.
-  - Never French connecting words or interjections: not parce que, mais, donc, maintenant, vraiment, en tout cas, d'accord, merci, ça va. Use the Wolof — ndax, waaye, kon, léegi, wéy (to continue — never kontine) — or the English a Gambian would use: okay, thank you (or jërëjëf).
+  - Never French connecting words or interjections: not parce que, pour (or pur), mais, donc, maintenant, vraiment, en tout cas, d'accord, merci, ça va. Use the Wolof — ngir (for, so that — never pur), ndax, waaye, kon, léegi, wéy (to continue — never kontine) — or the English a Gambian would use: okay, thank you (or jërëjëf).
   - Plain, everyday Gambian phrasing over formal or literary Wolof.
   Standard Latin orthography, e.g. "Salaam aleekum, maa ngi tudd Talk. Naka nga def? Yéwénal sa xel, amul gaaw."
 - Mandinka: Gambian Mandinka, written in standard Latin orthography with ŋ and ñ, e.g. "I be ñaadi? Ŋa a fo i ye, n too mu Talk le ti. Kana korto, waati be jee."
@@ -327,7 +327,11 @@ const FIELD_GUIDE: Record<RequiredField, string> = {
   location: `which part of the country they are in — ${AREAS.filter((a) => a !== "outside").join(", ")}, or outside The Gambia. A town name is enough; work out the area yourself.`,
   gender: 'whether they are a woman, a man, or would describe themselves another way — and "unsaid" is a perfectly good answer if they would rather not say.',
   concerns: "what has been weighing on them, and what brings them to Talk",
-  servicesWanted: `what kind of help they are looking for — ${SERVICE_CHOICES}. Name the kinds in your own words, as speech — never as a read-out list of labels.`,
+  // RECOMMENDED, never asked. People heard "which do you want: therapy,
+  // psychotherapy, counselling…" and could not answer — they do not know the
+  // words, and should not have to. Talk is the one who knows; she says what
+  // she thinks will help, from what they have told her, and they can say no.
+  servicesWanted: `the kind of help that fits them. Do NOT ask them to choose it, and never say the names of the kinds — therapy, psychotherapy, counselling, psychosocial support, social work mean nothing to most people. You are the expert: from what they have told you, decide yourself. The kinds, for you alone: ${SERVICE_CHOICES}. In ONE short, plain sentence, tell them what kind of person you will find for them and why, in everyday words — e.g. "From what you have told me, someone you can talk to regularly about the stress at work would really help, so I will look for people like that." — set servicesWanted to it, and carry straight on with the next thing still to learn in the same reply. If they say it is not what they want, change it to what they describe.`,
   providerGender: "whether they would prefer to talk to a woman or a man, or it does not matter",
 };
 
@@ -397,10 +401,10 @@ Fill "intake" with what THIS message tells you, null (or an empty list) for anyt
 - ageRange, location, gender: the background above, as the exact ids listed.
 - language: english, wolof, mandinka, pulaar or other — the language they want to be supported in.
 - concerns: any of ${SPECIALIZATIONS.join(", ")} ("depression" covers low mood; "youth" means they are young or a student). concernSummary: one short English sentence in their own terms.
-- servicesWanted: any of ${SERVICES.join(", ")}. Work out which fit from what they describe — most people will not know the words. More than one is fine.
+- servicesWanted: any of ${SERVICES.join(", ")} — YOUR recommendation, worked out from what they have told you; most people will not know the words. More than one is fine. Fill it as soon as you know what they are going through, and say your recommendation out loud in plain words in that same reply.
 - providerGender: woman, man, or any.
 
-- Whenever your question has a fixed set of answers, fill "choices" with those options written in their language, so they can be shown as buttons for someone who cannot read well or cannot hear you. ALSO name the options out loud in your reply, briefly and as speech ("…, …, or …?") — many people using Talk cannot read the buttons at all, and hearing the options is how they answer. Use these ids exactly: age, ${AGE_RANGES.join(", ")}; area, ${AREAS.join(", ")}; their own gender, ${USER_GENDERS.join(", ")}; the kind of help, ${SERVICES.join(", ")}; the provider's gender, woman, man, any. Leave choices empty for open questions.
+- Whenever your question has a fixed set of answers, fill "choices" with those options written in their language, so they can be shown as buttons for someone who cannot read well or cannot hear you. ALSO name the options out loud in your reply, briefly and as speech ("…, …, or …?") — many people using Talk cannot read the buttons at all, and hearing the options is how they answer. Use these ids exactly: age, ${AGE_RANGES.join(", ")}; area, ${AREAS.join(", ")}; their own gender, ${USER_GENDERS.join(", ")}; the provider's gender, woman, man, any. Leave choices empty for open questions. The kind of help is never a choice: you recommend it.
 - If they would rather not answer something, accept it kindly: record "any" for the provider's gender, and your best guess of the service from what they have said.
 - If they want to skip the questions and simply be matched, fill what you can and finish.
 - Sessions happen by video call — if they ask how they will meet, say so; do not ask them to choose.
@@ -545,18 +549,18 @@ export function speechRate(wpm: number | undefined): number {
 function cleanChoices(raw: unknown, intake: Intake): Choice[] {
   if (!Array.isArray(raw)) return [];
   const next = missingFields(intake)[0];
+  // No buttons for the kind of help: Talk recommends it rather than asking
+  // (FIELD_GUIDE), so a row of clinical labels has nothing to answer.
   const allowed: readonly string[] =
-    next === "servicesWanted"
-      ? SERVICES
-      : next === "providerGender"
-        ? GENDER_PREFS
-        : next === "ageRange"
-          ? AGE_RANGES
-          : next === "location"
-            ? AREAS
-            : next === "gender"
-              ? USER_GENDERS
-              : [];
+    next === "providerGender"
+      ? GENDER_PREFS
+      : next === "ageRange"
+        ? AGE_RANGES
+        : next === "location"
+          ? AREAS
+          : next === "gender"
+            ? USER_GENDERS
+            : [];
   if (!allowed.length) return [];
   const out: Choice[] = [];
   for (const c of raw) {
@@ -1165,7 +1169,7 @@ export async function runGreeting(
     : null;
   const ask =
     input.mode === "intake"
-      ? `${lead ?? `They are coming back to finish getting started. In ${language}, welcome them back${name ? ` by name (${name})` : ""} in one short sentence`}, then ask about: ${FIELD_GUIDE[missingFields(intake)[0] ?? "concerns"]}.`
+      ? `${lead ?? `They are coming back to finish getting started. In ${language}, welcome them back${name ? ` by name (${name})` : ""} in one short sentence`}, then go on to the next thing still to learn: ${FIELD_GUIDE[missingFields(intake)[0] ?? "concerns"]}.`
       : `${lead ?? `They have opened a conversation with you. In ${language}, greet them warmly${name ? ` by name (${name})` : ""}`} and ask, in one short sentence, what is on their mind today.`;
 
   const res = await generate(

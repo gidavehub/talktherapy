@@ -36,7 +36,7 @@ import Modal from "@/components/ui/Modal";
 import { useVoice, voice } from "@/lib/audio/lines";
 import { useConsultation } from "@/lib/payments/consultation";
 import { afterSignIn, isSettled, safeNext } from "@/lib/routing";
-import { AI_TIERS } from "@/lib/models";
+import { AI_TIERS, type AiTierId } from "@/lib/models";
 
 /**
  * Talk — the voice surface, and for a new person, the whole onboarding.
@@ -78,8 +78,16 @@ const STATUS: Record<Phase, string> = {
  * useSearchParams needs a Suspense boundary above it, or the build cannot
  * prerender the page. Nothing in it waits on data, so this resolves at once.
  */
-/** What Talk says to walk somebody through paying for the D200 consultation. */
-const PAY_LINES = ["price", "why", "pay-how"];
+/**
+ * What Talk says to walk somebody through paying: what it costs (the sheet
+ * opens as she says it), why it is worth it, then exactly what to tap. The
+ * D200 first consultation, or — once that is done — the D500 session for
+ * talking to her again.
+ */
+const PAY_LINES: Record<AiTierId, string[]> = {
+  initial: ["price", "why", "pay-how"],
+  extended: ["more-price", "more-why", "pay-how"],
+};
 
 export default function TalkPage() {
   return (
@@ -303,6 +311,7 @@ function Talk() {
   const consultation = useConsultation(tier, { expecting: params.has("paid") });
   const { paid, prepare } = consultation;
   const price = formatDalasi(AI_TIERS[tier].amountMinor);
+  const payLines = PAY_LINES[tier];
   const { start } = talk;
 
   // Providers and staff are never put through the door: on to where they
@@ -370,7 +379,7 @@ function Talk() {
     Boolean(user) &&
     paid === false &&
     !payClosed &&
-    (payOpen || heard.spoken.includes("price") || consultation.phase !== "idle");
+    (payOpen || heard.spoken.includes(payLines[0]) || consultation.phase !== "idle");
 
   // Whether this screen is still the one on show. A line's onDone can fire
   // after somebody has left, and must not open a microphone on a page that
@@ -440,10 +449,11 @@ function Talk() {
   // Signed in (on this screen, or before): what next? Once whatever she is
   // saying has finished:
   //
-  //   - not paid for the consultation: she walks them to paying AT ONCE,
-  //     however they arrived — the price (the sheet opens as she says it),
-  //     why this first consultation matters, then exactly what to tap. The
-  //     way to paying is the way in, just as signing in is.
+  //   - not paid: she walks them to paying AT ONCE, however they arrived —
+  //     the price (the sheet opens as she says it), why it matters, then
+  //     exactly what to tap. The way to paying is the way in, just as signing
+  //     in is. Before the intake that is the D200 first consultation; coming
+  //     back to talk to her after it, the D500 session (PAY_LINES).
   //   - paid, and they came in through a tap: welcome back, and begin.
   //
   // Arriving without a tap (a refresh, a redirect), the browser may refuse
@@ -454,14 +464,13 @@ function Talk() {
     if (decided.current || concluded.current || !ready || !user || !profile) return;
     if (heard.saying || paid === null || talk.active || profile.role !== "patient") return;
     if (!paid) {
-      // Only for the D200: the lines name its price and a FIRST consultation.
-      if (tier !== "initial") return;
       decided.current = true;
       // Build her voice into the graph first, so the particles follow it.
       // Where the browser still forbids sound (a fresh load on a phone),
       // the first touch anywhere resumes it and she says it again.
       voice.unlock();
-      voice.say(heard.spoken.includes("welcome") ? PAY_LINES : ["welcome", ...PAY_LINES]);
+      // The D500 lines open with "Welcome back" themselves.
+      voice.say(tier === "extended" || heard.spoken.includes("welcome") ? payLines : ["welcome", ...payLines]);
       return;
     }
     if (!doorway || isSettled(profile)) return;
@@ -480,19 +489,20 @@ function Talk() {
     const replay = () => {
       const sequence = !user
         ? ["welcome", "sign-in", "how"]
-        : paid === false && tier === "initial"
-          ? ["welcome", ...PAY_LINES]
+        : paid === false
+          ? tier === "extended"
+            ? payLines
+            : ["welcome", ...payLines]
           : ["welcome"];
       const current = heard.saying?.id ?? null;
       const from = current ? sequence.indexOf(current) : -1;
-      const lines =
-        from >= 0 ? sequence.slice(from) : !user ? ["sign-in", "how"] : sequence.length > 1 ? PAY_LINES : [];
+      const lines = from >= 0 ? sequence.slice(from) : !user ? ["sign-in", "how"] : paid === false ? payLines : [];
       voice.unlock();
       if (lines.length) voice.say(lines);
     };
     document.addEventListener("pointerdown", replay, { once: true, capture: true });
     return () => document.removeEventListener("pointerdown", replay, { capture: true });
-  }, [heard.blocked, heard.saying, user, paid, tier]);
+  }, [heard.blocked, heard.saying, user, paid, tier, payLines]);
 
   // Paid, in this visit. The checkout is in another tab; the moment the
   // consultation is written she thanks them and begins — once somebody is
@@ -532,11 +542,10 @@ function Talk() {
       setPayClosed(false);
       setPayOpen(true);
       // Inside this tap, so she can be heard: she walks them through paying,
-      // unless she is already talking or already has. Only for the D200 —
-      // the lines name its price and speak of a FIRST consultation.
-      if (tier === "initial" && !heard.saying && !heard.spoken.includes("pay-how")) {
+      // unless she is already talking or already has.
+      if (!heard.saying && !heard.spoken.includes("pay-how")) {
         voice.unlock();
-        voice.say(heard.spoken.includes("price") ? PAY_LINES.slice(1) : PAY_LINES);
+        voice.say(heard.spoken.includes(payLines[0]) ? payLines.slice(1) : payLines);
       }
       return;
     }

@@ -18,7 +18,7 @@ const FRENCH = [
   /\bkontin\w*/i, /\bkonfirm\w*/i, /\bmerci\b/i, /\bparce que\b/i, /\bmaintenant\b/i, /\bvraiment\b/i,
   /\bd'accord\b/i, /\ben tout cas\b/i, /\bportable\b/i, /\bt[ée]l[ée]phone\b/i, /\brendez-vous\b/i,
   /\bcarte\b/i, /\bl?opitaan\b/i, /\bdonc\b/i, /\bmais\b/i, /\bça va\b/i, /\bdoktoor\b/i, /\blekool\b/i,
-  /\bnim[ée]ro\b/i,
+  /\bnim[ée]ro\b/i, /\bpou?r\b/i,
   // French numbers.
   /\b(deux|trois|quatre|cinq|sept|huit|neuf|dix|onze|douze|quinze|vingt|trente|quarante|cinquante|soixante|cents?|mille|heures?)\b/i,
 ];

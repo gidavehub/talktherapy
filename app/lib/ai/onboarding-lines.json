@@ -44,6 +44,20 @@
       "woBack": "Press Pay, then choose Wave or your card. Confirm it on your phone, then come back here."
     },
     {
+      "id": "more-price",
+      "en": "Welcome back. To talk with me again, a session is five hundred dalasi, for twenty minutes.",
+      "wo": "Dalal jàmm. Ngir nu waxtaanaat, session bi five hundred dalasi la, ci twenty minutes.",
+      "woDraft": true,
+      "woBack": "Welcome. For us to talk again, the session is five hundred dalasi, for twenty minutes."
+    },
+    {
+      "id": "more-why",
+      "en": "Your first consultation is done. This time is just for you, to talk through what is on your mind, at your own pace.",
+      "wo": "Sa consultation bu njëkk bi jeex na. Waxtu wii, yaw rekk la, ngir nga wax li nekk ci sa xel, ndànk-ndànk.",
+      "woDraft": true,
+      "woBack": "Your first consultation is finished. This time, it's just you, so you can say what's on your mind, slowly."
+    },
+    {
       "id": "paid",
       "en": "Thank you. Now, let us begin.",
       "wo": "Jërëjëf. Léegi, nanu tàmbli.",

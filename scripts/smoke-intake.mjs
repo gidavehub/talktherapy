@@ -8,6 +8,7 @@
  *   - greets first,
  *   - switches to Wolof and stays there,
  *   - pulls the right structured answers out of what is said,
+ *   - recommends the kind of help herself, never asking them to choose it,
  *   - finishes (intakeComplete) once she has what she needs, and not before.
  *
  * Typed turns, not audio: this tests the agent's judgement. The audio path
@@ -76,15 +77,13 @@ const SCRIPT = [
     wolofReply: true,
   },
   {
+    // Talk recommends the kind of help from this — she does not ask for it.
     say: "Sama yaay dafa faatu weer wi weesu, te duma mëna nelaw guddi.",
-    expect: (i) => i.concerns?.includes("grief"),
-    what: "concerns include grief",
-    wolofReply: true,
-  },
-  {
-    say: "Dama bëgg kenn ku ma mëna waxtaan ak moom.",
-    expect: (i) => i.servicesWanted?.length > 0,
-    what: "service captured",
+    expect: (i, t) =>
+      i.concerns?.includes("grief") &&
+      i.servicesWanted?.length > 0 &&
+      !/psycho|counsel|social work/i.test(`${t.reply} ${t.replyEnglish ?? ""}`),
+    what: "concerns include grief, and she recommends the help in plain words",
     wolofReply: true,
   },
   {

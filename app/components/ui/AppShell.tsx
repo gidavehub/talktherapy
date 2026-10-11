@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { SPRING_SOFT, SPRING_SNAP } from "../motion/primitives";
 import { useAuth } from "../AuthProvider";
@@ -20,7 +20,22 @@ import { Avatar } from "./Feedback";
  *
  * Nav is injected rather than hardcoded so patient / provider / admin / org
  * all share one shell with four different rails.
+ *
+ * Messages is laid out like WhatsApp, edge to edge, and brings its own panes
+ * (ChatsSplit). On a phone an open conversation IS the screen: its header is
+ * the top bar — with the menu button in it, through useOpenMenu — and its
+ * composer is the bottom bar. Neither of this shell's bars is drawn over it.
  */
+
+/** Opens the full menu on a phone — for a screen that draws its own top bar. */
+const OpenMenu = createContext<() => void>(() => {});
+export function useOpenMenu() {
+  return useContext(OpenMenu);
+}
+
+function inMessages(pathname: string) {
+  return pathname === "/chats" || pathname.startsWith("/chats/");
+}
 
 export type NavItem = {
   href: string;
@@ -99,6 +114,9 @@ export default function AppShell({
   const [menuOpen, setMenuOpen] = useState(false);
 
   const primary = nav.filter((item) => item.primary).slice(0, 5);
+  const messages = inMessages(pathname);
+  // One conversation open: it draws both bars itself.
+  const conversation = pathname.startsWith("/chats/");
   const displayName = profile?.displayName ?? user?.displayName ?? user?.email ?? "You";
 
   const rail = (
@@ -141,6 +159,7 @@ export default function AppShell({
   );
 
   return (
+    <OpenMenu.Provider value={() => setMenuOpen(true)}>
     <div className="min-h-screen bg-[var(--background)]">
       {/* Desktop rail */}
       <aside className="hidden md:flex fixed inset-y-0 left-0 w-[264px] bg-[var(--dark)] px-6 py-8 flex-col z-30">
@@ -148,6 +167,7 @@ export default function AppShell({
       </aside>
 
       {/* Mobile top bar */}
+      {conversation ? null : (
       <header className="md:hidden sticky top-0 z-30 bg-[var(--background)]/90 backdrop-blur-md border-b border-[var(--border)] px-4 h-16 flex items-center justify-between">
         <Link href="/" className="leading-[0.85] text-[14px] font-medium tracking-tight">
           <span className="block">TALK</span>
@@ -173,6 +193,7 @@ export default function AppShell({
           </motion.button>
         </div>
       </header>
+      )}
 
       {/* Mobile full menu — the complete nav, since the bottom bar shows five */}
       <AnimatePresence>
@@ -200,7 +221,10 @@ export default function AppShell({
         ) : null}
       </AnimatePresence>
 
-      {/* Content */}
+      {/* Content — Messages edge to edge, everything else in a column */}
+      {messages ? (
+        <div className="md:pl-[264px]">{children}</div>
+      ) : (
       <div className="md:pl-[264px]">
         <div
           className={`px-4 sm:px-6 md:px-10 pt-6 md:pt-10 pb-28 md:pb-16 mx-auto ${
@@ -235,8 +259,10 @@ export default function AppShell({
           {children}
         </div>
       </div>
+      )}
 
       {/* Mobile bottom bar */}
+      {conversation ? null : (
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-[var(--border)] pb-[env(safe-area-inset-bottom)]">
         <div className="flex items-stretch">
           {primary.map((item) => {
@@ -289,6 +315,8 @@ export default function AppShell({
           })}
         </div>
       </nav>
+      )}
     </div>
+    </OpenMenu.Provider>
   );
 }

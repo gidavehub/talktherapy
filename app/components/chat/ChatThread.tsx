@@ -8,6 +8,7 @@ import { useAuth } from "../AuthProvider";
 import { EmptyState, Skeleton } from "../ui/Feedback";
 import { IconChat } from "../ui/icons";
 import MinorFlag from "../ui/MinorFlag";
+import { useOpenMenu } from "../ui/AppShell";
 import Composer from "./Composer";
 import DateSeparator, { startsNewDay } from "./DateSeparator";
 import MessageBubble from "./MessageBubble";
@@ -39,19 +40,14 @@ import {
 import type { Chat, ChatMessage } from "../../lib/models";
 
 /**
- * The thread.
+ * The thread, laid out as WhatsApp lays one out — the layout people already
+ * know from every messaging app.
  *
- * Fills the viewport with the composer pinned to the bottom, which is the one
- * layout people already know from every messaging app. The height is computed
- * rather than set to 100dvh because this sits inside AppShell, which has its
- * own chrome above and below:
- *
- *   mobile — 64px sticky top bar + 24px pt-6 + 112px pb-28  = 200px
- *   desktop — no top bar in flow + 40px pt-10 + 64px pb-16  = 104px
- *
- * Those numbers come straight from AppShell's content wrapper. If that padding
- * changes, this has to change with it — hence spelling out the arithmetic
- * instead of leaving two magic numbers behind.
+ * It fills its pane (ChatsSplit): on a phone that is the whole screen. The
+ * header is the top bar — back to the list, who it is, call, and the app's
+ * menu — and the composer is the bottom bar; AppShell draws neither of its
+ * own bars over a conversation. On a computer the list sits to the left, so
+ * there is no back button, and the app's rail holds the menu.
  *
  * Read-aloud is wired to every bubble. The language is the one the person
  * chose when they talked to Talk (`profile.intake.language`), not a guess from
@@ -59,6 +55,7 @@ import type { Chat, ChatMessage } from "../../lib/models";
  */
 export default function ChatThread({ chatId }: { chatId: string }) {
   const { user, profile, role } = useAuth();
+  const openMenu = useOpenMenu();
   const isProvider = role === "provider";
   const uid = user?.uid ?? null;
 
@@ -188,8 +185,45 @@ export default function ChatThread({ chatId }: { chatId: string }) {
   // one while reading it, or followed a link to a conversation that is not
   // theirs. Say so — an endless skeleton under a header pretending to be a
   // two-person chat is the worst possible answer to "where did my group go".
+  const back = (
+    <Link
+      href="/chats"
+      aria-label="Back to all conversations"
+      className="h-10 w-10 shrink-0 rounded-full flex items-center justify-center text-[var(--foreground)] hover:bg-black/5 transition-colors md:hidden"
+    >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+        <path d="M19 12H5M11 18l-6-6 6-6" />
+      </svg>
+    </Link>
+  );
+
+  // The app's menu, in the top bar a conversation draws for itself on a phone.
+  const menu = (
+    <button
+      type="button"
+      aria-label="Menu"
+      onClick={openMenu}
+      className="h-10 w-10 shrink-0 rounded-full bg-[var(--dark)] text-white flex items-center justify-center md:hidden"
+    >
+      <svg width="16" height="12" viewBox="0 0 16 12" fill="none" aria-hidden>
+        <rect width="16" height="1.6" rx="0.8" fill="currentColor" />
+        <rect y="5.2" width="16" height="1.6" rx="0.8" fill="currentColor" />
+        <rect y="10.4" width="16" height="1.6" rx="0.8" fill="currentColor" />
+      </svg>
+    </button>
+  );
+
+  const bar = "flex h-16 shrink-0 items-center gap-2 border-b border-[var(--border)] bg-[var(--surface)] px-2 md:px-4";
+
   if (chat === null) {
     return (
+      <div className="flex min-h-0 flex-1 flex-col bg-[var(--background)]">
+        <div className={bar}>
+          {back}
+          <p className="flex-1 truncate text-[15px] font-medium">Conversation</p>
+          {menu}
+        </div>
+        <div className="flex flex-1 items-center justify-center p-4">
       <EmptyState
         icon={<IconChat />}
         title="You are not in this conversation any more"
@@ -203,29 +237,23 @@ export default function ChatThread({ chatId }: { chatId: string }) {
           </Link>
         }
       />
+        </div>
+      </div>
     );
   }
 
   return (
     <motion.div
-      initial={{ y: 16, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
       transition={SPRING_SOFT}
-      className="flex flex-col h-[calc(100dvh-200px)] md:h-[calc(100dvh-104px)] min-h-[420px] -mx-1 sm:mx-0 overflow-hidden rounded-[28px] border border-[var(--border)] bg-[var(--background)]"
+      className="flex min-h-0 flex-1 flex-col bg-[var(--background)]"
     >
-      {/* Header */}
-      <div className="flex items-center gap-3 border-b border-[var(--border)] bg-white/70 px-3 py-2.5 backdrop-blur-md">
-        <Link
-          href="/chats"
-          aria-label="Back to all conversations"
-          className="h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-[var(--muted)] hover:bg-black/5 hover:text-[var(--foreground)] transition-colors"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
-            <path d="M19 12H5M11 18l-6-6 6-6" />
-          </svg>
-        </Link>
+      {/* Top bar */}
+      <div className={bar}>
+        {back}
 
-        <ProviderAvatar photoPath={peer.photoPath} name={peer.name} size={38} />
+        <ProviderAvatar photoPath={peer.photoPath} name={peer.name} size={40} />
 
         <div className="min-w-0 flex-1">
           {isGroup && chat ? (
@@ -264,13 +292,14 @@ export default function ChatThread({ chatId }: { chatId: string }) {
         {uid && isGroup && chat ? (
           <GroupInfo chat={chat} selfUid={uid} open={groupInfoOpen} onClose={() => setGroupInfoOpen(false)} />
         ) : null}
+        {menu}
       </div>
 
       {/* Thread */}
       <div
         ref={scrollRef}
         onScroll={onScroll}
-        className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-4"
+        className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-4 md:px-[5%]"
       >
         {loading ? (
           <div role="status" aria-label="Loading the conversation" aria-busy="true" className="space-y-2.5">

@@ -25,6 +25,9 @@ import type { Chat } from "../../lib/models";
  * Rows carry a speaker button too, not just the thread: someone who cannot
  * read the preview cannot tell which conversation to open, which would make
  * the read-aloud inside the thread useless to them.
+ *
+ * It is the left pane of Messages (ChatsSplit): flat rows, edge to edge, as
+ * in WhatsApp, with the open conversation lit on a computer.
  */
 
 /** Short relative time. "14:32" today, "Yesterday", then the date. */
@@ -60,12 +63,15 @@ function ChatRow({
   onRead,
   speaking,
   fallbackName,
+  open,
 }: {
   chat: Chat;
   selfUid: string;
   index: number;
   onRead: (id: string, text: string) => void;
   speaking: boolean;
+  /** The conversation showing beside the list. */
+  open: boolean;
   /** Shown until the name resolves, and for ever on the provider's side. */
   fallbackName: string;
 }) {
@@ -82,15 +88,16 @@ function ChatRow({
       initial={{ y: 18, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ ...SPRING_SOFT, delay: Math.min(index * 0.04, 0.24) }}
-      className="flex items-center gap-1"
+      className={`flex items-center pr-2 transition-colors ${open ? "bg-black/[.06]" : "hover:bg-black/[.03]"}`}
     >
       <Link
         href={`/chats/${chat.id}`}
-        className="group flex min-w-0 flex-1 items-center gap-3.5 rounded-[22px] bg-white px-4 py-3.5 transition-colors hover:bg-black/[.02]"
+        aria-current={open ? "page" : undefined}
+        className="group flex min-w-0 flex-1 items-center gap-3.5 py-3 pl-4"
       >
-        <ProviderAvatar photoPath={peer.photoPath} name={name} size={46} />
+        <ProviderAvatar photoPath={peer.photoPath} name={name} size={48} />
 
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 border-b border-[var(--border)] pb-3 -mb-3 pt-0.5">
           <div className="flex items-baseline justify-between gap-3">
             <p className="truncate text-[15px] font-medium leading-tight">{name}</p>
             <span className="shrink-0 text-[11px] tabular-nums text-[var(--muted)]">
@@ -136,7 +143,7 @@ function ChatRow({
   );
 }
 
-export default function ChatList() {
+export default function ChatList({ openId = null }: { openId?: string | null }) {
   const { user, profile, role } = useAuth();
   const isProvider = role === "provider";
   const [chats, setChats] = useState<Chat[] | null>(null);
@@ -148,11 +155,14 @@ export default function ChatList() {
     return watchChats(user.uid, setChats);
   }, [user]);
 
+  const fallbackName = isProvider ? "Someone you are working with" : "Your provider";
+
+  let body: React.ReactNode;
   if (!user || chats === null) {
-    return (
+    body = (
       <SkeletonList count={4} label="Loading your conversations">
-        <div className="flex items-center gap-3.5 rounded-[22px] bg-white px-4 py-3.5">
-          <Skeleton rounded="rounded-full" className="h-[46px] w-[46px] shrink-0" />
+        <div className="flex items-center gap-3.5 px-4 py-3">
+          <Skeleton rounded="rounded-full" className="h-12 w-12 shrink-0" />
           <div className="min-w-0 flex-1 space-y-2">
             <Skeleton className="h-3.5 w-1/3" />
             <Skeleton className="h-3 w-2/3" />
@@ -160,17 +170,16 @@ export default function ChatList() {
         </div>
       </SkeletonList>
     );
-  }
-
-  if (chats.length === 0) {
+  } else if (chats.length === 0) {
     // A provider is waiting to be written to, not looking for someone to write
     // to — the patient's empty state would send them shopping for a provider.
-    return isProvider ? (
+    body = isProvider ? (
       <EmptyState
         icon={<IconChat />}
         title="Nobody has written to you yet"
         description="When somebody picks you, their conversation appears here. You will see their name, what they told Talk they are going through, and whatever they write."
         action={<Button href="/pro/profile">Check your profile</Button>}
+        className="mx-4 mt-2"
       />
     ) : (
       <EmptyState
@@ -178,42 +187,46 @@ export default function ChatList() {
         title="No conversations yet"
         description="When you find a provider who fits you, open their profile and tap Message. You can write to them, or send a voice note if that is easier."
         action={<Button href="/matches">See providers for you</Button>}
+        className="mx-4 mt-2"
       />
     );
+  } else {
+    body = chats.map((chat, index) => (
+      <ChatRow
+        key={chat.id}
+        chat={chat}
+        selfUid={user.uid}
+        index={index}
+        onRead={read}
+        speaking={speakingId === chat.id}
+        fallbackName={fallbackName}
+        open={chat.id === openId}
+      />
+    ));
   }
 
   return (
-    <div className="space-y-2">
-      {/* Groups — led sessions and peer groups — start here, from the people they
-          already work with. Clients never see this control. */}
-      {isProvider ? (
-        <>
-          <div className="flex justify-end pb-1">
-            <Button variant="secondary" size="sm" onClick={() => setComposing(true)}>
-              New group
-            </Button>
-          </div>
-          <GroupComposer
-            open={composing}
-            onClose={() => setComposing(false)}
-            chats={chats}
-            selfUid={user.uid}
-            selfName={profile?.displayName ?? null}
-          />
-        </>
-      ) : null}
-
-      {chats.map((chat, index) => (
-        <ChatRow
-          key={chat.id}
-          chat={chat}
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex h-16 shrink-0 items-center justify-between gap-3 px-4">
+        <h1 className="text-[22px] font-medium tracking-tight">Messages</h1>
+        {/* Groups — led sessions and peer groups — start here, from the people
+            they already work with. Clients never see this control. */}
+        {isProvider && chats?.length ? (
+          <Button variant="secondary" size="sm" onClick={() => setComposing(true)}>
+            New group
+          </Button>
+        ) : null}
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{body}</div>
+      {isProvider && user && chats ? (
+        <GroupComposer
+          open={composing}
+          onClose={() => setComposing(false)}
+          chats={chats}
           selfUid={user.uid}
-          index={index}
-          onRead={read}
-          speaking={speakingId === chat.id}
-          fallbackName={isProvider ? "Someone you are working with" : "Your provider"}
+          selfName={profile?.displayName ?? null}
         />
-      ))}
+      ) : null}
     </div>
   );
 }
