@@ -17,12 +17,13 @@
  * one is wrong.
  */
 
-import { createHmac } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import {
   CARD_MINIMUM_MINOR,
   amountsAgree,
   buildCheckoutBody,
   decideFulfilment,
+  merchantKeyCandidates,
   normaliseWebhookEvent,
   paymentMethodsFor,
   readCheckoutResponse,
@@ -134,6 +135,36 @@ console.log("\nForgeries are rejected");
   check(!verifyWebhookSignature(SUCCESS_BODY, null, candidates).ok, "a missing signature header is rejected");
   check(!verifyWebhookSignature(SUCCESS_BODY, "", candidates).ok, "an empty signature header is rejected");
   check(!verifyWebhookSignature(SUCCESS_BODY, "not-hex-at-all", candidates).ok, "a nonsense header is rejected");
+}
+
+console.log("\nThe way Modem Pay actually signs a callback_url delivery");
+{
+  // docs.modempay.com, payment intents -> callback_url: the HMAC key is
+  // SHA-256 OF the merchant secret key. Every real delivery to Talk was
+  // refused until this was understood (13 of 13 in the logs, 2026-10-11).
+  const hashedHex = createHash("sha256").update(MERCHANT_SECRET, "utf8").digest("hex");
+  const hashedBytes = createHash("sha256").update(MERCHANT_SECRET, "utf8").digest();
+  const real = [...merchantKeyCandidates(MERCHANT_SECRET_PASTED), { routing: "webhook-signing-secret", secret: WEBHOOK_SECRET }];
+
+  const v1 = verifyWebhookSignature(SUCCESS_BODY, sign(hashedHex, SUCCESS_BODY), real);
+  check(v1.ok && v1.routing === "hashed-merchant-key", "signed with SHA-256(merchant key) as hex: accepted");
+  const v2 = verifyWebhookSignature(SUCCESS_BODY, sign(hashedBytes, SUCCESS_BODY), real);
+  check(v2.ok && v2.routing === "hashed-merchant-key-bytes", "signed with the raw SHA-256 bytes: accepted");
+  const v3 = verifyWebhookSignature(SUCCESS_BODY, sign(MERCHANT_SECRET, SUCCESS_BODY), real);
+  check(v3.ok && v3.routing === "merchant-secret-key", "signed with the raw merchant key: still accepted");
+  const v4 = verifyWebhookSignature(SUCCESS_BODY, sign(WEBHOOK_SECRET, SUCCESS_BODY), real);
+  check(v4.ok && v4.routing === "webhook-signing-secret", "signed with the dashboard webhook secret: accepted");
+  check(merchantKeyCandidates("").length === 0 && merchantKeyCandidates(null).length === 0, "no merchant key, no candidates");
+}
+
+console.log("\nA placeholder is never a signing key");
+{
+  // Secret Manager held "not-set-yet" as the webhook secret. As an HMAC key
+  // it would have let anybody who guessed it sign a delivery.
+  const placeholder = [{ routing: "webhook-signing-secret", secret: "not-set-yet" }];
+  check(!verifyWebhookSignature(SUCCESS_BODY, sign("not-set-yet", SUCCESS_BODY), placeholder).ok, "a delivery signed with 'not-set-yet' is rejected");
+  const short = [{ routing: "webhook-signing-secret", secret: "changeme" }];
+  check(!verifyWebhookSignature(SUCCESS_BODY, sign("changeme", SUCCESS_BODY), short).ok, "any secret under 24 characters is ignored");
 }
 
 console.log("\nComparison is constant-time");

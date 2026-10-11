@@ -42,6 +42,7 @@ import {
   verifyWebhookSignature,
   webhookEventKey,
   SIGNATURE_HEADER,
+  merchantKeyCandidates,
 } from "../../app/lib/payments/modempay-protocol";
 import { AI_PURPOSE, AI_TIERS, tierAlreadyHeld, tierForPurpose, type AiTierId } from "../../app/lib/models";
 import { onSchedule } from "firebase-functions/v2/scheduler";
@@ -151,6 +152,10 @@ async function modemPay(path: string, init: RequestInit = {}) {
 }
 
 /** What the transaction endpoint says — the authority on amount and metadata. */
+/** What Modem Pay calls a payment that has gone through. One list, for the
+ *  webhook and the return page alike. */
+const PAID_STATUSES = ["completed", "successful", "success", "succeeded", "paid"];
+
 async function fetchTransaction(id: string) {
   try {
     const body = (await modemPay(`/v1/transactions/${encodeURIComponent(id)}`, { method: "GET" })) as
@@ -556,9 +561,7 @@ async function reconcile(paymentIntentId: string, record: PaymentRecord) {
     return { status: record.status, fulfilled: false, needsReview: record.needsReview, reconciled: false };
   }
 
-  const succeeded = ["completed", "successful", "success", "succeeded", "paid"].includes(
-    authoritative.status,
-  );
+  const succeeded = PAID_STATUSES.includes(authoritative.status);
   if (!succeeded) {
     return { status: record.status, fulfilled: false, needsReview: record.needsReview, reconciled: true };
   }
@@ -834,12 +837,12 @@ export const modemWebhook = onRequest(
     const raw = req.rawBody ? req.rawBody.toString("utf8") : JSON.stringify(req.body ?? {});
 
     const verdict = verifyWebhookSignature(raw, req.get(SIGNATURE_HEADER), [
-      { routing: "merchant-secret-key", secret: MODEM_PAY_SECRET_KEY.value() },
+      ...merchantKeyCandidates(MODEM_PAY_SECRET_KEY.value()),
       { routing: "webhook-signing-secret", secret: MODEM_PAY_WEBHOOK_SECRET.value() },
     ]);
 
     if (!verdict.ok) {
-      console.warn("modemWebhook: signature matched neither the merchant key nor the webhook secret");
+      console.warn("modemWebhook: signature matched neither the merchant key (hashed or raw) nor the webhook secret");
       res.status(400).json({ error: "Invalid signature." });
       return;
     }
@@ -876,6 +879,24 @@ export const modemWebhook = onRequest(
     // something against a figure the delivered payload could not have been
     // wrong about.
     const authoritative = event.outcome === "succeeded" ? await fetchTransaction(event.paymentIntentId) : null;
+
+    // A delivery that SAYS it succeeded is believed only when Modem Pay itself
+    // says so. A signature proves who sent it, not that the money moved — and
+    // a forged or replayed "succeeded" must never grant anything. Cannot ask
+    // right now: a 500, so the gateway sends it again later.
+    if (event.outcome === "succeeded") {
+      if (!authoritative) {
+        res.status(500).json({ error: "Could not confirm the payment with Modem Pay. Please retry." });
+        return;
+      }
+      if (!PAID_STATUSES.includes(authoritative.status)) {
+        console.warn(
+          `modemWebhook: ${event.paymentIntentId} delivered as succeeded, but Modem Pay reports "${authoritative.status}" — not acted on`,
+        );
+        res.status(200).json({ received: true, acted: false, reason: "Modem Pay does not report this payment as paid" });
+        return;
+      }
+    }
 
     const payer = await resolvePayer({
       metadataUid: event.uid,

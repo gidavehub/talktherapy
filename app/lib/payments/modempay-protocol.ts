@@ -175,8 +175,17 @@ export function readCheckoutResponse(body: unknown): CheckoutResult {
 // ------------------------------------------------------- signature verification
 
 export type SignatureRouting =
-  /** Modem Pay signs with the MERCHANT SECRET KEY when it posts to a
-   *  per-intent `callback_url` — which is what this integration sets. */
+  /** Modem Pay signs a per-intent `callback_url` delivery — which is what
+   *  this integration sets — with SHA-256 OF THE MERCHANT SECRET KEY, not the
+   *  key itself (docs.modempay.com → payment intents → callback_url:
+   *  "hashed_secret_key = SHA-256(secret_key)", then the SDK's
+   *  composeEventDetails, an HMAC-SHA512 hex over the payload). The hex
+   *  digest is the form the SDK is handed; raw digest bytes are accepted too. */
+  | "hashed-merchant-key"
+  | "hashed-merchant-key-bytes"
+  /** The raw merchant key: what this code assumed until 2026-10-11, when the
+   *  logs showed every real delivery (13 of 13) refused under it. Kept only
+   *  so a gateway that does sign with the raw key is not refused. */
   | "merchant-secret-key"
   /** ...and with the WEBHOOK SIGNING SECRET when the delivery comes from a
    *  webhook configured in the dashboard. */
@@ -184,8 +193,30 @@ export type SignatureRouting =
 
 export type SignatureCandidate = {
   routing: SignatureRouting;
-  secret: string | null | undefined;
+  secret: string | Uint8Array | null | undefined;
 };
+
+/**
+ * Shorter than this is not a signing key — it is a placeholder. Real Modem Pay
+ * keys are 48 characters, webhook secrets 66, a SHA-256 digest 64 hex or 32
+ * bytes. Without this floor the "not-set-yet" placeholder that sat in Secret
+ * Manager was a valid HMAC key, and anybody who guessed it could sign a
+ * delivery.
+ */
+export const MIN_SECRET_LENGTH = 24;
+
+/** The candidates the merchant secret key yields, most likely first. */
+export function merchantKeyCandidates(secretKey: string | null | undefined): SignatureCandidate[] {
+  const key = (secretKey ?? "").trim();
+  if (!key) return [];
+  const digest = createHash("sha256").update(key, "utf8");
+  const bytes = digest.digest();
+  return [
+    { routing: "hashed-merchant-key", secret: bytes.toString("hex") },
+    { routing: "hashed-merchant-key-bytes", secret: new Uint8Array(bytes) },
+    { routing: "merchant-secret-key", secret: key },
+  ];
+}
 
 /** Which body bytes the HMAC was computed over. */
 export type SignedForm = "raw" | "restringified";
@@ -208,7 +239,7 @@ export type SignatureVerdict = {
 export const signatureStats = { digests: 0, compares: 0 };
 
 /** Hex HMAC-SHA512, which is what the `x-modem-signature` header holds. */
-export function hexHmacSha512(secret: string, body: string): string {
+export function hexHmacSha512(secret: string | Uint8Array, body: string): string {
   signatureStats.digests += 1;
   return createHmac("sha512", secret).update(body, "utf8").digest("hex");
 }
@@ -287,8 +318,10 @@ export function verifyWebhookSignature(
   const verdict: SignatureVerdict = { ok: false, routing: null, form: null };
 
   for (const candidate of candidates) {
-    const secret = (candidate.secret ?? "").trim();
-    if (!secret) continue;
+    const raw = candidate.secret ?? "";
+    const secret = typeof raw === "string" ? raw.trim() : raw;
+    // Unset, or a placeholder: never a key (see MIN_SECRET_LENGTH).
+    if (secret.length < MIN_SECRET_LENGTH) continue;
     for (const body of bodies) {
       const expected = hexHmacSha512(secret, body.text);
       const matched = timingSafeStringEqual(expected, presented);
