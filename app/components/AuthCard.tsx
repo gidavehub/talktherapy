@@ -115,14 +115,14 @@ export default function AuthCard({
       className={
         embedded
           ? "w-full"
-          : "w-full max-w-[440px] rounded-3xl bg-white shadow-[0_30px_80px_-30px_rgba(0,0,0,0.25)] p-6 sm:p-8 md:p-10"
+          : "w-full max-w-[440px] rounded-3xl bg-[var(--surface)] shadow-[var(--shadow-floating)] p-6 sm:p-8 md:p-10"
       }
     >
       <motion.p
         initial={{ x: -20, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ ...SPRING_SOFT, delay: 0.15 }}
-        className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]"
+        className="eyebrow"
       >
         {asProvider ? "Join as a provider" : isSignUp ? "Create your account" : "Welcome back"}
       </motion.p>
@@ -130,7 +130,7 @@ export default function AuthCard({
         initial={{ y: 30, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ ...SPRING_SOFT, delay: 0.2 }}
-        className="mt-3 text-[32px] md:text-[36px] leading-[1.05] tracking-tight font-medium whitespace-pre-line"
+        className="mt-3 text-[32px] md:text-[36px] leading-[1.05] font-display font-medium whitespace-pre-line"
       >
         {asProvider
           ? "Offer your\nwork here."
@@ -246,7 +246,7 @@ export default function AuthCard({
           whileTap={{ scale: 0.97 }}
           type="submit"
           disabled={busy}
-          className="w-full h-12 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-soft)] text-white text-[12px] uppercase tracking-[0.14em] font-medium flex items-center justify-center gap-3 transition-colors disabled:opacity-60"
+          className="w-full h-12 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-deep)] text-white text-[14px] font-medium flex items-center justify-center gap-3 transition-colors disabled:opacity-60"
         >
           {busy ? "Please wait…" : isSignUp ? "Create Account" : "Sign In"}
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">

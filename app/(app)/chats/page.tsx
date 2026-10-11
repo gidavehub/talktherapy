@@ -18,7 +18,7 @@ export default function ChatsPage() {
       <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--dark)] text-white">
         <IconChat />
       </span>
-      <h1 className="mt-5 text-[22px] font-medium tracking-tight">Your conversations</h1>
+      <h1 className="font-display mt-5 text-[24px] font-medium">Your conversations</h1>
       <p className="mt-2 max-w-[380px] text-[14px] leading-relaxed text-[var(--muted)]">
         Pick a conversation to open it. Write, or send a voice note — and tap the speaker on any message to hear it
         read aloud in your language.

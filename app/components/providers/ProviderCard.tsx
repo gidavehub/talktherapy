@@ -4,18 +4,23 @@ import Link from "next/link";
 import { motion } from "motion/react";
 import { SPRING_SOFT } from "../motion/primitives";
 import { Badge, Skeleton } from "../ui/Feedback";
-import ProviderAvatar from "./ProviderAvatar";
+import { ArchFrame, archTone } from "../ui/Arch";
+import { useProviderPhoto } from "./ProviderAvatar";
 import { formatDalasi } from "../../lib/money";
 import { LOCALE_LABELS, type ProviderProfile } from "../../lib/models";
-import { SERVICE_LABELS, SPECIALIZATION_LABELS, type Specialization } from "../../lib/matching";
+import { FORMAT_LABELS, SERVICE_LABELS, SPECIALIZATION_LABELS, type Specialization } from "../../lib/matching";
 
 /**
- * One provider, as a card. Shared by the public directory, the "for you"
- * list and the dashboard, so a provider looks the same everywhere.
+ * One provider, as a card — the redesign's: the person in an arch, their
+ * name and what they do, a word about them, what they help with, what they
+ * speak and how they meet, and the two buttons. Shared by the public
+ * directory, the "for you" list and the dashboard, so a provider looks the
+ * same everywhere.
  *
  * With `reasons`, the card leads with why this person was suggested — "Speaks
  * Wolof · Grief & loss · Video" says more to someone choosing than a bio does.
  */
+
 /**
  * Everything on the card as one spoken sentence, for someone who cannot read
  * it. Kept in the same order the card shows it, so hearing it and seeing it
@@ -32,6 +37,80 @@ export function providerSummary(profile: ProviderProfile, reasons?: string[]): s
   return `${parts.join(". ")}.`;
 }
 
+/**
+ * Stand-in faces for the sample profiles only — never for a real provider.
+ * Chosen from the faces of their gender by a well-mixed hash of their id;
+ * the salt is the one that gives each of the ten samples its own face.
+ */
+const WOMEN = ["provider-2", "provider-4", "provider-5", "mind-woman", "hero-woman-sage", "hero-woman-terracotta"];
+const MEN = ["provider-1", "provider-3", "provider-6", "mind-man", "hero-man"];
+const FACE_SALT = 129;
+
+function mixHash(text: string): number {
+  let h = (2166136261 ^ FACE_SALT) >>> 0;
+  for (let i = 0; i < text.length; i += 1) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x85ebca6b) >>> 0;
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35) >>> 0;
+  h ^= h >>> 16;
+  return h >>> 0;
+}
+
+function sampleFace(profile: ProviderProfile): string {
+  const pool = profile.gender === "woman" ? WOMEN : profile.gender === "man" ? MEN : [...WOMEN, ...MEN];
+  return `/people/${pool[mixHash(profile.uid) % pool.length]}.webp`;
+}
+
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join("");
+}
+
+/** The provider in their arch: their photo, a sample face, or their initials. */
+export function ProviderArch({
+  profile,
+  index = 0,
+  className = "",
+}: {
+  profile: ProviderProfile;
+  index?: number;
+  className?: string;
+}) {
+  const photo = useProviderPhoto(profile.photoPath);
+  const src = photo ?? (profile.sample ? sampleFace(profile) : null);
+  return (
+    <ArchFrame tone={archTone(index)} className={className}>
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={src}
+          alt=""
+          className={
+            photo
+              ? "absolute inset-0 h-full w-full object-cover object-top"
+              : // A sample face is a cut-out: standing at the bottom of the arch.
+                "absolute bottom-0 left-1/2 h-auto w-[122%] max-w-none -translate-x-1/2"
+          }
+        />
+      ) : (
+        <span className="font-display absolute inset-0 flex items-end justify-center pb-[22%] text-[28px] font-medium text-white/90">
+          {initials(profile.displayName)}
+        </span>
+      )}
+    </ArchFrame>
+  );
+}
+
+const LABEL = "text-[10.5px] uppercase tracking-[0.28em] text-[var(--sage)] font-medium";
+
 export default function ProviderCard({
   profile,
   index = 0,
@@ -47,181 +126,176 @@ export default function ProviderCard({
   reasons?: string[];
   /** The top suggestion. */
   best?: boolean;
-  /** Dashboard size: drops the fee/language footer. */
+  /** Dashboard size: drops the bio and the speaks/sessions row. */
   compact?: boolean;
   /** Read this provider aloud. Omitted where speech is not available. */
   onRead?: (id: string, text: string) => void;
   speaking?: boolean;
   /**
-   * What tapping the card does.
+   * What the main button does.
    *
    * Signed-in surfaces pass this and it opens the CONVERSATION with the
-   * provider — the point of the whole product is the hand-off to a person, and
-   * a profile page between the two is a page nobody asked for. The public
-   * directory omits it, because a visitor who is not signed in has nobody to
-   * open a conversation as, and falls back to the profile.
+   * provider — the point of the whole product is the hand-off to a person.
+   * The public directory omits it: a visitor who is not signed in has nobody
+   * to open a conversation as, and books instead.
    */
   onOpen?: (profile: ProviderProfile) => void;
 }) {
-  // What they offer, then where they are — the two things someone scanning a
-  // list actually chooses on.
-  const kind = [profile.services.map((s) => SERVICE_LABELS[s]).join(", ") || null, profile.location]
-    .filter(Boolean)
-    .join(" · ");
+  // Their role, short: "Therapy — working through…" reads as "Therapy".
+  const role =
+    profile.headline.split(/\s[—–-]\s/)[0] || profile.services.map((s) => SERVICE_LABELS[s]).join(", ") || "Provider";
+  const specialties = profile.specializations.map((s) => SPECIALIZATION_LABELS[s as Specialization] ?? s);
+  const shown = specialties.slice(0, 2);
+  const more = specialties.length - shown.length;
+  const sessions = profile.formats.length ? profile.formats.map((f) => FORMAT_LABELS[f]).join(" or ") : "Video";
 
   return (
     <motion.div
-      initial={{ y: 28, opacity: 0 }}
+      initial={{ y: 24, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ ...SPRING_SOFT, delay: Math.min(index, 8) * 0.05 }}
       whileHover={{ y: -4 }}
-      className="relative rounded-[28px] bg-white shadow-[0_18px_40px_-22px_rgba(0,0,0,0.25)] p-6 flex flex-col"
+      className="relative flex flex-col rounded-[28px] bg-[var(--surface)] p-5 shadow-[var(--shadow-card)] md:p-6"
     >
-      {onOpen ? (
-        <button
-          type="button"
-          onClick={() => onOpen(profile)}
-          className="absolute inset-0 rounded-[28px]"
-          aria-label={`Message ${profile.displayName}`}
-        />
-      ) : (
-        <Link
-          href={`/providers/${profile.uid}`}
-          className="absolute inset-0 rounded-[28px]"
-          aria-label={`${profile.displayName} — view profile`}
-        />
-      )}
-
       <div className="flex items-start gap-4">
-        <ProviderAvatar photoPath={profile.photoPath} name={profile.displayName} size={compact ? 48 : 56} />
-        <div className="min-w-0 flex-1">
-          <h3 className="text-[16px] font-medium leading-tight truncate">{profile.displayName}</h3>
-          {kind ? <p className="mt-1 text-[12px] text-[var(--muted)] truncate">{kind}</p> : null}
+        <ProviderArch
+          profile={profile}
+          index={index}
+          className={compact ? "h-[96px] w-[76px] shrink-0" : "h-[128px] w-[100px] shrink-0"}
+        />
+        <div className="min-w-0 flex-1 pt-1">
+          <div className="flex items-start gap-2">
+            <h3 className="font-display min-w-0 flex-1 text-[21px] font-medium leading-tight md:text-[22px]">
+              <Link href={`/providers/${profile.uid}`} className="hover:text-[var(--accent)]">
+                {profile.displayName}
+              </Link>
+            </h3>
+            {onRead ? (
+              <button
+                type="button"
+                className="-mr-1 -mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--border)] transition-colors hover:bg-[var(--sand)]"
+                aria-label={speaking ? `Stop reading ${profile.displayName} aloud` : `Read ${profile.displayName} aloud`}
+                onClick={() => onRead(profile.uid, providerSummary(profile, reasons))}
+              >
+                {speaking ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                    <rect x="6" y="5" width="4" height="14" rx="1" />
+                    <rect x="14" y="5" width="4" height="14" rx="1" />
+                  </svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                    <path d="M4 9v6h4l5 4V5L8 9H4z" />
+                    <path d="M17 8.5a5 5 0 0 1 0 7" strokeLinecap="round" />
+                  </svg>
+                )}
+              </button>
+            ) : null}
+          </div>
+          <p className="mt-1 truncate text-[13px] text-[var(--muted)]">{role}</p>
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {best ? <Badge tone="accent">Best fit</Badge> : null}
+            {profile.sample ? <Badge tone="neutral">Sample profile</Badge> : <Badge tone="positive">Verified</Badge>}
+          </div>
+          <p className="mt-2.5 text-[13.5px] font-medium text-[var(--accent)]">
+            From {formatDalasi(profile.sessionRateMinor)} per session
+          </p>
         </div>
-        {best ? <Badge tone="accent">Best fit</Badge> : null}
-        {onRead ? (
-          <button
-            type="button"
-            // Above the card-wide link, or the tap opens the profile instead.
-            className="relative z-10 -mr-1 -mt-1 h-9 w-9 shrink-0 rounded-full border border-[var(--border)] flex items-center justify-center hover:bg-black/5 transition-colors"
-            aria-label={speaking ? `Stop reading ${profile.displayName} aloud` : `Read ${profile.displayName} aloud`}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onRead(profile.uid, providerSummary(profile, reasons));
-            }}
-          >
-            {speaking ? (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                <rect x="6" y="5" width="4" height="14" rx="1" />
-                <rect x="14" y="5" width="4" height="14" rx="1" />
-              </svg>
-            ) : (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-                <path d="M4 9v6h4l5 4V5L8 9H4z" />
-                <path d="M17 8.5a5 5 0 0 1 0 7" strokeLinecap="round" />
-              </svg>
-            )}
-          </button>
-        ) : null}
       </div>
 
-      {reasons && reasons.length ? (
-        <div className="mt-5 flex flex-wrap gap-1.5">
-          {reasons.slice(0, 4).map((r) => (
-            <span
-              key={r}
-              className="inline-flex h-7 items-center rounded-full bg-[var(--accent)]/10 text-[var(--accent)] px-3 text-[11px] font-medium"
-            >
-              {r}
-            </span>
-          ))}
-        </div>
-      ) : profile.specializations.length ? (
-        <div className="mt-5 flex flex-wrap gap-1.5">
-          {profile.specializations.slice(0, 3).map((s) => (
-            <Badge key={s} tone="neutral">
-              {SPECIALIZATION_LABELS[s as Specialization] ?? s}
-            </Badge>
-          ))}
-        </div>
+      {!compact && profile.bio ? (
+        <p className="mt-5 line-clamp-3 text-[13.5px] leading-relaxed text-[var(--foreground)]/85">{profile.bio}</p>
       ) : null}
 
-      {!compact && profile.qualifications.length ? (
-        <p className="mt-4 text-[12px] text-[var(--muted)] truncate">
-          {profile.qualifications[0]}
-          {profile.qualifications.length > 1 ? ` +${profile.qualifications.length - 1}` : ""}
-        </p>
+      {reasons && reasons.length ? (
+        <div className="mt-5">
+          <p className={LABEL}>Why we suggest them</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {reasons.slice(0, 4).map((r) => (
+              <span key={r} className="inline-flex h-7 items-center rounded-full bg-[var(--accent)]/12 px-3 text-[12px] font-medium text-[var(--accent-deep)]">
+                {r}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : shown.length ? (
+        <div className="mt-5">
+          <p className={LABEL}>Specialties</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {shown.map((s) => (
+              <span key={s} className="inline-flex h-7 items-center rounded-full bg-[var(--sand)] px-3 text-[12px]">
+                {s}
+              </span>
+            ))}
+            {more > 0 ? (
+              <span className="inline-flex h-7 items-center rounded-full bg-[var(--sand)] px-3 text-[12px]">+{more} more</span>
+            ) : null}
+          </div>
+        </div>
       ) : null}
 
       {!compact ? (
-        <dl className="mt-6 grid grid-cols-2 gap-4 text-[12px]">
+        <dl className="mt-5 grid grid-cols-2 gap-4">
           <div>
-            <dt className="text-[var(--muted)]">Session</dt>
-            <dd className="mt-1 text-[15px] font-medium">{formatDalasi(profile.sessionRateMinor)}</dd>
+            <dt className={LABEL}>Speaks</dt>
+            <dd className="mt-1.5 text-[14px]">{profile.languages.map((l) => LOCALE_LABELS[l]).join(", ") || "—"}</dd>
           </div>
           <div>
-            <dt className="text-[var(--muted)]">Speaks</dt>
-            <dd className="mt-1 text-[13px]">{profile.languages.map((l) => LOCALE_LABELS[l]).join(", ")}</dd>
+            <dt className={LABEL}>Sessions</dt>
+            <dd className="mt-1.5 text-[14px]">{sessions}</dd>
           </div>
         </dl>
       ) : null}
 
-      <div className="mt-auto pt-5">
-        <div className="pt-5 border-t border-[var(--border)] flex items-center justify-between gap-3">
-          {profile.sample ? (
-            <Badge tone="warning">Sample profile</Badge>
-          ) : (
-            <span className="text-[12px] text-[var(--muted)]">
-              {/*
-                A rating only when somebody has actually given one. Showing
-                "0.0 ★" for every new provider would be a worse lie than
-                showing nothing, and it is the number people trust most.
-              */}
-              {profile.ratingCount > 0
-                ? `${profile.ratingAvg.toFixed(1)} ★ · ${profile.ratingCount} rating${profile.ratingCount === 1 ? "" : "s"}`
-                : compact
-                  ? formatDalasi(profile.sessionRateMinor)
-                  : profile.yearsExperience > 0
-                    ? `${profile.yearsExperience} yrs experience`
-                    : "Verified professional"}
-            </span>
-          )}
-          <span className="text-[12px] uppercase tracking-[0.14em] font-medium underline underline-offset-4">
-            {onOpen ? "Message" : "View"}
-          </span>
-        </div>
+      <div className="mt-auto grid grid-cols-2 gap-3 pt-6">
+        <Link
+          href={`/providers/${profile.uid}`}
+          className="inline-flex h-11 items-center justify-center rounded-full border-[1.5px] border-[var(--dark)] text-[14px] font-medium transition-colors hover:bg-[var(--dark)] hover:text-[var(--cream)]"
+        >
+          View profile
+        </Link>
+        {onOpen ? (
+          <button
+            type="button"
+            onClick={() => onOpen(profile)}
+            className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--accent)] text-[14px] font-medium text-white transition-colors hover:bg-[var(--accent-deep)]"
+          >
+            Message
+          </button>
+        ) : (
+          <Link
+            href={`/book/${profile.uid}`}
+            className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--accent)] text-[14px] font-medium text-white transition-colors hover:bg-[var(--accent-deep)]"
+          >
+            Book session
+          </Link>
+        )}
       </div>
     </motion.div>
   );
 }
 
 /**
- * A provider card that has not arrived yet.
- *
- * The same outline as the real card — face, name, a line of what they offer,
- * the footer rule — so the grid holds its shape while it loads and nothing
- * jumps when the providers land. `compact` matches the dashboard size.
+ * A provider card that has not arrived yet — the same outline as the real
+ * one, so the grid holds its shape while it loads.
  */
 export function ProviderCardSkeleton({ compact = false }: { compact?: boolean }) {
   return (
-    <div aria-hidden className="rounded-[28px] bg-white shadow-[var(--shadow-raised)] p-6 flex flex-col">
+    <div aria-hidden className="flex flex-col rounded-[28px] bg-[var(--surface)] p-6 shadow-[var(--shadow-card)]">
       <div className="flex items-start gap-4">
-        <Skeleton rounded="rounded-full" className={compact ? "h-12 w-12 shrink-0" : "h-14 w-14 shrink-0"} />
-        <div className="min-w-0 flex-1 space-y-2 pt-1">
-          <Skeleton className="h-4 w-2/3" />
+        <Skeleton rounded="arch" className={compact ? "h-[96px] w-[76px] shrink-0" : "h-[128px] w-[100px] shrink-0"} />
+        <div className="min-w-0 flex-1 space-y-2.5 pt-2">
+          <Skeleton className="h-5 w-2/3" />
           <Skeleton className="h-3 w-1/2" />
+          <Skeleton rounded="rounded-full" className="h-7 w-24" />
         </div>
       </div>
       <div className="mt-5 flex gap-1.5">
         <Skeleton rounded="rounded-full" className="h-7 w-20" />
         <Skeleton rounded="rounded-full" className="h-7 w-24" />
       </div>
-      <div className="mt-auto pt-5">
-        <div className="pt-5 border-t border-[var(--border)] flex items-center justify-between">
-          <Skeleton className="h-3 w-24" />
-          <Skeleton className="h-3 w-14" />
-        </div>
+      <div className="mt-auto grid grid-cols-2 gap-3 pt-6">
+        <Skeleton rounded="rounded-full" className="h-11" />
+        <Skeleton rounded="rounded-full" className="h-11" />
       </div>
     </div>
   );

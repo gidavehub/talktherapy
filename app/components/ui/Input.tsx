@@ -15,7 +15,7 @@ import { useId } from "react";
  */
 
 const CONTROL =
-  "w-full h-12 rounded-2xl bg-[var(--background)] border border-[var(--border)] px-4 text-[14px] outline-none focus:border-[var(--accent)] transition-colors disabled:opacity-60";
+  "w-full h-12 rounded-2xl bg-[var(--background)] border border-[var(--dark)]/15 px-4 text-[14px] text-[var(--foreground)] placeholder:text-[var(--muted)] outline-none focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent)]/10 transition-[border-color,box-shadow] disabled:opacity-60";
 
 export function Field({
   label,
@@ -43,7 +43,7 @@ export function Field({
         className={
           hideLabel
             ? "sr-only"
-            : "block text-[11px] uppercase tracking-[0.18em] text-[var(--muted)] mb-2"
+            : "block text-[11px] uppercase tracking-[0.24em] text-[var(--accent)] font-medium mb-2"
         }
       >
         {label}
@@ -219,7 +219,7 @@ export function ChipGroup<T extends string>({
 
   return (
     <fieldset className={className}>
-      <legend className="block text-[11px] uppercase tracking-[0.18em] text-[var(--muted)] mb-3">
+      <legend className="block text-[11px] uppercase tracking-[0.24em] text-[var(--accent)] font-medium mb-3">
         {label}
       </legend>
       <div className="flex flex-wrap gap-2">
@@ -231,10 +231,10 @@ export function ChipGroup<T extends string>({
               type="button"
               aria-pressed={active}
               onClick={() => toggle(option.value)}
-              className={`h-9 px-4 rounded-full text-[12px] tracking-wide transition-colors border ${
+              className={`h-10 px-5 rounded-full text-[13px] transition-colors border-[1.5px] ${
                 active
-                  ? "bg-[var(--dark)] text-white border-[var(--dark)]"
-                  : "bg-transparent border-[var(--border)] hover:bg-black/5"
+                  ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                  : "bg-transparent border-[var(--dark)]/50 hover:bg-[var(--sand)]"
               }`}
             >
               {option.label}
@@ -272,7 +272,7 @@ export function Checkbox({
         className={`mt-0.5 h-5 w-5 rounded-full shrink-0 flex items-center justify-center border transition-colors ${
           checked
             ? "bg-[var(--accent)] border-[var(--accent)] text-white"
-            : "bg-transparent border-[var(--border)]"
+            : "bg-transparent border-[var(--dark)]/30"
         }`}
       >
         {checked ? (

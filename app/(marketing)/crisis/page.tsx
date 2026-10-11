@@ -83,10 +83,10 @@ export default function CrisisPage() {
   return (
     <div className="bg-[var(--background)]">
       <div className="px-4 sm:px-6 md:px-10 pt-[120px] md:pt-[160px] pb-20 max-w-[900px] mx-auto">
-        <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">
+        <p className="eyebrow">
           Urgent help
         </p>
-        <h1 className="mt-4 text-[34px] sm:text-[44px] md:text-[56px] leading-[1.02] tracking-[-0.025em] font-medium">
+        <h1 className="mt-4 text-[34px] sm:text-[44px] md:text-[56px] leading-[1.06] font-display font-medium">
           If you are in danger
           <br />
           right now, call.
@@ -134,7 +134,7 @@ export default function CrisisPage() {
             id is the link target; scroll-mt keeps the heading clear of the
             fixed header when it is jumped to. */}
         <section id="under-18" className="scroll-mt-28">
-          <h2 className="mt-16 md:mt-20 text-[24px] md:text-[32px] leading-tight tracking-tight font-medium">
+          <h2 className="mt-16 md:mt-20 text-[24px] md:text-[32px] leading-tight font-display font-medium">
             If you are under 18
           </h2>
           <p className="mt-3 text-[14px] md:text-[15px] leading-relaxed text-[var(--muted)] max-w-[620px]">
@@ -163,7 +163,7 @@ export default function CrisisPage() {
 
         {/* ------------------------------------------------------------------ */}
 
-        <h2 className="mt-16 md:mt-20 text-[24px] md:text-[32px] leading-tight tracking-tight font-medium">
+        <h2 className="mt-16 md:mt-20 text-[24px] md:text-[32px] leading-tight font-display font-medium">
           Mental health services
         </h2>
         <p className="mt-3 text-[14px] leading-relaxed text-[var(--muted)] max-w-[620px]">
@@ -190,7 +190,7 @@ export default function CrisisPage() {
 
         {/* ------------------------------------------------------------------ */}
 
-        <h2 className="mt-16 md:mt-20 text-[24px] md:text-[32px] leading-tight tracking-tight font-medium">
+        <h2 className="mt-16 md:mt-20 text-[24px] md:text-[32px] leading-tight font-display font-medium">
           If you are not in immediate danger
         </h2>
         <div className="mt-6 space-y-4 text-[14px] md:text-[15px] leading-relaxed text-[var(--muted)] max-w-[680px]">
@@ -210,13 +210,13 @@ export default function CrisisPage() {
         <div className="mt-8 flex flex-col sm:flex-row gap-3">
           <Link
             href="/providers"
-            className="inline-flex h-12 items-center justify-center rounded-full bg-[var(--dark)] text-white px-7 text-[12px] uppercase tracking-[0.14em] font-medium hover:bg-[var(--dark-soft)] transition-colors"
+            className="inline-flex h-12 items-center justify-center rounded-full bg-[var(--dark)] text-white px-7 text-[14px] font-medium hover:bg-[var(--dark-soft)] transition-colors"
           >
             Find a provider
           </Link>
           <Link
             href="/resources"
-            className="inline-flex h-12 items-center justify-center rounded-full border border-[var(--foreground)] px-7 text-[12px] uppercase tracking-[0.14em] font-medium hover:bg-[var(--dark)] hover:text-white hover:border-[var(--dark)] transition-colors"
+            className="inline-flex h-12 items-center justify-center rounded-full border border-[var(--foreground)] px-7 text-[14px] font-medium hover:bg-[var(--dark)] hover:text-white hover:border-[var(--dark)] transition-colors"
           >
             Wellbeing resources
           </Link>

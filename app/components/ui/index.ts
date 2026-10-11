@@ -9,7 +9,7 @@
 export { default as Button } from "./Button";
 export type { ButtonProps } from "./Button";
 
-export { default as Card, StatTile, DarkPanel } from "./Card";
+export { default as Card, StatTile, DarkPanel, ArchStack } from "./Card";
 
 export { Field, Input, Textarea, Select, ChipGroup, Checkbox } from "./Input";
 

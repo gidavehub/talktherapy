@@ -10,7 +10,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </Link>
         <Link
           href="/"
-          className="h-11 px-5 rounded-full border border-[var(--border)] text-[12px] uppercase tracking-[0.14em] font-medium flex items-center hover:bg-black/5 transition-colors"
+          className="h-11 px-5 rounded-full border border-[var(--border)] text-[14px] font-medium flex items-center hover:bg-black/5 transition-colors"
         >
           Back
         </Link>

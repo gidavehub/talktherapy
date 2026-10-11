@@ -125,7 +125,7 @@ export default function AboutPage() {
           lines={["Not another", "technology platform."]}
           lede="Over time Talk could grow into a wider digital wellbeing ecosystem — multilingual support, locally relevant content, moderated peer communities, corporate and university programmes, and research partnerships. Expansion into other African markets could follow once the model has been responsibly validated at home."
         />
-        <p className="mt-10 text-[24px] md:text-[34px] leading-[1.15] tracking-tight font-medium max-w-[760px]">
+        <p className="mt-10 text-[24px] md:text-[34px] leading-[1.15] font-display font-medium max-w-[760px]">
           The ambition is to build an environment where asking for help becomes
           easier — and where saying{" "}
           <span className="stamp text-[var(--accent)]">“I need to talk”</span>{" "}

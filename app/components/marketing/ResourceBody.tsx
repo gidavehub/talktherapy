@@ -40,7 +40,7 @@ export default function ResourceBody({ body }: { body: string }) {
           return (
             <h2
               key={i}
-              className="mt-12 first:mt-0 text-[22px] md:text-[26px] leading-tight tracking-tight font-medium"
+              className="mt-12 first:mt-0 text-[22px] md:text-[26px] leading-tight font-display font-medium"
             >
               {block.slice(3)}
             </h2>

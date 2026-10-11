@@ -1,38 +1,48 @@
 @import "tailwindcss";
 
 :root {
-  --background: #E7E4DE;
-  --foreground: #0A0A0A;
-  --surface: #FFFFFF;
-  --muted: #6B6B6B;
-  --border: rgba(10, 10, 10, 0.08);
-  --accent: #FF5A1F;
-  --accent-soft: #FF7A45;
-  --dark: #0A0A0A;
-  --dark-soft: #141414;
+  /* The redesign: cream paper, terracotta, sage and dark brown — the palette
+     of the logo (TALK's sage arch and terracotta dot on brown letters). */
+  --background: #FBF7F1;
+  --cream: #F4EADD;
+  --sand: #EFE5D8;
+  --foreground: #3B2C26;
+  --surface: #FFFDFA;
+  --muted: #7A6A61;
+  --border: rgba(74, 53, 48, 0.12);
+  --accent: #C8754E;
+  --accent-soft: #D68C68;
+  --accent-deep: #B3613C;
+  --peach: #E7A381;
+  --sage: #6E8763;
+  --sage-deep: #5B7351;
+  --sage-soft: #A9BC9C;
+  --sage-pale: #DDE5D3;
+  --dark: #4A3530;
+  --dark-soft: #5B433C;
+  --stage: #2E221E; /* Talk's screen: the brown, deepened, so her particles glow */
 
-  /* Status colours. The accent orange cannot carry "confirmed / pending /
+  /* Status colours. The terracotta accent cannot carry "confirmed / pending /
      cancelled / escalated" on its own, and a crisis banner must never read as
      a marketing CTA. */
-  --success: #0E7C5A;
-  --success-soft: rgba(14, 124, 90, 0.12);
-  --warning: #B4690E;
-  --warning-soft: rgba(180, 105, 14, 0.14);
-  --danger: #C03221;
-  --danger-soft: rgba(192, 50, 33, 0.12);
-  --info: #2563EB;
-  --info-soft: rgba(37, 99, 235, 0.10);
+  --success: #5B7F52;
+  --success-soft: rgba(91, 127, 82, 0.14);
+  --warning: #A86A16;
+  --warning-soft: rgba(168, 106, 22, 0.14);
+  --danger: #A8352A;
+  --danger-soft: rgba(168, 53, 42, 0.12);
+  --info: #4D6A86;
+  --info-soft: rgba(77, 106, 134, 0.12);
 
   /* A nested card sitting on a white card needs its own step. */
-  --surface-2: #F5F3EF;
-  /* Used inline ~8 times across the dark sections. */
-  --on-dark-muted: rgba(255, 255, 255, 0.65);
+  --surface-2: #F6EEE3;
+  --on-dark-muted: rgba(244, 234, 221, 0.7);
 
-  /* Elevation, lifted from StatCard / AuthCard / the Hero CTA so new screens
-     cannot invent a fourth shadow. */
-  --shadow-raised: 0 18px 40px -18px rgba(0, 0, 0, 0.18);
-  --shadow-floating: 0 30px 80px -30px rgba(0, 0, 0, 0.25);
-  --shadow-accent: 0 10px 30px -10px rgba(255, 90, 31, 0.6);
+  /* Elevation: warm, soft — never a grey smudge on cream. */
+  --shadow-card: 0 12px 32px -20px rgba(74, 53, 48, 0.28);
+  --shadow-raised: 0 18px 40px -22px rgba(74, 53, 48, 0.3);
+  --shadow-floating: 0 30px 80px -30px rgba(74, 53, 48, 0.32);
+  --shadow-accent: 0 12px 26px -14px rgba(200, 117, 78, 0.6);
 }
 
 @theme inline {
@@ -45,22 +55,67 @@
   --color-accent-soft: var(--accent-soft);
   --color-dark: var(--dark);
   --color-dark-soft: var(--dark-soft);
+  --color-cream: var(--cream);
+  --color-sand: var(--sand);
+  --color-sage: var(--sage);
+  --color-sage-soft: var(--sage-soft);
+  --color-sage-pale: var(--sage-pale);
+  --color-peach: var(--peach);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
   --color-info: var(--info);
   --color-surface-2: var(--surface-2);
-  --font-sans: var(--font-geist-sans);
-  --font-display: var(--font-instrument-serif);
+  --font-sans: var(--font-poppins);
+  --font-display: var(--font-fraunces);
   --font-mono: var(--font-geist-mono);
 }
 
 html, body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-poppins), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+}
+
+/* Headlines: the soft serif. A second line in italic sage is the signature
+   ("Find someone who / understands you."). */
+.font-display {
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-optical-sizing: auto;
+  letter-spacing: -0.01em;
+}
+.display-accent {
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-style: italic;
+  color: var(--sage);
+}
+
+/* "OUR PROVIDERS" — the letter-spaced terracotta label over a heading. */
+.eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 500;
+}
+
+/* The row of terracotta triangles between sections. */
+.zigzag {
+  height: 12px;
+  background-image: linear-gradient(135deg, var(--zig, var(--accent)) 33%, transparent 33%),
+    linear-gradient(225deg, var(--zig, var(--accent)) 33%, transparent 33%);
+  background-size: 22px 22px;
+  background-position: 0 0;
+  background-repeat: repeat-x;
+  transform: scaleY(-1);
+}
+
+/* An arch: a pill rounded only at the top. */
+.arch {
+  border-top-left-radius: 9999px;
+  border-top-right-radius: 9999px;
 }
 
 @keyframes marquee {
@@ -99,7 +154,7 @@ html, body {
 
 /* Big italic stamp text at bottom of sections */
 .stamp {
-  font-family: var(--font-instrument-serif), serif;
+  font-family: var(--font-fraunces), Georgia, serif;
   font-style: italic;
   font-weight: 400;
   letter-spacing: -0.04em;

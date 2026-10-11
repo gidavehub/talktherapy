@@ -46,10 +46,10 @@ export default function JournalPage() {
     <div className="space-y-8">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">
+          <p className="eyebrow">
             Journal
           </p>
-          <h1 className="mt-2 text-[28px] md:text-[38px] leading-[1.05] tracking-tight font-medium">
+          <h1 className="mt-2 font-display text-[30px] md:text-[40px] leading-[1.08] font-medium">
             Private by design.
           </h1>
           <p className="mt-3 text-[14px] text-[var(--muted)] max-w-[520px] leading-relaxed">
@@ -94,7 +94,7 @@ export default function JournalPage() {
                 })}
               </p>
 
-              <h2 className="mt-3 text-[18px] leading-snug tracking-tight font-medium">
+              <h2 className="mt-3 text-[18px] leading-snug font-display font-medium">
                 <Link
                   href={`/journal/${entry.id}`}
                   className="hover:text-[var(--accent)] transition-colors"

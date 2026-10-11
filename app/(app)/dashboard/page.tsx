@@ -101,14 +101,14 @@ export default function DashboardPage() {
         animate={{ y: 0, opacity: 1 }}
         transition={SPRING_SOFT}
       >
-        <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">
+        <p className="eyebrow">
           {new Date().toLocaleDateString("en-GB", {
             weekday: "long",
             day: "numeric",
             month: "long",
           })}
         </p>
-        <h1 className="mt-2 text-[28px] md:text-[38px] leading-[1.05] tracking-tight font-medium">
+        <h1 className="mt-2 font-display text-[30px] md:text-[40px] leading-[1.08] font-medium">
           {greeting()}
           {firstName ? `, ${firstName}.` : "."}
         </h1>
@@ -117,7 +117,7 @@ export default function DashboardPage() {
       {/* Providers for you — the first option, always. */}
       <section>
         <div className="flex items-end justify-between gap-4 mb-4">
-          <h2 className="text-[20px] md:text-[24px] tracking-tight font-medium">Providers for you</h2>
+          <h2 className="text-[20px] md:text-[24px] font-display font-medium">Providers for you</h2>
           <Link
             href="/matches"
             className="text-[12px] uppercase tracking-[0.14em] text-[var(--muted)] underline underline-offset-4 hover:text-[var(--foreground)] transition-colors shrink-0"
@@ -181,7 +181,7 @@ export default function DashboardPage() {
               <p className="text-[11px] uppercase tracking-[0.22em] text-white/65">
                 Today
               </p>
-              <h2 className="mt-3 text-[24px] md:text-[32px] leading-tight tracking-tight font-medium">
+              <h2 className="mt-3 text-[24px] md:text-[32px] leading-tight font-display font-medium">
                 How are you feeling?
               </h2>
               <p className="mt-3 text-[14px] leading-relaxed text-white/70 max-w-[420px]">
@@ -247,7 +247,7 @@ export default function DashboardPage() {
       {journal && journal.length > 0 ? (
         <div>
           <div className="flex items-center justify-between gap-4 mb-4">
-            <h2 className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">
+            <h2 className="eyebrow">
               Recent writing
             </h2>
             <Link

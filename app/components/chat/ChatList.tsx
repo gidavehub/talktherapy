@@ -208,7 +208,7 @@ export default function ChatList({ openId = null }: { openId?: string | null }) 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex h-16 shrink-0 items-center justify-between gap-3 px-4">
-        <h1 className="text-[22px] font-medium tracking-tight">Messages</h1>
+        <h1 className="font-display text-[26px] font-medium">Messages</h1>
         {/* Groups — led sessions and peer groups — start here, from the people
             they already work with. Clients never see this control. */}
         {isProvider && chats?.length ? (

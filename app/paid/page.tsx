@@ -37,7 +37,7 @@ export default function PaidPage() {
     <main className="flex min-h-screen items-center justify-center bg-[var(--dark)] px-6 text-white">
       <div className="max-w-[420px] text-center">
         <p className="text-[11px] uppercase tracking-[0.22em] text-white/50">Payment received</p>
-        <h1 className="mt-3 text-[28px] leading-tight tracking-tight font-medium">Thank you.</h1>
+        <h1 className="mt-3 text-[28px] leading-tight font-display font-medium">Thank you.</h1>
         {stayed ? (
           <>
             <p className="mt-3 text-[14px] leading-relaxed text-white/70">
@@ -46,7 +46,7 @@ export default function PaidPage() {
             </p>
             <Link
               href="/talk?paid=1"
-              className="mt-6 inline-flex h-12 items-center rounded-full border border-white/25 px-6 text-[12px] uppercase tracking-[0.14em] hover:bg-white/10"
+              className="mt-6 inline-flex h-12 items-center rounded-full border border-white/25 px-6 text-[14px] font-medium hover:bg-white/10"
             >
               Or carry on here
             </Link>

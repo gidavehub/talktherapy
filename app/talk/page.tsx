@@ -30,6 +30,7 @@ import { IconSpeaker } from "@/components/ui/icons";
 import ProviderCard from "@/components/providers/ProviderCard";
 import GuardianConsentModal from "@/components/therapy/GuardianConsentModal";
 import PaymentSheet from "@/components/onboarding/PaymentSheet";
+import Logo from "@/components/Logo";
 import SpokenCaption from "@/components/onboarding/SpokenCaption";
 import AuthCard from "@/components/AuthCard";
 import Modal from "@/components/ui/Modal";
@@ -104,7 +105,7 @@ export default function TalkPage() {
  */
 function TalkShell() {
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-end bg-[var(--dark)] px-4 pb-10 text-white">
+    <div className="relative flex min-h-screen flex-col items-center justify-end bg-[var(--stage)] px-4 pb-10 text-[var(--cream)]">
       <p className="text-center text-[11px] uppercase leading-relaxed tracking-[0.18em] text-white/45 max-w-[460px]">
         Talk is an AI, not a therapist, and cannot respond to an emergency.{" "}
         <Link href="/crisis" className="underline underline-offset-4 text-white/70">
@@ -640,22 +641,21 @@ function Talk() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[var(--dark)] text-white" style={BLOB_VARS}>
+    <div className="relative min-h-screen overflow-hidden bg-[var(--stage)] text-[var(--cream)]" style={BLOB_VARS}>
       {/* Ambient warmth behind the field. */}
       <div
         aria-hidden
         className="absolute inset-0 opacity-60"
         style={{
           background:
-            "radial-gradient(circle at 50% 42%, rgba(255,90,31,0.30) 0%, rgba(255,90,31,0) 58%)," +
-            "radial-gradient(circle at 80% 18%, rgba(255,90,31,0.14), transparent 52%)",
+            "radial-gradient(circle at 50% 42%, rgba(200,117,78,0.32) 0%, rgba(200,117,78,0) 58%)," +
+            "radial-gradient(circle at 80% 18%, rgba(110,135,99,0.18), transparent 52%)",
         }}
       />
 
       <header className="relative z-10 px-4 sm:px-6 md:px-10 pt-5 md:pt-8 flex items-center justify-between">
-        <Link href="/" className="leading-[0.85] text-[15px] font-medium tracking-tight">
-          <span className="block">TALK</span>
-          <span className="block">THERAPY</span>
+        <Link href="/" aria-label="TALK — home">
+          <Logo height={34} light />
         </Link>
         {/* Mid-onboarding, "home" is the only way out: the dashboard would
             send them straight back here. */}
@@ -665,7 +665,7 @@ function Talk() {
             voice.stop();
             talk.stop();
           }}
-          className="h-10 px-4 rounded-full border border-white/20 text-[12px] uppercase tracking-[0.14em] font-medium flex items-center hover:bg-white/10 transition-colors"
+          className="h-10 px-4 rounded-full border border-white/20 text-[14px] font-medium flex items-center hover:bg-white/10 transition-colors"
         >
           Exit
         </Link>
@@ -691,7 +691,7 @@ function Talk() {
               <motion.span
                 key={f}
                 className="h-1.5 w-1.5 rounded-full"
-                animate={{ backgroundColor: i < learned ? "rgba(255,90,31,1)" : "rgba(255,255,255,0.2)" }}
+                animate={{ backgroundColor: i < learned ? "rgba(200,117,78,1)" : "rgba(244,234,221,0.2)" }}
                 transition={SPRING_SOFT}
               />
             ))}
@@ -919,13 +919,13 @@ function Talk() {
             <div className="mt-3 flex items-center justify-center gap-2">
               <a
                 href="tel:117"
-                className="h-10 px-4 rounded-full bg-[var(--accent)] text-[12px] uppercase tracking-[0.14em] font-medium flex items-center"
+                className="h-10 px-4 rounded-full bg-[var(--accent)] text-[14px] font-medium flex items-center"
               >
                 Police 117
               </a>
               <a
                 href="tel:116"
-                className="h-10 px-4 rounded-full bg-[var(--accent)] text-[12px] uppercase tracking-[0.14em] font-medium flex items-center"
+                className="h-10 px-4 rounded-full bg-[var(--accent)] text-[14px] font-medium flex items-center"
               >
                 Ambulance 116
               </a>
@@ -1017,7 +1017,7 @@ function Talk() {
             type="button"
             disabled={!canStart}
             onClick={talk.active ? talk.stop : begin}
-            className="h-12 px-7 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-soft)] disabled:opacity-40 text-white text-[12px] uppercase tracking-[0.14em] font-medium transition-colors"
+            className="h-12 px-7 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-deep)] disabled:opacity-40 text-white text-[14px] font-medium transition-colors"
           >
             {talk.active
               ? "End"
@@ -1049,7 +1049,7 @@ function Talk() {
           ) : !intakeMode ? (
             <Link
               href="/matches"
-              className="h-12 px-6 rounded-full border border-white/20 text-[12px] uppercase tracking-[0.14em] font-medium flex items-center hover:bg-white/10 transition-colors"
+              className="h-12 px-6 rounded-full border border-white/20 text-[14px] font-medium flex items-center hover:bg-white/10 transition-colors"
             >
               Talk to a human
             </Link>

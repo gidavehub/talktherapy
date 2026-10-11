@@ -52,6 +52,22 @@ function resolve(path: string): Promise<string | null> {
   return pending;
 }
 
+/** A provider photo's URL (null until known, and when there is none). */
+export function useProviderPhoto(photoPath?: string | null): string | null {
+  const [url, setUrl] = useState<string | null>(() => (photoPath ? cache.get(photoPath) ?? null : null));
+  useEffect(() => {
+    if (!photoPath || !firebaseConfigured()) return;
+    let cancelled = false;
+    void resolve(photoPath).then((next) => {
+      if (!cancelled) setUrl(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [photoPath]);
+  return photoPath ? url : null;
+}
+
 export default function ProviderAvatar({
   photoPath,
   name,
@@ -63,22 +79,6 @@ export default function ProviderAvatar({
   size?: number;
   className?: string;
 }) {
-  const [url, setUrl] = useState<string | null>(() =>
-    photoPath ? cache.get(photoPath) ?? null : null,
-  );
-
-  useEffect(() => {
-    if (!photoPath || !firebaseConfigured()) return;
-
-    let cancelled = false;
-    void resolve(photoPath).then((next) => {
-      if (!cancelled) setUrl(next);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [photoPath]);
-
+  const url = useProviderPhoto(photoPath);
   return <Avatar src={url} name={name} size={size} className={className} />;
 }

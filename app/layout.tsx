@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
+import { Fraunces, Geist_Mono, Poppins } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "./components/AuthProvider";
 import { ToastProvider } from "./components/ui/Toast";
 import MotionProvider from "./components/MotionProvider";
 import VoiceUnlock from "./components/VoiceUnlock";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+/** Text: a soft geometric sans. */
+const poppins = Poppins({
+  variable: "--font-poppins",
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
 });
 
 const geistMono = Geist_Mono({
@@ -16,10 +18,10 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const instrumentSerif = Instrument_Serif({
-  variable: "--font-instrument-serif",
+/** Headlines: a warm serif, with the italic the second lines are set in. */
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
   subsets: ["latin"],
-  weight: "400",
   style: ["normal", "italic"],
 });
 
@@ -28,9 +30,9 @@ export const metadata: Metadata = {
   description:
     "Calm your mind. Elevate your clarity. Talk Therapy uses conversational AI to match you with the right provider in minutes.",
   icons: {
-    icon: "/tablogo.png",
-    shortcut: "/tablogo.png",
-    apple: "/tablogo.png",
+    icon: "/brand/icon.png",
+    shortcut: "/brand/icon.png",
+    apple: "/brand/icon.png",
   },
 };
 
@@ -42,7 +44,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} antialiased`}
+      className={`${poppins.variable} ${geistMono.variable} ${fraunces.variable} antialiased`}
     >
       <body
         className="min-h-screen bg-[var(--background)] text-[var(--foreground)]"

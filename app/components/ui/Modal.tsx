@@ -138,7 +138,7 @@ export default function Modal({
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 {title ? (
-                  <h2 className="text-[22px] md:text-[26px] leading-[1.1] tracking-tight font-medium">
+                  <h2 className="text-[22px] md:text-[26px] leading-[1.1] font-display font-medium">
                     {title}
                   </h2>
                 ) : null}

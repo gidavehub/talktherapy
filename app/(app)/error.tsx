@@ -32,10 +32,10 @@ export default function AppError({
   return (
     <div className="min-h-[60vh] grid place-items-center py-16">
       <div className="max-w-[520px] text-center">
-        <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">
+        <p className="eyebrow">
           Something went wrong
         </p>
-        <h1 className="mt-4 text-[28px] md:text-[38px] leading-[1.05] tracking-tight font-medium">
+        <h1 className="mt-4 font-display text-[30px] md:text-[40px] leading-[1.08] font-medium">
           That did not load properly.
         </h1>
         <p className="mt-4 text-[14px] leading-relaxed text-[var(--muted)]">
@@ -47,13 +47,13 @@ export default function AppError({
           <button
             type="button"
             onClick={retry}
-            className="inline-flex h-12 items-center justify-center rounded-full bg-[var(--accent)] hover:bg-[var(--accent-soft)] transition-colors text-white px-7 text-[12px] uppercase tracking-[0.14em] font-medium"
+            className="inline-flex h-12 items-center justify-center rounded-full bg-[var(--accent)] hover:bg-[var(--accent-soft)] transition-colors text-white px-7 text-[14px] font-medium"
           >
             Try again
           </button>
           <Link
             href="/dashboard"
-            className="inline-flex h-12 items-center justify-center rounded-full border border-[var(--border)] px-7 text-[12px] uppercase tracking-[0.14em] font-medium hover:bg-black/[.03] transition-colors"
+            className="inline-flex h-12 items-center justify-center rounded-full border border-[var(--border)] px-7 text-[14px] font-medium hover:bg-black/[.03] transition-colors"
           >
             Go home
           </Link>

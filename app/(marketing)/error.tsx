@@ -29,10 +29,10 @@ export default function MarketingError({
   return (
     <div className="min-h-[70vh] grid place-items-center px-4 sm:px-6 py-24">
       <div className="max-w-[560px] text-center">
-        <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">
+        <p className="eyebrow">
           Something went wrong
         </p>
-        <h1 className="mt-4 text-[32px] sm:text-[42px] md:text-[52px] leading-[1.02] tracking-[-0.025em] font-medium">
+        <h1 className="mt-4 text-[32px] sm:text-[42px] md:text-[52px] leading-[1.06] font-display font-medium">
           That did not
           <br />
           load properly.
@@ -45,13 +45,13 @@ export default function MarketingError({
           <button
             type="button"
             onClick={retry}
-            className="inline-flex h-12 items-center justify-center rounded-full bg-[var(--accent)] hover:bg-[var(--accent-soft)] transition-colors text-white px-7 text-[12px] uppercase tracking-[0.14em] font-medium"
+            className="inline-flex h-12 items-center justify-center rounded-full bg-[var(--accent)] hover:bg-[var(--accent-soft)] transition-colors text-white px-7 text-[14px] font-medium"
           >
             Try again
           </button>
           <Link
             href="/"
-            className="inline-flex h-12 items-center justify-center rounded-full border border-[var(--foreground)] px-7 text-[12px] uppercase tracking-[0.14em] font-medium hover:bg-[var(--dark)] hover:text-white hover:border-[var(--dark)] transition-colors"
+            className="inline-flex h-12 items-center justify-center rounded-full border border-[var(--foreground)] px-7 text-[14px] font-medium hover:bg-[var(--dark)] hover:text-white hover:border-[var(--dark)] transition-colors"
           >
             Back home
           </Link>

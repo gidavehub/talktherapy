@@ -72,7 +72,7 @@ export default function SupportPage() {
             </Alert>
 
             <div className="rounded-[28px] bg-[var(--background)] p-6">
-              <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">
+              <p className="eyebrow">
                 You might also want
               </p>
               <ul className="mt-5 space-y-3 text-[14px]">

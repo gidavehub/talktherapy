@@ -14,8 +14,8 @@ import { SPRING_SOFT } from "../motion/primitives";
 type Tone = "light" | "dark" | "bare";
 
 const TONES: Record<Tone, string> = {
-  light: "bg-white shadow-[0_18px_40px_-18px_rgba(0,0,0,0.18)]",
-  dark: "bg-[var(--dark)] text-white shadow-[0_30px_70px_-25px_rgba(0,0,0,0.5)]",
+  light: "bg-[var(--surface)] shadow-[var(--shadow-card)] border border-[var(--dark)]/[0.05]",
+  dark: "bg-[var(--dark)] text-[var(--cream)] shadow-[var(--shadow-floating)]",
   bare: "border border-[var(--border)]",
 };
 
@@ -90,14 +90,14 @@ export function StatTile({
       viewport={{ once: true, amount: 0.3 }}
       transition={{ ...SPRING_SOFT, delay }}
       whileHover={{ y: -4, scale: 1.02 }}
-      className={`rounded-2xl bg-white shadow-[0_18px_40px_-18px_rgba(0,0,0,0.18)] px-5 py-4 ${className}`}
+      className={`rounded-[22px] bg-[var(--surface)] shadow-[var(--shadow-card)] border border-[var(--dark)]/[0.05] px-5 py-4 ${className}`}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-[12px] text-[var(--muted)] tracking-wide truncate">
             {label}
           </p>
-          <div className="mt-3 flex items-baseline gap-1 text-[28px] leading-none font-medium text-[var(--foreground)]">
+          <div className="font-display mt-3 flex items-baseline gap-1 text-[30px] leading-none font-medium text-[var(--foreground)]">
             {value}
             {caption ? (
               <span className="ml-2 text-[11px] text-[var(--muted)] font-normal tracking-wide">
@@ -107,7 +107,7 @@ export function StatTile({
           </div>
         </div>
         {icon ? (
-          <span className="shrink-0 h-10 w-10 rounded-full bg-[var(--dark)] text-white flex items-center justify-center">
+          <span className="arch shrink-0 flex h-11 w-10 items-center justify-center rounded-b-lg bg-[var(--sage)] text-white">
             {icon}
           </span>
         ) : null}
@@ -117,9 +117,9 @@ export function StatTile({
 }
 
 /**
- * Full-bleed dark panel with the two ambient orange blooms from
- * ConsultationBanner. Used for the AI companion surfaces and any CTA that
- * needs to feel like the product rather than the brochure.
+ * The redesign's banded panel: sage green, with the concentric arches rising
+ * at the right — "Not sure who to choose? Let TALK match you." Used for the
+ * AI companion surfaces and any CTA that should feel like the product.
  */
 export function DarkPanel({
   children,
@@ -132,27 +132,28 @@ export function DarkPanel({
 }) {
   return (
     <div
-      className={`relative overflow-hidden rounded-[28px] md:rounded-[40px] bg-[var(--dark)] text-white ${padding} ${className}`}
+      className={`relative overflow-hidden rounded-[28px] md:rounded-[36px] bg-[var(--sage)] text-[var(--cream)] ${padding} ${className}`}
     >
-      <div
-        aria-hidden
-        className="absolute -right-20 -top-24 h-[320px] w-[320px] rounded-full"
-        style={{
-          background:
-            "radial-gradient(circle, rgba(255,122,69,0.55), rgba(255,90,31,0))",
-          filter: "blur(12px)",
-        }}
-      />
-      <div
-        aria-hidden
-        className="absolute -left-16 -bottom-20 h-[260px] w-[260px] rounded-full"
-        style={{
-          background:
-            "radial-gradient(circle, rgba(255,90,31,0.35), rgba(255,90,31,0))",
-          filter: "blur(20px)",
-        }}
-      />
+      <ArchStack className="absolute -bottom-6 right-[-60px] hidden h-[115%] md:block" />
       <div className="relative z-10">{children}</div>
     </div>
+  );
+}
+
+/** Concentric arches with a terracotta sun — the bands' decoration. */
+export function ArchStack({
+  className = "",
+  colors = ["#8FA582", "#B9C8AC", "#F4EADD"],
+}: {
+  className?: string;
+  colors?: [string, string, string] | string[];
+}) {
+  return (
+    <svg aria-hidden viewBox="0 0 320 300" preserveAspectRatio="xMidYMax meet" className={className}>
+      <path d="M0 300V160a160 160 0 0 1 320 0v140z" fill={colors[0]} />
+      <path d="M45 300V165a115 115 0 0 1 230 0v135z" fill={colors[1]} />
+      <path d="M90 300V170a70 70 0 0 1 140 0v130z" fill={colors[2]} />
+      <circle cx="160" cy="190" r="26" fill="#C8754E" />
+    </svg>
   );
 }

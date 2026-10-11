@@ -104,10 +104,10 @@ export default function MoodPage() {
   return (
     <div className="space-y-8">
       <div>
-        <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">
+        <p className="eyebrow">
           Mood
         </p>
-        <h1 className="mt-2 text-[28px] md:text-[38px] leading-[1.05] tracking-tight font-medium">
+        <h1 className="mt-2 font-display text-[30px] md:text-[40px] leading-[1.08] font-medium">
           {checkedInToday ? "Checked in today." : "How are you, really?"}
         </h1>
       </div>
@@ -130,7 +130,7 @@ export default function MoodPage() {
             </motion.div>
           ) : (
             <motion.div key="form" exit={{ opacity: 0 }}>
-              <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">
+              <p className="eyebrow">
                 {checkedInToday ? "Check in again" : "Today"}
               </p>
 
@@ -256,7 +256,7 @@ export default function MoodPage() {
           </Card>
 
           <div>
-            <h2 className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)] mb-4">
+            <h2 className="eyebrow mb-4">
               Recent check-ins
             </h2>
             <ul className="space-y-2">

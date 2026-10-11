@@ -74,7 +74,7 @@ export default function TechnologyPage() {
 
         <div className="mt-12 md:mt-16 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
           <div className="rounded-[28px] bg-[var(--background)] p-6 md:p-8">
-            <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">
+            <p className="eyebrow">
               What the companion does
             </p>
             <ul className="mt-6 space-y-3">

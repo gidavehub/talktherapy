@@ -91,7 +91,7 @@ export default function DataSettingsPage() {
   return (
     <div className="max-w-[640px] space-y-6">
       <Card radius="md" padding="p-6 md:p-8" reveal={false}>
-        <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">
+        <p className="eyebrow">
           Export
         </p>
         <h2 className="mt-3 text-[20px] leading-tight font-medium">
@@ -109,7 +109,7 @@ export default function DataSettingsPage() {
       </Card>
 
       <Card radius="md" padding="p-6 md:p-8" reveal={false}>
-        <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">
+        <p className="eyebrow">
           Delete
         </p>
         <h2 className="mt-3 text-[20px] leading-tight font-medium">
@@ -127,7 +127,7 @@ export default function DataSettingsPage() {
       </Card>
 
       <Card radius="md" padding="p-6 md:p-8" reveal={false}>
-        <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">
+        <p className="eyebrow">
           Close account
         </p>
         <h2 className="mt-3 text-[20px] leading-tight font-medium">

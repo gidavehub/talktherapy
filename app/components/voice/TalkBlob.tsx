@@ -310,11 +310,11 @@ void main(){
   float heat = clamp(length(V.xyz) / uHeatScale, 0.0, 1.0);
   vec3 col = mix(uColA, uColB, clamp(p.z / uRadius * 0.5 + 0.5, 0.0, 1.0));
 
-  /* Per-particle colour variation — a few deep embers, a few golds — so the
-     field has grain instead of being one flat orange. */
+  /* Per-particle colour variation — a few sage, a few cream, the palette of
+     the logo — so the field has grain instead of being one flat terracotta. */
   float hue = rnd(pid, 16u);
-  col = mix(col, vec3(0.78, 0.17, 0.05), smoothstep(0.72, 1.0, hue) * 0.7);
-  col = mix(col, vec3(1.0, 0.68, 0.32), smoothstep(0.28, 0.0, hue) * 0.55);
+  col = mix(col, vec3(0.62, 0.72, 0.56), smoothstep(0.72, 1.0, hue) * 0.75);
+  col = mix(col, vec3(0.96, 0.90, 0.82), smoothstep(0.28, 0.0, hue) * 0.55);
 
   /* Whitening capped on every term, or additive blending blows it to white. */
   col = mix(col, uColHot, heat * 0.4);
@@ -377,9 +377,9 @@ const PRESETS: Record<BlobState, Preset> = {
   speaking:  { spring: 30.0, damp: 4.5, flow: 0.08, jitter: 0.08, deform: 0.20, swirl: 0.24, burst: 0.2, kick: 55, alpha: 0.21, bandGain: 0.7, idle: 0.4, twitch: 0.25, wander: 1.0 },
 };
 
-const ACCENT = [1.0, 0.353, 0.122]; // #FF5A1F
-const ACCENT_SOFT = [1.0, 0.478, 0.271]; // #FF7A45
-const HOT = [1.0, 0.9, 0.78];
+const ACCENT = [0.9, 0.56, 0.38]; // terracotta, lifted to glow on the brown
+const ACCENT_SOFT = [0.97, 0.73, 0.58]; // peach
+const HOT = [0.98, 0.94, 0.87]; // cream
 
 function compile(gl: WebGL2RenderingContext, type: number, src: string) {
   const sh = gl.createShader(type);

@@ -60,7 +60,7 @@ export default async function ResourcePage(props: PageProps<"/resources/[slug]">
             </span>
           </div>
 
-          <h1 className="mt-5 text-[32px] sm:text-[40px] md:text-[52px] leading-[1.03] tracking-[-0.025em] font-medium">
+          <h1 className="mt-5 text-[32px] sm:text-[40px] md:text-[52px] leading-[1.06] font-display font-medium">
             {resource.title}
           </h1>
 

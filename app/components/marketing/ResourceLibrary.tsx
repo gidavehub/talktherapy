@@ -93,7 +93,7 @@ export default function ResourceLibrary({
               </span>
             </div>
 
-            <h3 className="mt-5 text-[18px] leading-snug tracking-tight font-medium">
+            <h3 className="mt-5 text-[18px] leading-snug font-display font-medium">
               <Link
                 href={`/resources/${resource.slug}`}
                 className="hover:text-[var(--accent)] transition-colors"

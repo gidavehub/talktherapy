@@ -8,62 +8,64 @@ import { useAuth } from "../AuthProvider";
 import { beginDoorway, isTalk } from "../../lib/talkDoorway";
 
 /**
- * The button vocabulary from the landing page, factored out.
+ * The button vocabulary, one place for every screen.
  *
- * Class strings are lifted verbatim from Hero / ConsultationBanner / Pricing /
- * AuthCard rather than re-derived, so a new screen is pixel-identical to the
- * marketing site. If you find yourself hand-rolling a button elsewhere, add a
- * variant here instead — that drift is exactly what this file exists to stop.
+ * The redesign's buttons are plain pills with a sentence-case label —
+ * "Begin with TALK" in solid terracotta, "View profile" outlined in brown. If
+ * you find yourself hand-rolling a button elsewhere, add a variant here
+ * instead — that drift is exactly what this file exists to stop.
  *
- * The trailing "puck" (the circular arrow that slides on hover) is the
- * signature detail; `withArrow` is on by default for primary and secondary.
+ * The trailing arrow puck is opt-in (`withArrow`).
  */
 
 type Variant =
-  | "primary" // accent fill, white text — the main CTA
-  | "secondary" // hairline outline that inverts to dark on hover
-  | "ghost" // subtle bordered pill, used in headers
-  | "dark" // solid near-black
+  | "primary" // terracotta fill — the main CTA
+  | "secondary" // brown outline that fills brown on hover
+  | "ghost" // subtle bordered pill
+  | "dark" // solid brown
+  | "sage" // solid sage green
   | "onDark" // outlined, for use on a dark surface
-  | "danger"; // destructive, reuses accent at low emphasis
+  | "danger"; // destructive
 
 type Size = "sm" | "md" | "lg";
 
 const SIZES: Record<Size, { base: string; padded: string; puck: string }> = {
-  sm: { base: "h-11", padded: "px-5", puck: "h-8 w-8" },
-  md: { base: "h-12", padded: "px-6", puck: "h-9 w-9" },
-  lg: { base: "h-12 md:h-14", padded: "px-6 md:px-8", puck: "h-10 w-10 md:h-11 md:w-11" },
+  sm: { base: "h-10", padded: "px-5", puck: "h-7 w-7" },
+  md: { base: "h-11", padded: "px-6", puck: "h-8 w-8" },
+  lg: { base: "h-12 md:h-[52px]", padded: "px-7 md:px-8", puck: "h-9 w-9" },
 };
 
-const LABEL = "text-[12px] uppercase tracking-[0.14em] font-medium";
+const LABEL = "text-[14px] font-medium tracking-[0.01em]";
 
 const VARIANTS: Record<Variant, { shell: string; puck: string }> = {
   primary: {
-    shell:
-      "bg-[var(--accent)] hover:bg-[var(--accent-soft)] text-white shadow-[0_10px_30px_-10px_rgba(255,90,31,0.6)]",
-    puck: "bg-white/15",
+    shell: "bg-[var(--accent)] hover:bg-[var(--accent-deep)] text-white shadow-[var(--shadow-accent)]",
+    puck: "bg-white/20",
   },
   secondary: {
     shell:
-      "border border-[var(--foreground)] hover:bg-[var(--dark)] hover:text-white hover:border-[var(--dark)]",
+      "border-[1.5px] border-[var(--dark)] text-[var(--foreground)] bg-transparent hover:bg-[var(--dark)] hover:text-[var(--cream)]",
     puck: "bg-[var(--accent)] text-white",
   },
   ghost: {
-    shell: "border border-[var(--border)] bg-transparent hover:bg-black/5",
+    shell: "border border-[var(--border)] bg-transparent text-[var(--foreground)] hover:bg-[var(--sand)]",
     puck: "bg-[var(--dark)] text-white",
   },
   dark: {
-    shell: "bg-[var(--dark)] text-white hover:bg-[var(--dark-soft)]",
+    shell: "bg-[var(--dark)] text-[var(--cream)] hover:bg-[var(--dark-soft)]",
+    puck: "bg-white/15",
+  },
+  sage: {
+    shell: "bg-[var(--sage)] text-white hover:bg-[var(--sage-deep)]",
     puck: "bg-white/15",
   },
   onDark: {
-    shell: "border border-white/20 text-white hover:bg-white/10",
+    shell: "border-[1.5px] border-[var(--cream)]/50 text-[var(--cream)] hover:bg-[var(--cream)]/10",
     puck: "bg-[var(--accent)] text-white",
   },
   danger: {
-    shell:
-      "border border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-white",
-    puck: "bg-[var(--accent)] text-white",
+    shell: "border-[1.5px] border-[var(--danger)] text-[var(--danger)] hover:bg-[var(--danger)] hover:text-white",
+    puck: "bg-[var(--danger)] text-white",
   },
 };
 
@@ -121,10 +123,8 @@ export default function Button({
   const sizing = SIZES[size];
   const styles = VARIANTS[variant];
 
-  // The puck is the default for the two CTA variants and opt-in elsewhere,
-  // matching how the marketing page uses it.
-  const showArrow =
-    withArrow ?? (variant === "primary" || variant === "secondary");
+  // The arrow puck is opt-in: the redesign's pills are plain.
+  const showArrow = withArrow ?? false;
 
   const isDisabled = disabled || loading;
 
@@ -165,7 +165,7 @@ export default function Button({
   );
 
   const motionProps = {
-    whileHover: isDisabled ? undefined : { scale: 1.04 },
+    whileHover: isDisabled ? undefined : { scale: 1.02 },
     whileTap: isDisabled ? undefined : { scale: 0.97 },
     transition: SPRING_SNAP,
     className: fullWidth ? "w-full" : "inline-block",

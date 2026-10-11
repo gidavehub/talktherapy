@@ -33,7 +33,7 @@ export default function CrisisReadAloud() {
           voice.say(LINES);
         }}
         aria-pressed={reading}
-        className={`inline-flex h-11 items-center gap-2 rounded-full border px-5 text-[12px] uppercase tracking-[0.14em] font-medium transition-colors ${
+        className={`inline-flex h-11 items-center gap-2 rounded-full border px-5 text-[14px] font-medium transition-colors ${
           reading
             ? "border-[var(--accent)] bg-[var(--accent)] text-white"
             : "border-[var(--foreground)]/30 hover:bg-black/5"

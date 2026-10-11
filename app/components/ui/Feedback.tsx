@@ -15,10 +15,11 @@ type BadgeTone = "accent" | "neutral" | "positive" | "warning" | "dark";
 
 const BADGE_TONES: Record<BadgeTone, string> = {
   accent: "bg-[var(--accent)] text-white",
-  neutral: "bg-black/5 text-[var(--muted)]",
-  positive: "bg-emerald-600/10 text-emerald-700",
-  warning: "bg-amber-500/15 text-amber-700",
-  dark: "bg-[var(--dark)] text-white",
+  neutral: "bg-[var(--sand)] text-[var(--foreground)]",
+  // "Next available: Today" — solid sage.
+  positive: "bg-[var(--sage)] text-white",
+  warning: "bg-[var(--warning-soft)] text-[var(--warning)]",
+  dark: "bg-[var(--dark)] text-[var(--cream)]",
 };
 
 export function Badge({
@@ -32,7 +33,7 @@ export function Badge({
 }) {
   return (
     <span
-      className={`inline-flex h-6 items-center rounded-full px-3 text-[10px] uppercase tracking-[0.18em] ${BADGE_TONES[tone]} ${className}`}
+      className={`inline-flex h-7 items-center rounded-full px-3 text-[11.5px] font-medium ${BADGE_TONES[tone]} ${className}`}
     >
       {children}
     </span>
@@ -51,11 +52,14 @@ export function Pill({
   onClick?: () => void;
   className?: string;
 }) {
-  const shell = `inline-flex h-9 items-center gap-2 rounded-full px-4 text-[12px] tracking-wide border transition-colors ${
-    active
-      ? "bg-[var(--dark)] text-white border-[var(--dark)]"
-      : "border-[var(--border)] hover:bg-black/5"
-  } ${className}`;
+  // A choice (onClick): outlined, terracotta when chosen. A label: a sand chip.
+  const shell = onClick
+    ? `inline-flex h-10 items-center gap-2 rounded-full px-5 text-[13px] border-[1.5px] transition-colors ${
+        active
+          ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+          : "border-[var(--dark)]/60 text-[var(--foreground)] hover:bg-[var(--sand)]"
+      } ${className}`
+    : `inline-flex h-7 items-center rounded-full px-3 text-[12px] bg-[var(--sand)] text-[var(--foreground)] ${className}`;
 
   if (!onClick) return <span className={shell}>{children}</span>;
 
@@ -102,7 +106,7 @@ export function Avatar({
   return (
     <span
       aria-hidden
-      className={`rounded-full bg-[var(--dark)] text-white flex items-center justify-center shrink-0 font-medium ${className}`}
+      className={`rounded-full bg-[var(--sage)] text-white flex items-center justify-center shrink-0 font-medium ${className}`}
       style={{ width: size, height: size, fontSize: size * 0.36 }}
     >
       {initials || "?"}
@@ -149,7 +153,7 @@ export function Skeleton({
   return (
     <span
       aria-hidden
-      className={`block bg-black/[.06] motion-safe:animate-pulse ${rounded} ${className}`}
+      className={`block bg-[var(--sand)] motion-safe:animate-pulse ${rounded} ${className}`}
     />
   );
 }
@@ -197,14 +201,14 @@ export function EmptyState({
       initial={{ y: 20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={SPRING_SOFT}
-      className={`rounded-[28px] border border-dashed border-[var(--border)] px-6 py-12 md:py-16 text-center ${className}`}
+      className={`rounded-[28px] border border-dashed border-[var(--dark)]/20 bg-[var(--surface)]/60 px-6 py-12 md:py-16 text-center ${className}`}
     >
       {icon ? (
-        <span className="mx-auto mb-5 h-12 w-12 rounded-full bg-[var(--dark)] text-white flex items-center justify-center">
+        <span className="arch mx-auto mb-5 flex h-14 w-12 items-center justify-center rounded-b-xl bg-[var(--sage)] text-white">
           {icon}
         </span>
       ) : null}
-      <p className="text-[16px] md:text-[17px] font-medium leading-tight">{title}</p>
+      <p className="font-display text-[20px] md:text-[22px] font-medium leading-tight">{title}</p>
       {description ? (
         <p className="mt-3 text-[13px] md:text-[14px] text-[var(--muted)] leading-relaxed max-w-[420px] mx-auto">
           {description}

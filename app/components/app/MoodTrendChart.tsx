@@ -113,7 +113,7 @@ export default function MoodTrendChart({
   return (
     <div>
       <div className="flex items-start justify-between gap-4 mb-4">
-        <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">
+        <p className="eyebrow">
           Last {days} days
         </p>
         <button

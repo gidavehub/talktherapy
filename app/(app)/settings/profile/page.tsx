@@ -103,7 +103,7 @@ export default function ProfileSettingsPage() {
       </Card>
 
       <Card radius="md" padding="p-6 md:p-8" reveal={false}>
-        <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">
+        <p className="eyebrow">
           Account
         </p>
         <dl className="mt-5 space-y-4 text-[14px]">

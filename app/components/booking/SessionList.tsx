@@ -361,7 +361,7 @@ export default function SessionList() {
 
       {rest.length > 0 ? (
         <div className="space-y-2">
-          <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">
+          <p className="eyebrow">
             Earlier
           </p>
           {rest.map((booking) => (

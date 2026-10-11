@@ -133,7 +133,7 @@ export default function ProviderProfileView({ providerId }: { providerId: string
         >
           <ProviderAvatar photoPath={profile.photoPath} name={profile.displayName} size={80} />
           <div className="min-w-0 pt-1">
-            <h1 className="text-[28px] md:text-[36px] leading-tight tracking-tight font-medium">
+            <h1 className="text-[28px] md:text-[36px] leading-tight font-display font-medium">
               {profile.displayName}
             </h1>
             <p className="mt-2 text-[14px] md:text-[15px] text-[var(--muted)] leading-relaxed">
@@ -167,7 +167,7 @@ export default function ProviderProfileView({ providerId }: { providerId: string
             transition={{ ...SPRING_SOFT, delay: 0.08 }}
             className="mt-12"
           >
-            <h2 className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">
+            <h2 className="eyebrow">
               About
             </h2>
             <p className="mt-4 text-[14px] md:text-[15px] leading-relaxed text-[var(--muted)] whitespace-pre-line max-w-[640px]">
@@ -178,7 +178,7 @@ export default function ProviderProfileView({ providerId }: { providerId: string
 
         {profile.specializations.length ? (
           <div className="mt-12">
-            <h2 className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">
+            <h2 className="eyebrow">
               Areas of focus
             </h2>
             <div className="mt-4 flex flex-wrap gap-2">
@@ -193,7 +193,7 @@ export default function ProviderProfileView({ providerId }: { providerId: string
 
         {profile.qualifications.length ? (
           <div className="mt-12">
-            <h2 className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">
+            <h2 className="eyebrow">
               Qualifications
             </h2>
             <ul className="mt-4 space-y-3">
@@ -248,7 +248,7 @@ export default function ProviderProfileView({ providerId }: { providerId: string
               whileHover={opening ? undefined : { scale: 1.03 }}
               whileTap={opening ? undefined : { scale: 0.97 }}
               transition={SPRING_SNAP}
-              className="w-full h-12 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-soft)] text-white text-[12px] uppercase tracking-[0.14em] font-medium flex items-center justify-center gap-2.5 shadow-[0_10px_30px_-10px_rgba(255,90,31,0.6)] transition-colors disabled:opacity-70"
+              className="w-full h-12 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-deep)] text-white text-[14px] font-medium flex items-center justify-center gap-2.5 shadow-[0_10px_30px_-10px_rgba(255,90,31,0.6)] transition-colors disabled:opacity-70"
             >
               {opening ? (
                 <>
@@ -267,7 +267,7 @@ export default function ProviderProfileView({ providerId }: { providerId: string
           {canMessage ? (
             <Link
               href={`/book/${providerId}`}
-              className="w-full h-12 rounded-full border border-[var(--border)] text-[12px] uppercase tracking-[0.14em] font-medium flex items-center justify-center gap-2.5 hover:bg-black/[.03] transition-colors"
+              className="w-full h-12 rounded-full border border-[var(--border)] text-[14px] font-medium flex items-center justify-center gap-2.5 hover:bg-black/[.03] transition-colors"
             >
               <IconCalendar size={15} />
               Book a session
@@ -323,14 +323,14 @@ export default function ProviderProfileView({ providerId }: { providerId: string
                 type="button"
                 onClick={() => void startChat()}
                 disabled={opening}
-                className="flex-1 h-12 rounded-full bg-[var(--accent)] text-white text-[12px] uppercase tracking-[0.14em] font-medium flex items-center justify-center gap-2 shadow-[var(--shadow-accent)] disabled:opacity-70"
+                className="flex-1 h-12 rounded-full bg-[var(--accent)] text-white text-[14px] font-medium flex items-center justify-center gap-2 shadow-[var(--shadow-accent)] disabled:opacity-70"
               >
                 <IconChat size={15} />
                 {opening ? "Opening" : "Message"}
               </button>
               <Link
                 href={`/book/${providerId}`}
-                className="flex-1 h-12 rounded-full border border-[var(--border)] text-[12px] uppercase tracking-[0.14em] font-medium flex items-center justify-center gap-2"
+                className="flex-1 h-12 rounded-full border border-[var(--border)] text-[14px] font-medium flex items-center justify-center gap-2"
               >
                 <IconCalendar size={15} />
                 Book

@@ -41,8 +41,8 @@ export default function ProvidersForYouPage() {
   return (
     <div className="space-y-8">
       <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={SPRING_SOFT}>
-        <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">For you</p>
-        <h1 className="mt-2 text-[28px] md:text-[38px] leading-[1.05] tracking-tight font-medium">
+        <p className="eyebrow">For you</p>
+        <h1 className="mt-2 font-display text-[30px] md:text-[40px] leading-[1.08] font-medium">
           {welcome && name ? `${name}, these people fit you.` : "People who fit you."}
         </h1>
 

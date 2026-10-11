@@ -9,6 +9,7 @@ import { useAuth } from "../AuthProvider";
 import { signOutToHome } from "../../lib/signOutFlow";
 import { voice } from "../../lib/audio/lines";
 import { Avatar } from "./Feedback";
+import Logo from "../Logo";
 
 /**
  * Application chrome for every signed-in surface.
@@ -74,8 +75,8 @@ function NavLink({
         aria-current={active ? "page" : undefined}
         className={`flex items-center gap-3 rounded-full h-11 px-4 text-[13px] tracking-wide transition-colors ${
           active
-            ? "bg-white/10 text-white"
-            : "text-white/65 hover:text-white hover:bg-white/5"
+            ? "bg-[var(--accent)] text-white"
+            : "text-[var(--cream)]/70 hover:text-[var(--cream)] hover:bg-white/5"
         }`}
       >
         <span className="shrink-0 w-4 h-4 flex items-center justify-center">
@@ -121,9 +122,8 @@ export default function AppShell({
 
   const rail = (
     <>
-      <Link href="/" className="leading-[0.85] text-[15px] font-medium tracking-tight text-white">
-        <span className="block">TALK</span>
-        <span className="block">THERAPY</span>
+      <Link href="/" aria-label="TALK — home">
+        <Logo height={40} light />
       </Link>
 
       <nav className="mt-10 flex flex-col gap-1">
@@ -138,7 +138,7 @@ export default function AppShell({
       </nav>
 
       <div className="mt-auto pt-8">
-        <div className="flex items-center gap-3 rounded-2xl bg-white/5 px-3 py-3">
+        <div className="flex items-center gap-3 rounded-2xl bg-white/[0.06] px-3 py-3">
           <Avatar src={profile?.photoURL ?? user?.photoURL} name={displayName} size={36} />
           <div className="min-w-0 flex-1">
             <p className="text-[13px] text-white truncate">{displayName}</p>
@@ -150,7 +150,7 @@ export default function AppShell({
         <button
           type="button"
           onClick={() => void signOutToHome(router)}
-          className="mt-2 w-full h-10 rounded-full text-[11px] uppercase tracking-[0.18em] text-white/60 hover:text-white hover:bg-white/5 transition-colors"
+          className="mt-2 w-full h-10 rounded-full text-[13px] text-[var(--cream)]/60 hover:text-[var(--cream)] hover:bg-white/5 transition-colors"
         >
           Sign out
         </button>
@@ -169,9 +169,8 @@ export default function AppShell({
       {/* Mobile top bar */}
       {conversation ? null : (
       <header className="md:hidden sticky top-0 z-30 bg-[var(--background)]/90 backdrop-blur-md border-b border-[var(--border)] px-4 h-16 flex items-center justify-between">
-        <Link href="/" className="leading-[0.85] text-[14px] font-medium tracking-tight">
-          <span className="block">TALK</span>
-          <span className="block">THERAPY</span>
+        <Link href="/" aria-label="TALK — home">
+          <Logo height={32} />
         </Link>
         <div className="flex items-center gap-2">
           {actions}
@@ -235,7 +234,7 @@ export default function AppShell({
             <div className="flex items-start justify-between gap-4 mb-8 md:mb-10">
               <div className="min-w-0">
                 {eyebrow ? (
-                  <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">
+                  <p className="eyebrow">
                     {eyebrow}
                   </p>
                 ) : null}
@@ -244,7 +243,7 @@ export default function AppShell({
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     transition={SPRING_SOFT}
-                    className={`text-[28px] md:text-[38px] leading-[1.05] tracking-tight font-medium ${
+                    className={`font-display text-[30px] md:text-[40px] leading-[1.08] font-medium ${
                       eyebrow ? "mt-2" : ""
                     }`}
                   >
@@ -263,7 +262,7 @@ export default function AppShell({
 
       {/* Mobile bottom bar */}
       {conversation ? null : (
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-[var(--border)] pb-[env(safe-area-inset-bottom)]">
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-[var(--surface)] border-t border-[var(--border)] pb-[env(safe-area-inset-bottom)]">
         <div className="flex items-stretch">
           {primary.map((item) => {
             const active = isActive(pathname, item.href);

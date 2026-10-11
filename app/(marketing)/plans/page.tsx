@@ -2,65 +2,15 @@ import type { Metadata } from "next";
 import PageIntro from "@/components/marketing/PageIntro";
 import { Section, FAQ, CTABlock } from "@/components/marketing/Sections";
 import { SectionHeading } from "@/components/ui/Typography";
-import { CheckItem, Badge, Alert } from "@/components/ui/Feedback";
+import { Alert } from "@/components/ui/Feedback";
 import Button from "@/components/ui/Button";
-import { AI_TIERS, HUMAN_RATE_MIN_MINOR, HUMAN_RATE_MAX_MINOR } from "@/lib/models";
-import { formatDalasi, formatDalasiRange } from "@/lib/money";
+import PricingPlans from "@/components/home/PricingPlans";
 
 export const metadata: Metadata = {
   title: "Plans & pricing",
   description:
     "Free wellbeing resources, AI consultations from D200, and human sessions from D700. Pricing in Gambian Dalasi.",
 };
-
-const TIERS = [
-  {
-    name: "Resource centre",
-    price: "Free",
-    cadence: "always",
-    blurb:
-      "Articles, audio exercises and guided reflections on stress, grief, relationships, study and work pressure.",
-    features: [
-      "Full wellbeing resource library",
-      "Mood check-ins and private journal",
-      "Breathing and grounding exercises",
-      "No card required",
-    ],
-    cta: { label: "Create a free account", href: "/sign-up" },
-    featured: false,
-  },
-  {
-    name: "A human provider",
-    price: formatDalasiRange(HUMAN_RATE_MIN_MINOR, HUMAN_RATE_MAX_MINOR),
-    cadence: "per session",
-    blurb:
-      "A confidential consultation with a credential-verified provider or psychosocial support professional.",
-    features: [
-      "45–60 minute private video session",
-      "Choose your provider by specialisation and language",
-      "Every professional credential-verified",
-      "Book follow-ups with the same person",
-      "Rate set by the individual professional",
-    ],
-    cta: { label: "Browse providers", href: "/providers" },
-    featured: true,
-  },
-  {
-    name: "AI companion",
-    price: formatDalasi(AI_TIERS.initial.amountMinor),
-    cadence: "first consultation",
-    blurb:
-      `A first conversation of up to ${Math.round(AI_TIERS.initial.durationSec / 60)} minutes with the AI companion, ending with providers matched to you.`,
-    features: [
-      "Private, judgement-free first conversation",
-      "Guided reflection and grounding",
-      `Longer ${Math.round(AI_TIERS.extended.durationSec / 60)}-minute sessions at ${formatDalasi(AI_TIERS.extended.amountMinor)}`,
-      "Always clearly labelled as AI",
-    ],
-    cta: { label: "Learn about the companion", href: "/technology" },
-    featured: false,
-  },
-];
 
 const FAQS = [
   {
@@ -89,77 +39,17 @@ export default function PlansPage() {
   return (
     <>
       <PageIntro
-        eyebrow="Plans"
-        lines={["Priced so the right", "choice is affordable."]}
-        lede="Everything preventative is free. Where support costs money, it costs less to see a qualified human than to keep talking to a machine — and that is on purpose."
-        stamp="PLANS"
+        eyebrow="Pricing"
+        lines={["Pay for", "what you use."]}
+        lede="No plans, no subscription. Pay with mobile money or a card. Everything preventative is free — and seeing a qualified person costs less than talking to a machine, on purpose."
       />
 
-      <Section tone="surface">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-          {TIERS.map((tier) => (
-            <div
-              key={tier.name}
-              className={`relative rounded-[28px] p-6 md:p-8 flex flex-col ${
-                tier.featured
-                  ? "bg-[var(--dark)] text-white shadow-[0_30px_70px_-25px_rgba(0,0,0,0.5)] md:-mt-4 md:mb-4"
-                  : "bg-[var(--background)] shadow-[0_18px_40px_-22px_rgba(0,0,0,0.25)]"
-              }`}
-            >
-              {tier.featured ? (
-                <span className="absolute -top-3 left-6">
-                  <Badge tone="accent">Most chosen</Badge>
-                </span>
-              ) : null}
+      <PricingPlans heading={false} />
 
-              <p
-                className={`text-[12px] uppercase tracking-[0.18em] ${
-                  tier.featured ? "opacity-70" : "text-[var(--muted)]"
-                }`}
-              >
-                {tier.name}
-              </p>
-
-              <div className="mt-5 flex items-baseline gap-2">
-                <span className="text-[34px] md:text-[42px] leading-none font-medium tracking-tight">
-                  {tier.price}
-                </span>
-                <span className="text-[12px] opacity-60">{tier.cadence}</span>
-              </div>
-
-              <p
-                className={`mt-4 text-[13px] leading-relaxed ${
-                  tier.featured ? "text-white/75" : "text-[var(--muted)]"
-                }`}
-              >
-                {tier.blurb}
-              </p>
-
-              <ul className="mt-6 space-y-3 flex-1">
-                {tier.features.map((feature) => (
-                  <CheckItem key={feature} onDark={tier.featured}>
-                    {feature}
-                  </CheckItem>
-                ))}
-              </ul>
-
-              <div className="mt-8">
-                <Button
-                  href={tier.cta.href}
-                  variant={tier.featured ? "primary" : "secondary"}
-                  fullWidth
-                  withArrow={false}
-                >
-                  {tier.cta.label}
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <Alert tone="info" className="mt-10 max-w-[820px]">
-          All prices are in Gambian Dalasi (D). Sessions are charged individually
-          — Talk has no subscription and stores no card on file.
+      <Section padding="pb-12 md:pb-16 pt-0">
+        <Alert tone="info" className="mx-auto max-w-[820px]">
+          All prices are in Gambian Dalasi (D). Sessions are charged individually — Talk has no subscription and stores
+          no card on file. The resource centre, mood check-ins and your journal are free.
         </Alert>
       </Section>
 

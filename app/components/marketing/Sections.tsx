@@ -5,13 +5,15 @@ import { AnimatePresence, motion } from "motion/react";
 import { SPRING_SOFT, SPRING_SNAP } from "../motion/primitives";
 import { SectionHeading } from "../ui/Typography";
 import Button from "../ui/Button";
+import { ArchStack } from "../ui/Card";
 
 /**
- * Composable blocks for the public pages.
+ * Composable blocks for the public pages, in the redesign's dress: cream and
+ * sand bands, white cards with a warm shadow, sage arches for icons and
+ * numbers, the serif for headings.
  *
- * Every one of these obeys the landing page's rhythm — `px-4 sm:px-6 md:px-10`,
- * `py-16 md:py-24`, `max-w-[1400px]` — so pages assembled from them line up
- * with the hero without anyone measuring.
+ * Every one obeys the same rhythm — `px-5 md:px-10`, `max-w-[1200px]` — so
+ * pages assembled from them line up with the header without anyone measuring.
  */
 
 export function Section({
@@ -27,13 +29,13 @@ export function Section({
 }) {
   const tones = {
     light: "bg-[var(--background)]",
-    surface: "bg-white",
-    dark: "bg-[var(--dark)] text-white",
+    surface: "bg-[var(--cream)]",
+    dark: "bg-[var(--dark)] text-[var(--cream)]",
   } as const;
 
   return (
-    <section className={`px-4 sm:px-6 md:px-10 ${padding} ${tones[tone]} ${className}`}>
-      <div className="max-w-[1400px] mx-auto">{children}</div>
+    <section className={`px-5 md:px-10 ${padding} ${tones[tone]} ${className}`}>
+      <div className="max-w-[1200px] mx-auto">{children}</div>
     </section>
   );
 }
@@ -66,27 +68,27 @@ export function FeatureGrid({
           viewport={{ once: true, amount: 0.2 }}
           transition={{ ...SPRING_SOFT, delay: i * 0.06 }}
           whileHover={{ y: -4 }}
-          className={`rounded-[28px] p-6 md:p-8 ${
+          className={`rounded-[26px] p-6 md:p-8 ${
             onDark
-              ? "bg-white/[0.06] border border-white/10"
-              : "bg-white shadow-[0_18px_40px_-22px_rgba(0,0,0,0.25)]"
+              ? "bg-[var(--cream)]/[0.06] border border-[var(--cream)]/10"
+              : "bg-[var(--surface)] shadow-[var(--shadow-card)]"
           }`}
         >
           {item.icon ? (
             <span
-              className={`mb-5 h-10 w-10 rounded-full flex items-center justify-center ${
-                onDark ? "bg-[var(--accent)] text-white" : "bg-[var(--dark)] text-white"
+              className={`arch mb-5 flex h-12 w-11 items-center justify-center rounded-b-lg ${
+                onDark ? "bg-[var(--accent)] text-white" : "bg-[var(--sage)] text-[var(--cream)]"
               }`}
             >
               {item.icon}
             </span>
           ) : null}
-          <h3 className="text-[16px] md:text-[17px] font-medium leading-tight">
+          <h3 className="font-display text-[20px] md:text-[22px] font-medium leading-tight">
             {item.title}
           </h3>
           <p
             className={`mt-3 text-[13px] md:text-[14px] leading-relaxed ${
-              onDark ? "text-white/65" : "text-[var(--muted)]"
+              onDark ? "text-[var(--on-dark-muted)]" : "text-[var(--muted)]"
             }`}
           >
             {item.body}
@@ -119,19 +121,19 @@ export function StepList({
           className="grid grid-cols-[auto_1fr] gap-5 md:gap-8 items-start"
         >
           <span
-            className={`h-11 w-11 md:h-14 md:w-14 rounded-full flex items-center justify-center text-[13px] md:text-[15px] font-medium shrink-0 ${
-              onDark ? "bg-[var(--accent)] text-white" : "bg-[var(--dark)] text-white"
+            className={`arch font-display flex h-14 w-12 shrink-0 items-center justify-center rounded-b-xl pt-1 text-[20px] font-medium md:h-16 md:w-14 md:text-[22px] ${
+              onDark ? "bg-[var(--accent)] text-white" : "bg-[var(--sage)] text-[var(--cream)]"
             }`}
           >
-            {String(i + 1).padStart(2, "0")}
+            {i + 1}
           </span>
           <div className="pt-1 md:pt-3">
-            <h3 className="text-[18px] md:text-[22px] leading-tight tracking-tight font-medium">
+            <h3 className="font-display text-[20px] md:text-[24px] leading-tight font-medium">
               {step.title}
             </h3>
             <p
-              className={`mt-2 text-[13px] md:text-[15px] leading-relaxed max-w-[620px] ${
-                onDark ? "text-white/65" : "text-[var(--muted)]"
+              className={`mt-2 text-[14px] md:text-[15px] leading-relaxed max-w-[620px] ${
+                onDark ? "text-[var(--on-dark-muted)]" : "text-[var(--muted)]"
               }`}
             >
               {step.body}
@@ -159,7 +161,7 @@ export function Prose({
           viewport={{ once: true, amount: 0.2 }}
           transition={{ ...SPRING_SOFT, delay: Math.min(i, 4) * 0.04 }}
         >
-          <h2 className="text-[22px] md:text-[28px] leading-tight tracking-tight font-medium">
+          <h2 className="font-display text-[24px] md:text-[30px] leading-tight font-medium">
             {section.heading}
           </h2>
           <div className="mt-4 space-y-4">
@@ -182,24 +184,26 @@ export function FAQ({ items }: { items: { q: string; a: string }[] }) {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <div className="max-w-[820px] divide-y divide-[var(--border)] border-y border-[var(--border)]">
+    <div className="max-w-[820px] space-y-3">
       {items.map((item, i) => {
         const open = openIndex === i;
         return (
-          <div key={item.q}>
+          <div key={item.q} className="rounded-[20px] bg-[var(--surface)] px-6 shadow-[var(--shadow-card)]">
             <button
               type="button"
               onClick={() => setOpenIndex(open ? null : i)}
               aria-expanded={open}
-              className="w-full py-6 flex items-start justify-between gap-6 text-left group"
+              className="w-full py-5 flex items-start justify-between gap-6 text-left"
             >
-              <span className="text-[16px] md:text-[18px] leading-snug font-medium">
+              <span className="text-[15px] md:text-[16px] leading-snug font-medium">
                 {item.q}
               </span>
               <motion.span
                 animate={{ rotate: open ? 45 : 0 }}
                 transition={SPRING_SNAP}
-                className="mt-0.5 h-8 w-8 shrink-0 rounded-full border border-[var(--border)] flex items-center justify-center group-hover:bg-black/5 transition-colors"
+                className={`mt-0.5 h-7 w-7 shrink-0 rounded-full flex items-center justify-center transition-colors ${
+                  open ? "bg-[var(--accent)] text-white" : "bg-[var(--sage-pale)] text-[var(--sage-deep)]"
+                }`}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M12 5v14M5 12h14" />
@@ -215,7 +219,7 @@ export function FAQ({ items }: { items: { q: string; a: string }[] }) {
                   transition={SPRING_SOFT}
                   className="overflow-hidden"
                 >
-                  <p className="pb-6 pr-12 text-[14px] leading-relaxed text-[var(--muted)]">
+                  <p className="pb-5 pr-12 text-[14px] leading-relaxed text-[var(--muted)]">
                     {item.a}
                   </p>
                 </motion.div>
@@ -228,7 +232,7 @@ export function FAQ({ items }: { items: { q: string; a: string }[] }) {
   );
 }
 
-/** Closing call to action — the dark card with ambient orange blooms. */
+/** Closing call to action — the sage band with arches rising at the right. */
 export function CTABlock({
   eyebrow = "Get started",
   lines,
@@ -244,24 +248,9 @@ export function CTABlock({
 }) {
   return (
     <Section padding="py-12 md:py-16">
-      <div className="relative overflow-hidden rounded-[28px] md:rounded-[40px] bg-[var(--dark)] text-white px-6 md:px-12 py-12 md:py-16">
-        <div
-          aria-hidden
-          className="absolute -right-20 -top-24 h-[320px] w-[320px] rounded-full"
-          style={{
-            background: "radial-gradient(circle, rgba(255,122,69,0.55), rgba(255,90,31,0))",
-            filter: "blur(12px)",
-          }}
-        />
-        <div
-          aria-hidden
-          className="absolute -left-16 -bottom-20 h-[260px] w-[260px] rounded-full"
-          style={{
-            background: "radial-gradient(circle, rgba(255,90,31,0.35), rgba(255,90,31,0))",
-            filter: "blur(20px)",
-          }}
-        />
-        <div className="relative z-10 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-8 md:gap-12 items-center">
+      <div className="relative overflow-hidden rounded-[28px] md:rounded-[36px] bg-[var(--sage)] text-[var(--cream)] px-6 md:px-12 py-12 md:py-16">
+        <ArchStack className="absolute bottom-0 right-[3%] hidden h-[85%] opacity-60 lg:block" />
+        <div className="relative z-10 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-8 md:gap-12 items-center lg:pr-[22%]">
           <SectionHeading eyebrow={eyebrow} lines={lines} lede={body} onDark size="section" />
           <div className="flex flex-col sm:flex-row md:flex-col gap-3 shrink-0">
             <Button href={primary.href} variant="primary" size="lg">

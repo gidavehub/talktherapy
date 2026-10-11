@@ -23,11 +23,7 @@ export function Eyebrow({
   className?: string;
 }) {
   return (
-    <p
-      className={`text-[11px] uppercase tracking-[0.22em] ${
-        onDark ? "text-white/65" : "text-[var(--muted)]"
-      } ${className}`}
-    >
+    <p className={`eyebrow ${onDark ? "!text-[var(--peach)]" : ""} ${className}`}>
       {children}
     </p>
   );
@@ -35,6 +31,9 @@ export function Eyebrow({
 
 /**
  * The headline reveal: each line wipes up from behind a clip-path, staggered.
+ *
+ * Set in the serif; with more than one line, the last is in italic sage —
+ * "Find someone who / understands you." — unless `accent` is false.
  *
  * Pass `lines` as separate strings rather than one string with `<br/>` — the
  * animation is per-line and needs real elements to drive.
@@ -47,7 +46,9 @@ export function RevealHeading({
   className = "",
   delayChildren = 0.15,
   once = true,
+  accent = true,
 }: {
+  accent?: boolean;
   lines: string[];
   as?: "h1" | "h2" | "h3";
   size?: "hero" | "section" | "panel";
@@ -57,10 +58,9 @@ export function RevealHeading({
   once?: boolean;
 }) {
   const sizes = {
-    hero: "text-[36px] sm:text-[44px] md:text-[60px] lg:text-[68px] leading-[0.98] tracking-[-0.025em]",
-    section:
-      "text-[34px] sm:text-[44px] md:text-[52px] leading-[1.02] tracking-[-0.02em]",
-    panel: "text-[24px] sm:text-[28px] md:text-[34px] leading-[1.05] tracking-[-0.02em]",
+    hero: "text-[40px] sm:text-[48px] md:text-[58px] lg:text-[64px] leading-[1.04]",
+    section: "text-[32px] sm:text-[38px] md:text-[46px] leading-[1.08]",
+    panel: "text-[24px] sm:text-[28px] md:text-[32px] leading-[1.1]",
   } as const;
 
   const MotionTag = motion[Tag];
@@ -74,12 +74,12 @@ export function RevealHeading({
         hidden: {},
         show: { transition: { staggerChildren: 0.08, delayChildren } },
       }}
-      className={`font-medium ${sizes[size]} ${onDark ? "text-white" : ""} ${className}`}
+      className={`font-display font-medium ${sizes[size]} ${onDark ? "text-[var(--cream)]" : "text-[var(--foreground)]"} ${className}`}
     >
       {lines.map((line, i) => (
         <motion.span
           key={`${line}-${i}`}
-          className="block"
+          className={`block ${accent && lines.length > 1 && i === lines.length - 1 ? `display-accent ${onDark ? "!text-[var(--sage-pale)]" : ""}` : ""}`}
           variants={{
             hidden: { y: 50, opacity: 0, clipPath: "inset(0 0 100% 0)" },
             show: {
@@ -113,8 +113,8 @@ export function Lede({
       whileInView={{ y: 0, opacity: 1 }}
       viewport={{ once: true, amount: 0.5 }}
       transition={{ ...SPRING_SOFT, delay: 0.1 }}
-      className={`text-[14px] md:text-[16px] leading-relaxed ${
-        onDark ? "text-white/70" : "text-[var(--muted)]"
+      className={`text-[15px] md:text-[16px] leading-relaxed ${
+        onDark ? "text-[var(--on-dark-muted)]" : "text-[var(--muted)]"
       } ${className}`}
     >
       {children}
@@ -175,22 +175,10 @@ export function SectionHeading({
 }
 
 /**
- * The oversized italic serif watermark. The only place Instrument Serif is
- * used anywhere in the product — see `.stamp` in globals.css.
+ * The oversized italic watermark of the old design. The redesign has none, so
+ * it draws nothing; kept so the screens that place one need no edit.
  */
-export function Stamp({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div
-      aria-hidden
-      className={`stamp select-none pointer-events-none ${className}`}
-    >
-      {children}
-    </div>
-  );
+export function Stamp(props: { children: React.ReactNode; className?: string }) {
+  void props;
+  return null;
 }

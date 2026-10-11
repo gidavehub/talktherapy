@@ -60,7 +60,7 @@ export default function PrivacySettingsPage() {
   return (
     <div className="max-w-[640px] space-y-6">
       <Card radius="md" padding="p-6 md:p-8" reveal={false}>
-        <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">
+        <p className="eyebrow">
           Optional
         </p>
         <h2 className="mt-3 text-[20px] leading-tight font-medium">
@@ -89,7 +89,7 @@ export default function PrivacySettingsPage() {
       </Card>
 
       <Card radius="md" padding="p-6 md:p-8" reveal={false}>
-        <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">
+        <p className="eyebrow">
           Required
         </p>
         <h2 className="mt-3 text-[20px] leading-tight font-medium">
