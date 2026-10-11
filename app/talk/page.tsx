@@ -457,11 +457,16 @@ function Talk() {
       // Only for the D200: the lines name its price and a FIRST consultation.
       if (tier !== "initial") return;
       decided.current = true;
+      // Build her voice into the graph first, so the particles follow it.
+      // Where the browser still forbids sound (a fresh load on a phone),
+      // the first touch anywhere resumes it and she says it again.
+      voice.unlock();
       voice.say(heard.spoken.includes("welcome") ? PAY_LINES : ["welcome", ...PAY_LINES]);
       return;
     }
     if (!doorway || isSettled(profile)) return;
     decided.current = true;
+    voice.unlock();
     voice.say(["welcome-back"], { onDone: () => beginTalk(false) });
   });
 
@@ -503,6 +508,7 @@ function Talk() {
       thanked.current = true;
       decided.current = true;
       setPayOpen(false);
+      voice.unlock();
       voice.say(["paid"], { onDone: () => beginTalk(false) });
     };
     go();
