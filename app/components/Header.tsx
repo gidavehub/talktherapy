@@ -11,14 +11,16 @@ import Logo from "./Logo";
 
 /**
  * Public site header: the TALK mark, four links with a terracotta underline on
- * the page you are on, Sign in, and "Begin with TALK".
+ * the page you are on, Sign in, "Begin with TALK", and the menu.
  *
- * Positioned over the top of each page (the marketing layout is `relative`),
- * so the page's first band — cream on the home page, sand on the others —
- * runs up behind it. Pages leave room for it (Hero, PageIntro).
+ * Pinned to the top of the window on every public page, however far down you
+ * scroll — the logo and the menu are always there. At the very top it is
+ * clear, so the page's first band — cream on the home page, sand on the
+ * others — runs up behind it; once the page moves, it turns solid. Pages
+ * leave room for it (HomeHero, PageIntro). Talk's screen has its own.
  *
- * On a phone the links fold into the menu, which also carries the rest of the
- * site and the urgent-help link — always one tap away.
+ * The menu carries the rest of the site and the urgent-help link — always
+ * one tap away. On a phone it is also where the four links go.
  */
 
 const PRIMARY_LINKS = [
@@ -45,6 +47,15 @@ export default function Header() {
   const [open, setOpen] = useState(false);
   const { user, ready } = useAuth();
   const pathname = usePathname();
+  // Moved off the very top: the bar turns solid so it reads over anything.
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -79,9 +90,17 @@ export default function Header() {
         initial={{ y: -24, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ ...SPRING_SOFT, delay: 0.05 }}
-        className="absolute top-0 left-0 right-0 z-30"
+        className={`fixed left-0 right-0 top-0 z-40 transition-[background-color,box-shadow,backdrop-filter] duration-300 ${
+          scrolled
+            ? "bg-[var(--background)]/92 shadow-[0_8px_24px_-18px_rgba(74,53,48,0.35)] backdrop-blur-md"
+            : "bg-transparent"
+        }`}
       >
-        <div className="mx-auto flex h-[84px] max-w-[1200px] items-center justify-between gap-6 px-5 md:h-[92px] md:px-10">
+        <div
+          className={`mx-auto flex max-w-[1200px] items-center justify-between gap-6 px-5 transition-[height] duration-300 md:px-10 ${
+            scrolled ? "h-[68px] md:h-[72px]" : "h-[84px] md:h-[92px]"
+          }`}
+        >
           <Link href="/" aria-label="TALK — home" className="shrink-0">
             <Logo height={38} priority />
           </Link>
@@ -130,7 +149,7 @@ export default function Header() {
               onClick={() => setOpen(true)}
               whileTap={{ scale: 0.94 }}
               transition={SPRING_SNAP}
-              className="flex h-11 w-11 items-center justify-center rounded-full border-[1.5px] border-[var(--dark)]/70 text-[var(--foreground)] lg:hidden"
+              className="flex h-11 w-11 items-center justify-center rounded-full border-[1.5px] border-[var(--dark)]/70 text-[var(--foreground)] transition-colors hover:bg-[var(--sand)]"
             >
               <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
                 <rect width="16" height="1.6" rx="0.8" fill="currentColor" />
