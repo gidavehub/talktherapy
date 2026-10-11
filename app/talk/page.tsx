@@ -468,8 +468,8 @@ function Talk() {
   // Her voice was refused (nobody had tapped yet): the first tap anywhere
   // unlocks it and she says it again — from the line on screen, or, if she
   // already finished in silence, the part that matters now (how to sign in,
-  // or how to pay). A "Tap to hear Talk" prompt sits with the captions
-  // meanwhile (SpokenCaption).
+  // or how to pay). No prompt: any touch does it (and VoiceUnlock, in the
+  // root layout, unlocks her on the first touch anywhere on the site).
   useEffect(() => {
     if (!heard.blocked) return;
     const replay = () => {

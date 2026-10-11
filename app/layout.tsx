@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "./components/AuthProvider";
 import { ToastProvider } from "./components/ui/Toast";
 import MotionProvider from "./components/MotionProvider";
+import VoiceUnlock from "./components/VoiceUnlock";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -52,6 +53,7 @@ export default function RootLayout({
       >
         <MotionProvider>
           <AuthProvider>
+            <VoiceUnlock />
             <ToastProvider>{children}</ToastProvider>
           </AuthProvider>
         </MotionProvider>
