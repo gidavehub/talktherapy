@@ -1,4 +1,5 @@
 import { VoiceAnalyser, type AudioFeed } from "./analysis";
+import { voiceOutput } from "./loudness";
 
 /**
  * Plays Talk's voice as it streams in.
@@ -36,7 +37,9 @@ export class StreamPlayer {
 
   constructor(private readonly ctx: AudioContext) {
     this.out = ctx.createGain();
-    this.out.connect(ctx.destination);
+    // Through the loudness chain, not straight out: Talk has to be heard
+    // from a phone in a room. The blob reads the voice before the boost.
+    this.out.connect(voiceOutput(ctx));
     this.analyser = new VoiceAnalyser(ctx, this.out);
   }
 

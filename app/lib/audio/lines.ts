@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from "react";
 import manifest from "../ai/voice-lines.generated.json";
 import { VoiceAnalyser, type AudioFeed } from "./analysis";
+import { voiceOutput } from "./loudness";
 
 /**
  * Talk's pre-recorded lines, played in English and then in Wolof.
@@ -161,7 +162,9 @@ export const voice = {
         ctx = new Ctx();
         void ctx.resume().catch(() => {});
         const source = ctx.createMediaElementSource(audio);
-        source.connect(ctx.destination);
+        // Through the loudness chain — the recorded lines were the quietest
+        // and most uneven thing Talk said. The particles read the line itself.
+        source.connect(voiceOutput(ctx));
         analyser = new VoiceAnalyser(ctx, source);
       } catch {
         // No graph — she still speaks, the particles just do not follow her.
