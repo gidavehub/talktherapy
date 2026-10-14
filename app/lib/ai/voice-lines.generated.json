@@ -5,18 +5,18 @@
       "id": "welcome",
       "clips": {
         "en": {
-          "src": "/voice/onboarding/welcome.en.77bdbfc2f2.mp3",
-          "text": "Welcome to Talk Therapy.",
-          "seconds": 1.96,
-          "bytes": 12096,
-          "sha256": "77bdbfc2f2d1f0de1b0ae666bda4a13d2df38bb49c842bffa33b83308bf4b7cd"
+          "src": "/voice/onboarding/welcome.en.f4d4726d17.mp3",
+          "text": "Welcome to TALK.",
+          "seconds": 1.71,
+          "bytes": 10656,
+          "sha256": "f4d4726d172c6c96720cd81beebf4b0a7227a9c06e255cf4cb784fc55b8e467b"
         },
         "wo": {
-          "src": "/voice/onboarding/welcome.wo.5b104a3b0e.mp3",
-          "text": "Dalal ak jàmm ci Talk Therapy.",
-          "seconds": 2.65,
-          "bytes": 16272,
-          "sha256": "5b104a3b0e5f9e9f3a4210bea78248658b59e64521900b58cafb509a71f3f056",
+          "src": "/voice/onboarding/welcome.wo.2a79ea92fb.mp3",
+          "text": "Dalal ak jàmm ci TALK.",
+          "seconds": 2.17,
+          "bytes": 13392,
+          "sha256": "2a79ea92fb0eba25ac1d88da08c477b7291b395cd4997a985ef7619a30d096eb",
           "draft": true
         }
       }
