@@ -286,6 +286,19 @@ service cloud.firestore {
       allow create, delete: if false;
     }
 
+    // ------------------------------------------------------------- hand-offs
+
+    // handoffs/{pairId} — the short summary of what somebody told TALK, for
+    // the provider they chose (functions/src/handoff.ts). The id is the
+    // pair's chat id. Read by the two people it is about and nobody else —
+    // not staff, for the same reason staff cannot read chats. Written only by
+    // the functions, which check the consent; the person takes it back
+    // through them too, so it can never be quietly re-shared from a browser.
+    match /handoffs/{pairId} {
+      allow get, list: if isSignedIn() && request.auth.uid in resource.data.participants;
+      allow write: if false;
+    }
+
     // -------------------------------------------------------- availability
 
     match /availability/{providerId} {

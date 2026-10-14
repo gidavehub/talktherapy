@@ -49,6 +49,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { resolveReview as decide } from "./review";
 import { audit, requireStaff } from "./staff";
 import { bookSlot, cancelBooking, reportMissedSession as reportMissed } from "./bookings";
+import { shareIntakeWith } from "./handoff";
 import { PAYOUT_HOLD_MS } from "../../app/lib/payouts";
 import {
   activeConsultation,
@@ -226,6 +227,13 @@ export const bookSession = onCall(CALLABLE, async (request) => {
     // picking again, not a malformed request.
     throw new HttpsError("aborted", result.reason);
   }
+
+  // Booking is choosing a provider, so the summary TALK promised them goes
+  // with it (handoff.ts decides whether it may). A failure here must not undo
+  // a booking that has already been made.
+  await shareIntakeWith(uid, providerId, "booking").catch((error) =>
+    console.error(`bookSession: hand-off to ${providerId} failed`, error),
+  );
 
   return { bookingId: result.bookingId, startsAt: result.startsAt, endsAt: result.endsAt };
 });
@@ -1000,6 +1008,7 @@ export const modemWebhook = onRequest(
 // Four feature tracks, one module each, so they never edit the same lines.
 // Each module exports its own functions; adding one there deploys it.
 export * from "./providers";
+export { intakeHandoff } from "./handoff";
 export * from "./adminStats";
 export * from "./adminOps";
 export * from "./content";

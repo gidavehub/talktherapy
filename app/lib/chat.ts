@@ -43,6 +43,7 @@ import {
 } from "firebase/firestore";
 import { getBlob, ref as storageRef, uploadBytesResumable } from "firebase/storage";
 import { firebaseConfigured, firebaseStorage, firestore } from "./firebase";
+import { shareWithProvider } from "./handoff";
 import { COLLECTIONS, WAVEFORM_BARS, type Chat, type ChatMessage, type ChatMessageKind } from "./models";
 
 const CHATS = COLLECTIONS.chats;
@@ -246,6 +247,9 @@ export async function openChat(
       // A chat opened before the age question was answered. The flag only
       // ever goes ON from here; nothing on this path turns it off.
       if (minor && existing.data().minor !== true) await updateDoc(ref, { minor: true });
+      // Brings the provider's summary up to date with what they have told
+      // TALK since — unless they stopped sharing it (see lib/handoff.ts).
+      shareWithProvider(providerId);
       return chatId;
     }
   } catch (error) {
@@ -265,6 +269,10 @@ export async function openChat(
     typing: {},
     createdAt: serverTimestamp(),
   });
+
+  // Opening a conversation is choosing this provider: the short summary
+  // TALK's consent promised them goes with it, if it may (lib/handoff.ts).
+  shareWithProvider(providerId);
 
   return chatId;
 }

@@ -829,7 +829,7 @@ export const SECTIONS = {
             },
             {
               q: "Who can see what I share?",
-              a: "Your journal entries and mood check-ins are private to you. Providers do not have access to them unless you deliberately share something in a session. The words of your conversation with TALK are not saved — only what she learns to match you. Messages with your provider are encrypted in transit and at rest, and nothing you share is ever sold or used for advertising.",
+              a: "Your journal entries and mood check-ins are private to you. Providers do not have access to them unless you deliberately share something in a session. The words of your conversation with TALK are not saved — only what she learns to match you, and the provider you choose sees a short summary of that, so you do not have to start from the beginning. You can stop sharing it in your privacy settings. Messages with your provider are encrypted in transit and at rest, and nothing you share is ever sold or used for advertising.",
             },
             {
               q: "How do I know a provider is qualified?",
@@ -1276,7 +1276,7 @@ export const SECTIONS = {
             },
             {
               title: "Confidentiality by default",
-              body: "Journal entries and mood check-ins are visible only to you. Providers see what you choose to share in a session, and nothing else.",
+              body: "Journal entries and mood check-ins are visible only to you. Providers see what you share with them, and — once you choose one — a short summary of what you told TALK. Nothing else.",
             },
             {
               title: "Reporting",
@@ -1646,7 +1646,7 @@ export const SECTIONS = {
             heading: "Who can see what",
             body: [
               "Your journal entries and mood check-ins are visible only to you. Providers cannot read them. Administrators cannot read them. They are stored under your account and the access rules enforce that at the database level, not merely in the interface.",
-              "A provider sees what you share during a session, the messages you send them, and any note you attach to a booking.",
+              "A provider sees what you share during a session, the messages you send them, and any note you attach to a booking. When you choose a provider — by messaging them or booking a session — they also see a short summary of what you told TALK: the name you like to be called, your language, your age range, what brought you and the kind of help you asked for. You agree to this when TALK asks at the start, and you can stop sharing it at any time in your privacy settings.",
               "When institutional funding launches and an organisation pays for your sessions, it will never see who booked a session, when, or with whom. Any reporting to organisations will be aggregate, and suppressed entirely for small groups so that individuals cannot be identified.",
             ],
           },

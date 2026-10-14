@@ -125,6 +125,24 @@ const payment = {
   needsReview: false,
 };
 
+/** A hand-off, as functions/src/handoff.ts writes it. */
+const handoff = {
+  patientId: PATIENT,
+  providerId: PROVIDER,
+  participants: [PATIENT, PROVIDER].sort(),
+  preferredName: "Fatou",
+  language: "wolof",
+  ageRange: "25-34",
+  minor: false,
+  concernSummary: "Struggling to sleep since losing a job.",
+  concerns: ["sleep", "workplace"],
+  servicesWanted: ["mental-health-counselling"],
+  via: "chat",
+  sharedAt: 1_790_000_000_000,
+  updatedAt: 1_790_000_000_000,
+  revokedAt: null,
+};
+
 /** The evaluator's clock for every request below. */
 const NOW = "2026-10-03T12:05:00Z";
 const BACKDATED = "2026-09-26T12:05:00Z";
@@ -365,6 +383,19 @@ const CASES = [
     `${DOCS}/providerProfiles/${PROVIDER}`, listing],
   ["a provider reads their own listing before it is checked", "ALLOW", PROVIDER, "get",
     `${DOCS}/providerProfiles/${PROVIDER}`, listing],
+
+  // --- the hand-off --------------------------------------------------------
+  // What somebody told TALK, for the provider they chose. Those two read it;
+  // nobody else does, and nobody writes it from a browser — not even the
+  // person it is about, who stops sharing through the function instead.
+  ["the provider reads the summary they were given", "ALLOW", PROVIDER, "get", `${DOCS}/handoffs/${PAIR}`, handoff],
+  ["the person reads what they shared", "ALLOW", PATIENT, "get", `${DOCS}/handoffs/${PAIR}`, handoff],
+  ["a stranger cannot read it", "DENY", STRANGER, "get", `${DOCS}/handoffs/${PAIR}`, handoff],
+  ["staff cannot read it", "DENY", ADMIN, "get", `${DOCS}/handoffs/${PAIR}`, handoff],
+  ["nobody signed in cannot read it", "DENY", null, "get", `${DOCS}/handoffs/${PAIR}`, handoff],
+  ["a provider cannot write themselves a summary", "DENY", PROVIDER, "create", `${DOCS}/handoffs/${PAIR}`, null, handoff],
+  ["the person cannot rewrite theirs from the browser", "DENY", PATIENT, "update", `${DOCS}/handoffs/${PAIR}`,
+    handoff, { ...handoff, concernSummary: "Something else" }],
 
   // --- sessions ----------------------------------------------------------
   // A booking and the slot it takes have to change together, and a patient

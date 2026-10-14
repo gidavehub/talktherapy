@@ -18,6 +18,7 @@ import ProviderAvatar from "../providers/ProviderAvatar";
 import CallButton from "./CallButton";
 import GroupCallButton from "./GroupCallButton";
 import GroupInfo from "./GroupInfo";
+import HandoffSheet from "./HandoffSheet";
 import type { VoiceRecording } from "./useVoiceRecorder";
 import { useReadAloud } from "../../lib/useReadAloud";
 import {
@@ -76,6 +77,7 @@ export default function ChatThread({ chatId }: { chatId: string }) {
   const [messages, setMessages] = useState<ChatMessage[] | null>(null);
   const [typingUids, setTypingUids] = useState<string[]>([]);
   const [groupInfoOpen, setGroupInfoOpen] = useState(false);
+  const [handoffOpen, setHandoffOpen] = useState(false);
   const [sending, setSending] = useState<Sending[]>([]);
   /** The listener stopped: what is on screen stays, with a word about it. */
   const [stale, setStale] = useState(false);
@@ -352,6 +354,16 @@ export default function ChatThread({ chatId }: { chatId: string }) {
             >
               {groupTitle(chat)}
             </button>
+          ) : isProvider ? (
+            // A provider opens what this person told TALK from their name.
+            <button
+              type="button"
+              onClick={() => setHandoffOpen(true)}
+              aria-label={`${peer.name}: what they told TALK`}
+              className="block max-w-full truncate text-left text-[14px] font-medium leading-tight hover:underline underline-offset-2"
+            >
+              {peer.name}
+            </button>
           ) : (
             <p className="truncate text-[14px] font-medium leading-tight">{peer.name}</p>
           )}
@@ -371,12 +383,29 @@ export default function ChatThread({ chatId }: { chatId: string }) {
           </div>
         </div>
 
+        {isProvider && !isGroup && chat ? (
+          <button
+            type="button"
+            onClick={() => setHandoffOpen(true)}
+            aria-label={`What ${peer.name} told TALK`}
+            title="What they told TALK"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--foreground)] transition-colors hover:bg-[var(--dark)]/[0.06]"
+          >
+            <svg aria-hidden width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 11v5.5M12 7.6v.1" />
+            </svg>
+          </button>
+        ) : null}
         {uid && peerUid && !isGroup ? (
           <CallButton selfUid={uid} peerUid={peerUid} canBook={!isProvider} />
         ) : null}
         {uid && isGroup && chat ? <GroupCallButton chat={chat} selfUid={uid} /> : null}
         {uid && isGroup && chat ? (
           <GroupInfo chat={chat} selfUid={uid} open={groupInfoOpen} onClose={() => setGroupInfoOpen(false)} />
+        ) : null}
+        {isProvider && !isGroup && chat ? (
+          <HandoffSheet pairId={chatId} name={peer.name} open={handoffOpen} onClose={() => setHandoffOpen(false)} />
         ) : null}
         {menu}
       </div>

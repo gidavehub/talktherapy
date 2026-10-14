@@ -67,7 +67,13 @@ export function deletionPlan(uid: string): DeletionPlan | null {
       // How many conversation reports they sent today.
       `analyticsQuota/${uid}`,
     ],
-    matching: [{ collection: "notifications", field: "to" }],
+    matching: [
+      { collection: "notifications", field: "to" },
+      // The summary from TALK, both ways: what they shared with providers,
+      // and — for a provider — what people shared with them.
+      { collection: "handoffs", field: "patientId" },
+      { collection: "handoffs", field: "providerId" },
+    ],
     storagePrefixes: [
       // Certificates, licences, ID and the photo sent with an application.
       `provider-credentials/${uid}/`,

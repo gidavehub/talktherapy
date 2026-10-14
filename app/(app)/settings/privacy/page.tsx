@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/Input";
 import { Alert } from "@/components/ui/Feedback";
 import { useToast } from "@/components/ui/Toast";
 import { recordConsent } from "@/lib/wellbeing";
+import SharedSummaries from "@/components/settings/SharedSummaries";
 import type { Consents } from "@/lib/models";
 
 /**
@@ -88,6 +89,8 @@ export default function PrivacySettingsPage() {
         </div>
       </Card>
 
+      {user && profile?.role === "patient" ? <SharedSummaries uid={user.uid} /> : null}
+
       <Card radius="md" padding="p-6 md:p-8" reveal={false}>
         <p className="eyebrow">
           Required
@@ -166,7 +169,8 @@ export default function PrivacySettingsPage() {
       <Alert tone="info">
         Nobody at TALK can read your journal or mood entries — not providers,
         not administrators. That is enforced by the database access rules, not
-        by policy.
+        by policy. The summary from TALK is seen only by the providers you
+        choose, listed above.
       </Alert>
     </div>
   );

@@ -75,6 +75,12 @@ check(
   "clears their notifications, by recipient",
   (plan?.matching ?? []).some((m) => m.collection === "notifications" && m.field === "to"),
 );
+check(
+  "clears the summaries from TALK they shared, and any shared with them",
+  ["patientId", "providerId"].every((field) =>
+    (plan?.matching ?? []).some((m) => m.collection === "handoffs" && m.field === field),
+  ),
+);
 check("empties provider-credentials/{uid}/", prefixes.includes(`provider-credentials/${UID}/`));
 check("empties avatars/{uid}/", prefixes.includes(`avatars/${UID}/`));
 
