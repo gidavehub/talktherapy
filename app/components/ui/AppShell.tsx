@@ -11,6 +11,7 @@ import { signOutToHome } from "../../lib/signOutFlow";
 import { voice } from "../../lib/audio/lines";
 import { Avatar } from "./Feedback";
 import Logo from "../Logo";
+import NotificationsBell, { useNotificationFeed } from "../app/NotificationsBell";
 
 /**
  * Application chrome for every signed-in surface.
@@ -34,6 +35,10 @@ import Logo from "../Logo";
  * the way back on booking — and then the logo makes room for them. On a
  * phone the menu button is always at its right; on a computer, where the
  * rail is the menu, the bar is only drawn when a screen has something for it.
+ *
+ * The notifications bell sits beside the menu button on a phone, and beside
+ * the logo at the top of the rail on a computer, so what the app has to tell
+ * somebody is one tap away on every screen.
  */
 
 /** Opens the full menu on a phone — for a screen that draws its own top bar. */
@@ -148,9 +153,15 @@ function NavLink({
         </span>
         <span className="flex-1 truncate">{item.label}</span>
         {item.badge ? (
-          <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--accent)] px-1.5 text-[10px] text-white">
-            {item.badge}
-          </span>
+          <>
+            <span
+              aria-hidden
+              className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--accent)] px-1.5 text-[10px] text-white"
+            >
+              {item.badge}
+            </span>
+            <span className="sr-only">, {item.badge} waiting</span>
+          </>
         ) : null}
       </Link>
     </motion.div>
@@ -193,8 +204,10 @@ export default function AppShell({
   // One conversation open: it draws both bars itself.
   const conversation = pathname.startsWith("/chats/");
   const displayName = profile?.displayName ?? user?.displayName ?? user?.email ?? "You";
-  // A count on an item the bottom bar leaves out — staff Messages — would
-  // otherwise only be seen by someone who opened the menu, so the menu
+  // Read once here for both bells: the rail's and the phone's top bar's.
+  const notices = useNotificationFeed();
+  // A count on an item the bottom bar leaves out — staff Messages, Support —
+  // would otherwise only be seen by someone who opened the menu, so the menu
   // button carries it on a phone.
   const menuBadge = nav.reduce((sum, item) => (primary.includes(item) ? sum : sum + (item.badge ?? 0)), 0);
 
@@ -219,9 +232,16 @@ export default function AppShell({
 
   const rail = (
     <>
-      <Link href="/" aria-label="TALK — home">
-        <Logo height={40} light />
-      </Link>
+      <div className="flex items-center justify-between gap-3">
+        <Link href="/" aria-label="TALK — home">
+          <Logo height={40} light />
+        </Link>
+        {/* The computer's bell. In the phone's menu, which draws this same
+            rail, it is hidden: the phone's bell is in the top bar. */}
+        <div className="hidden md:block">
+          <NotificationsBell feed={notices} tone="dark" />
+        </div>
+      </div>
 
       {/* Scrolls on its own when it outgrows the screen — the staff rail is
           three times the length of a patient one — so the account card below
@@ -345,14 +365,15 @@ export default function AppShell({
               {hasBar ? null : <div className="flex-1" />}
               <div className="flex shrink-0 items-center gap-2 md:hidden">
                 {actions}
+                <NotificationsBell feed={notices} tone="light" />
                 <motion.button
                   type="button"
-                  aria-label={menuBadge > 0 ? `Menu, ${menuBadge} unread` : "Menu"}
+                  aria-label={menuBadge > 0 ? `Menu, ${menuBadge} waiting` : "Menu"}
                   aria-expanded={menuOpen}
                   onClick={() => setMenuOpen((v) => !v)}
                   whileTap={{ scale: 0.94 }}
                   transition={SPRING_SNAP}
-                  className="relative h-10 w-10 rounded-full border-[1.5px] border-[var(--dark)]/70 text-[var(--foreground)] flex items-center justify-center"
+                  className="relative h-11 w-11 rounded-full border-[1.5px] border-[var(--dark)]/70 text-[var(--foreground)] flex items-center justify-center"
                 >
                   <svg width="16" height="12" viewBox="0 0 16 12" fill="none" aria-hidden>
                     <rect width="16" height="1.6" rx="0.8" fill="currentColor" />
@@ -448,7 +469,7 @@ export default function AppShell({
                       initial={{ scale: 0.4, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
                       transition={SPRING_SNAP}
-                      aria-label={`${item.badge} unread`}
+                      aria-label={`${item.badge} waiting`}
                       className="absolute -top-1.5 -right-2.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[9px] font-medium leading-none text-white ring-2 ring-white tabular-nums"
                     >
                       {item.badge > 99 ? "99+" : item.badge}

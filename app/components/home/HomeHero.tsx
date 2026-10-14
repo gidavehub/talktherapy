@@ -5,14 +5,18 @@ import { motion } from "motion/react";
 import { SPRING_SOFT } from "../motion/primitives";
 import StartLink from "../StartLink";
 import { ArchPortrait } from "../ui/Arch";
-import { AI_TIERS } from "../../lib/models";
-import { formatDalasi } from "../../lib/money";
+import type { HomeContent } from "../../lib/content/schema";
 
 /**
  * The landing hero: "Talk it through, your own way." beside three arches,
  * each with somebody in it — and under it, the brown band of four facts.
+ *
+ * The words, pictures and facts are the site content's (home.hero), read by
+ * the page on the server; where "Begin with TALK" leads, and the languages,
+ * stay in code.
  */
 
+/** The languages TALK speaks: what she can do, not copy, so not editable. */
 const LANGUAGES = ["English", "Wolof", "Mandinka", "Pulaar"];
 
 /** A speech bubble, drawn on the arches the way the mockup has them. */
@@ -41,7 +45,8 @@ const rise = (delay: number) => ({
   transition: { ...SPRING_SOFT, delay },
 });
 
-export default function HomeHero() {
+export default function HomeHero({ content }: { content: HomeContent["hero"] }) {
+  const { images } = content;
   return (
     <>
       <section className="relative overflow-hidden bg-[var(--background)] pt-[84px] md:pt-[92px]">
@@ -49,28 +54,27 @@ export default function HomeHero() {
           <div className="pb-6 pt-8 md:pt-12 lg:pb-20">
             <motion.p {...rise(0.05)} className="eyebrow flex items-center gap-3">
               <span className="h-[2px] w-8 bg-[var(--accent)]" aria-hidden />
-              Care that understands your world
+              {content.eyebrow}
             </motion.p>
             <motion.h1
               {...rise(0.12)}
               className="font-display mt-6 text-[44px] font-medium leading-[1.04] sm:text-[54px] lg:text-[62px]"
             >
-              Talk it through,
-              <span className="display-accent block">your own way.</span>
+              {content.lines[0]}
+              <span className="display-accent block">{content.lines[1]}</span>
             </motion.h1>
             <motion.p {...rise(0.2)} className="mt-6 max-w-[440px] text-[16px] leading-relaxed text-[var(--foreground)]/80">
-              Private conversations with TALK and qualified providers, in English, Wolof, Mandinka or Pulaar.
-              Culturally rooted care, for everyone.
+              {content.lede}
             </motion.p>
             <motion.div {...rise(0.28)} className="mt-8 flex flex-wrap gap-3">
               <StartLink className="inline-flex h-12 items-center rounded-full bg-[var(--accent)] px-7 text-[14.5px] font-medium text-white shadow-[var(--shadow-accent)] transition-colors hover:bg-[var(--accent-deep)]">
-                Begin with TALK
+                {content.startLabel}
               </StartLink>
               <Link
-                href="/providers"
+                href={content.secondary.href}
                 className="inline-flex h-12 items-center rounded-full border-[1.5px] border-[var(--dark)] px-7 text-[14.5px] font-medium transition-colors hover:bg-[var(--dark)] hover:text-[var(--cream)]"
               >
-                Meet providers
+                {content.secondary.label}
               </Link>
             </motion.div>
             <motion.ul {...rise(0.36)} aria-label="Languages" className="mt-7 flex flex-wrap gap-2">
@@ -85,11 +89,11 @@ export default function HomeHero() {
           {/* Three arches, standing on the brown band. */}
           <div className="relative mx-auto flex h-[360px] w-full max-w-[560px] items-end justify-center gap-3 sm:h-[440px] lg:h-[500px]">
             <motion.div {...rise(0.15)} className="relative h-[78%] w-[31%]">
-              <ArchPortrait src="/people/hero-phone.webp" alt="A young man lying back on a cushion, laughing at his phone" tone="var(--sage-soft)" className="h-full w-full" sizes="(min-width: 1024px) 260px, 45vw" scale={1.25} aspect={4 / 3} priority />
+              <ArchPortrait src={images.left.src} alt={images.left.alt} tone="var(--sage-soft)" className="h-full w-full" sizes="(min-width: 1024px) 260px, 45vw" scale={1.25} aspect={4 / 3} priority />
               <span className="absolute left-[18%] top-[16%] h-5 w-5 rounded-full bg-[var(--surface)]/80" aria-hidden />
             </motion.div>
             <motion.div {...rise(0.05)} className="relative h-full w-[33%]">
-              <ArchPortrait src="/people/hero-chat.webp" alt="Two friends on a bench, deep in a laughing conversation" tone="var(--peach)" className="h-full w-full" sizes="(min-width: 1024px) 280px, 48vw" scale={1.15} aspect={4 / 3} priority />
+              <ArchPortrait src={images.middle.src} alt={images.middle.alt} tone="var(--peach)" className="h-full w-full" sizes="(min-width: 1024px) 280px, 48vw" scale={1.15} aspect={4 / 3} priority />
               <motion.div
                 initial={{ scale: 0, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
@@ -108,7 +112,7 @@ export default function HomeHero() {
               </motion.div>
             </motion.div>
             <motion.div {...rise(0.25)} className="relative h-[86%] w-[31%]">
-              <ArchPortrait src="/people/hero-rest.webp" alt="A woman resting on a cushion with headphones on, smiling" tone="var(--sage)" className="h-full w-full" sizes="(min-width: 1024px) 260px, 45vw" scale={1.25} aspect={4 / 3} priority />
+              <ArchPortrait src={images.right.src} alt={images.right.alt} tone="var(--sage)" className="h-full w-full" sizes="(min-width: 1024px) 260px, 45vw" scale={1.25} aspect={4 / 3} priority />
               <span className="absolute left-[16%] top-[13%] h-6 w-6 rounded-full bg-[var(--cream)]" aria-hidden />
             </motion.div>
           </div>
@@ -118,14 +122,9 @@ export default function HomeHero() {
       {/* The four facts. */}
       <section aria-label="TALK at a glance" className="bg-[var(--dark)] text-[var(--cream)]">
         <dl className="mx-auto grid max-w-[1200px] grid-cols-2 md:grid-cols-4">
-          {[
-            ["4", "languages TALK speaks"],
-            ["24/7", "TALK, whenever you need her"],
-            [formatDalasi(AI_TIERS.initial.amountMinor), "first conversation"],
-            ["Free", "emergency numbers, no account"],
-          ].map(([big, small], i) => (
+          {content.facts.map(({ value: big, label: small }, i) => (
             <div
-              key={small}
+              key={i}
               className={`flex flex-col items-center justify-center px-4 py-6 text-center md:py-7 ${
                 i % 2 === 1 ? "border-l border-[var(--cream)]/15" : ""
               } ${i === 2 ? "md:border-l md:border-[var(--cream)]/15" : ""} ${i > 1 ? "border-t border-[var(--cream)]/15 md:border-t-0" : ""}`}

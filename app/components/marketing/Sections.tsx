@@ -6,6 +6,8 @@ import { SPRING_SOFT, SPRING_SNAP } from "../motion/primitives";
 import { SectionHeading } from "../ui/Typography";
 import Button from "../ui/Button";
 import { ArchStack } from "../ui/Card";
+import { parseRichText, richTextSections } from "../../lib/content/markdown";
+import { RICH_TEXT_CLASSES, RichBlocks, RichInline } from "../../lib/content/richText";
 
 /**
  * Composable blocks for the public pages, in the redesign's dress: cream and
@@ -14,6 +16,9 @@ import { ArchStack } from "../ui/Card";
  *
  * Every one obeys the same rhythm — `px-5 md:px-10`, `max-w-[1200px]` — so
  * pages assembled from them line up with the header without anyone measuring.
+ *
+ * The words come from the site content, which staff edit: lists are keyed by
+ * position, since two cards or questions may be written the same.
  */
 
 export function Section({
@@ -63,7 +68,7 @@ export function FeatureGrid({
     <div className={`grid grid-cols-1 ${cols} gap-4 md:gap-6`}>
       {items.map((item, i) => (
         <motion.div
-          key={item.title}
+          key={i}
           initial={{ y: 30, opacity: 0, rotate: i % 2 ? 1 : -1 }}
           whileInView={{ y: 0, opacity: 1, rotate: 0 }}
           viewport={{ once: true, amount: 0.2 }}
@@ -114,7 +119,7 @@ export function StepList({
     <ol className="mt-10 md:mt-14 space-y-8 md:space-y-10">
       {steps.map((step, i) => (
         <motion.li
-          key={step.title}
+          key={i}
           initial={{ x: -30, opacity: 0 }}
           whileInView={{ x: 0, opacity: 1 }}
           viewport={{ once: true, amount: 0.3 }}
@@ -146,34 +151,30 @@ export function StepList({
   );
 }
 
-/** Long-form prose block for the legal and policy pages. */
-export function Prose({
-  sections,
-}: {
-  sections: { heading: string; body: string[] }[];
-}) {
+/**
+ * Long-form prose block for the legal and policy pages: rich text with "## "
+ * headings (see lib/content/markdown), one block per heading, each rising into
+ * view on its own.
+ */
+export function Prose({ source }: { source: string }) {
+  const sections = richTextSections(parseRichText(source, { headings: true }).blocks);
   return (
     <div className="max-w-[760px] space-y-12 md:space-y-16">
       {sections.map((section, i) => (
         <motion.div
-          key={section.heading}
+          key={i}
           initial={{ y: 24, opacity: 0 }}
           whileInView={{ y: 0, opacity: 1 }}
           viewport={{ once: true, amount: 0.2 }}
           transition={{ ...SPRING_SOFT, delay: Math.min(i, 4) * 0.04 }}
         >
-          <h2 className="font-display text-[24px] md:text-[30px] leading-tight font-medium">
-            {section.heading}
-          </h2>
-          <div className="mt-4 space-y-4">
-            {section.body.map((paragraph, j) => (
-              <p
-                key={j}
-                className="text-[14px] md:text-[15px] leading-relaxed text-[var(--muted)]"
-              >
-                {paragraph}
-              </p>
-            ))}
+          {section.heading ? (
+            <h2 className={RICH_TEXT_CLASSES.heading}>
+              <RichInline nodes={section.heading} />
+            </h2>
+          ) : null}
+          <div className={`${section.heading ? "mt-4 " : ""}space-y-4`}>
+            <RichBlocks blocks={section.blocks} />
           </div>
         </motion.div>
       ))}
@@ -189,7 +190,7 @@ export function FAQ({ items }: { items: { q: string; a: string }[] }) {
       {items.map((item, i) => {
         const open = openIndex === i;
         return (
-          <div key={item.q} className="rounded-[20px] bg-[var(--surface)] px-6 shadow-[var(--shadow-card)]">
+          <div key={i} className="rounded-[20px] bg-[var(--surface)] px-6 shadow-[var(--shadow-card)]">
             <button
               type="button"
               onClick={() => setOpenIndex(open ? null : i)}
@@ -233,18 +234,22 @@ export function FAQ({ items }: { items: { q: string; a: string }[] }) {
   );
 }
 
-/** Closing call to action — the sage band with arches rising at the right. */
+/**
+ * Closing call to action — the sage band with arches rising at the right. The
+ * shape of the content's closing blocks, so a page passes its `cta` as it is.
+ */
 export function CTABlock({
-  eyebrow = "Get started",
+  eyebrow,
   lines,
   body,
-  primary = { label: "Create your account", href: "/sign-up" },
+  primary,
   secondary,
 }: {
-  eyebrow?: string;
+  eyebrow: string;
   lines: string[];
+  /** Optional: an empty one draws no line under the heading. */
   body?: string;
-  primary?: { label: string; href: string };
+  primary: { label: string; href: string };
   secondary?: { label: string; href: string };
 }) {
   return (

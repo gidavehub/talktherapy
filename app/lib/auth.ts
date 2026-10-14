@@ -347,6 +347,12 @@ export async function updateUserProfile(
  * rules no longer authorise deleting anything that is left, and the data is
  * stranded in the database forever.
  *
+ * What the browser cannot delete — presence, a provider application and its
+ * review, the listing, the payout wallet, notifications, the application's
+ * files — goes when the parent document does: the cleanUpDeletedAccount
+ * function clears it (functions/src/accountDeletion.ts, with the list in
+ * app/lib/accountDeletion.ts).
+ *
  * `clearData` is injected rather than imported so this module stays free of a
  * dependency on the wellbeing layer.
  */

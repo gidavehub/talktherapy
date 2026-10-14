@@ -5,7 +5,7 @@
  * here may import server code — this file ships to the client.
  */
 
-import type { Intake } from "../matching";
+import type { Intake, Specialization } from "../matching";
 
 export const LANGUAGES = ["english", "wolof", "mandinka", "pulaar", "other"] as const;
 export type Language = (typeof LANGUAGES)[number];
@@ -153,6 +153,12 @@ export type TurnResult = {
   helpAppended?: boolean;
   /** Talk speaking first — nothing was heard. */
   greeting?: boolean;
+  /**
+   * Companion mode: what this message was about, as ids from the fixed list
+   * of concerns (SPECIALIZATIONS) — never their words. Only ever counted, for
+   * the staff numbers (app/lib/analytics/reportTalkSession.ts).
+   */
+  topics?: Specialization[];
   /** Intake mode: everything known after this turn (merged, validated). */
   intake?: Intake;
   /** Intake mode: everything needed has been learned; the page moves on. */

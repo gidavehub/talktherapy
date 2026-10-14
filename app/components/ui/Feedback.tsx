@@ -53,8 +53,10 @@ export function Pill({
   className?: string;
 }) {
   // A choice (onClick): outlined, terracotta when chosen. A label: a sand chip.
+  // A choice is 40px to look at; the invisible band around it makes the tap
+  // target 44px.
   const shell = onClick
-    ? `inline-flex h-10 items-center gap-2 rounded-full px-5 text-[13px] border-[1.5px] transition-colors ${
+    ? `relative inline-flex h-10 items-center gap-2 rounded-full px-5 text-[13px] border-[1.5px] transition-colors after:absolute after:inset-x-0 after:-inset-y-0.5 after:content-[''] ${
         active
           ? "bg-[var(--accent)] text-white border-[var(--accent)]"
           : "border-[var(--dark)]/60 text-[var(--foreground)] hover:bg-[var(--sand)]"

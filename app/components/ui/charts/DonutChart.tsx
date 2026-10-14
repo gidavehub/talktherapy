@@ -29,8 +29,8 @@ import type { ChartTableData } from "./ChartCard";
  * Hovering or focusing a slice lifts it, lights its legend row and reads
  * its value and share in the hole, where it cannot cover anything.
  *
- * Suppressed groups (under ten people) are not drawn — an angle would state
- * a value we are withholding. They are listed in the legend as "<10" and
+ * Suppressed groups (under five people) are not drawn — an angle would state
+ * a value we are withholding. They are listed in the legend as "<5" and
  * left out of the percentages.
  */
 

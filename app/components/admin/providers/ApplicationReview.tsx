@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import PageHeader from "../../ui/PageHeader";
 import Button from "../../ui/Button";
@@ -15,12 +16,14 @@ import { useToast } from "../../ui/Toast";
 import { PageBar } from "../../ui/AppShell";
 import { useAuth } from "../../AuthProvider";
 import StatusBadge from "./StatusBadge";
+import { usePrivateFile } from "../../apply/usePrivateFile";
 import { useNow } from "@/lib/useNow";
 import {
   REVIEW_CHECKS,
   addReviewNote,
   decideApplication,
-  privateFileUrl,
+  ensureStaffFileAccess,
+  openPrivateFile,
   saveStaffReview,
   watchApplication,
   watchReviewNotes,
@@ -39,7 +42,9 @@ import {
   DOC_TYPE_LABELS,
   LOCALE_LABELS,
   STATUS_LABELS,
+  STEPS,
   ageOn,
+  isOwnCredentialPath,
   formatPhone,
   gambianPhone,
   incompleteSteps,
@@ -145,19 +150,25 @@ function Card({ title, children, aside }: { title: string; children: React.React
   );
 }
 
-function PrivateImage({ path, alt }: { path: string; alt: string }) {
-  const [shown, setShown] = useState<{ path: string; src: string } | null>(null);
-  const [failed, setFailed] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    privateFileUrl(path)
-      .then((src) => !cancelled && setShown({ path, src }))
-      .catch(() => !cancelled && setFailed(true));
-    return () => {
-      cancelled = true;
-    };
-  }, [path]);
-  const src = shown?.path === path ? shown.src : null;
+/** Whether this staff member's sign-in can open applicants' files yet. */
+type FileAccess = "checking" | "ready" | "denied";
+
+const NO_FILE_ACCESS =
+  "Your sign-in cannot open applicants' files yet. Sign out and in again; if it still fails, check your account is staff.";
+
+/**
+ * Until it is sent, an application can name any path at all for its photo
+ * and documents — the checks run on sending. Staff open only what really is
+ * in this applicant's own folder, so a draft cannot show a reviewer somebody
+ * else's passport under its own name.
+ */
+const NOT_THEIRS = "This is not a file in the applicant's own folder, so it is not shown.";
+
+function PrivateImage({ uid, path, alt, access }: { uid: string; path: string; alt: string; access: FileAccess }) {
+  const theirs = isOwnCredentialPath(path, uid);
+  const file = usePrivateFile(path, access === "ready" && theirs);
+  const src = file.status === "ready" ? file.src : null;
+  const failed = !theirs || access === "denied" || file.status === "failed";
   return (
     <span className="arch relative block aspect-[4/5] w-full max-w-[220px] overflow-hidden rounded-b-3xl bg-[var(--peach)]">
       {src ? (
@@ -165,7 +176,7 @@ function PrivateImage({ path, alt }: { path: string; alt: string }) {
         <img src={src} alt={alt} className="absolute inset-0 h-full w-full object-cover object-top" />
       ) : failed ? (
         <span className="absolute inset-0 grid place-items-center px-4 text-center text-[12.5px] text-[var(--dark)]">
-          Could not load the photo. Your staff access may still be on its way — reload.
+          {!theirs ? NOT_THEIRS : access === "denied" ? NO_FILE_ACCESS : "Could not load the photo. Reload to try again."}
         </span>
       ) : (
         <Skeleton className="absolute inset-0" rounded="rounded-none" />
@@ -194,13 +205,26 @@ export default function ApplicationReview({ uid }: { uid: string }) {
   const [message, setMessage] = useState("");
   const [decisionError, setDecisionError] = useState<string | null>(null);
   const [opening, setOpening] = useState<string | null>(null);
+  const [workspaceError, setWorkspaceError] = useState(false);
+  const [fileAccess, setFileAccess] = useState<FileAccess>("checking");
 
   useEffect(
     () => watchApplication(uid, setApp, () => setLoadError("This application could not be loaded. Reload to try again.")),
     [uid],
   );
-  useEffect(() => watchStaffReview(uid, setReview), [uid]);
-  useEffect(() => watchReviewNotes(uid, setNotes), [uid]);
+  useEffect(() => watchStaffReview(uid, setReview, () => setWorkspaceError(true)), [uid]);
+  useEffect(() => watchReviewNotes(uid, setNotes, () => setWorkspaceError(true)), [uid]);
+  // Documents are read straight from Storage, which knows staff by a claim on
+  // their sign-in. Made sure of once, before any file is asked for.
+  useEffect(() => {
+    let live = true;
+    void ensureStaffFileAccess().then((ok) => {
+      if (live) setFileAccess(ok ? "ready" : "denied");
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
 
   if (loadError) {
     return (
@@ -272,24 +296,30 @@ export default function ApplicationReview({ uid }: { uid: string }) {
   }
 
   async function open(doc: Pick<ApplicationDocument, "id" | "path">) {
+    if (!isOwnCredentialPath(doc.path, uid)) {
+      toast.error(NOT_THEIRS);
+      return;
+    }
+    if (fileAccess !== "ready") {
+      toast.error(fileAccess === "checking" ? "Still checking your access — try again in a moment." : NO_FILE_ACCESS);
+      return;
+    }
     setOpening(doc.id);
-    const tab = window.open("", "_blank");
     try {
-      const url = await privateFileUrl(doc.path);
-      if (tab) tab.location.href = url;
-      else window.location.assign(url);
+      await openPrivateFile(doc.path);
     } catch {
-      tab?.close();
-      toast.error("That file could not be opened. If you were just made staff, sign out and in again.");
+      toast.error("That file could not be opened. Check your connection and try again.");
     } finally {
       setOpening(null);
     }
   }
 
+  // Only the one entry that changed: the write merges, so two members of
+  // staff ticking different boxes at once do not undo each other's.
   const setCheck = (id: string, on: boolean) =>
-    void saveStaffReview(uid, { checks: { ...review.checks, [id]: on } }, me).catch(() => toast.error("Not saved."));
+    void saveStaffReview(uid, { checks: { [id]: on } }, me).catch(() => toast.error("Not saved."));
   const setVerdict = (docId: string, verdict: DocVerdict) =>
-    void saveStaffReview(uid, { documents: { ...review.documents, [docId]: verdict } }, me).catch(() => toast.error("Not saved."));
+    void saveStaffReview(uid, { documents: { [docId]: verdict } }, me).catch(() => toast.error("Not saved."));
 
   const actions = ACTIONS_FOR[app.status];
   const actionButtons = actions.map((a) => (
@@ -324,7 +354,17 @@ export default function ApplicationReview({ uid }: { uid: string }) {
   return (
     <div>
       <PageBar>
-        <span className="truncate font-display text-[17px]">{name}</span>
+        <Link
+          href="/admin/providers"
+          aria-label="Back to all applications"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-[var(--sand)]"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+            <path d="M19 12H5M11 18l-6-6 6-6" />
+          </svg>
+        </Link>
+        <span className="min-w-0 flex-1 truncate font-display text-[17px] font-medium">{name}</span>
+        <StatusBadge status={app.status} className="hidden sm:inline-flex" />
       </PageBar>
 
       <PageHeader
@@ -345,7 +385,18 @@ export default function ApplicationReview({ uid }: { uid: string }) {
 
       {incomplete.length > 0 && app.status !== "draft" ? (
         <Alert tone="warning" title="Incomplete by today's checks" className="mb-6">
-          Some parts no longer pass the checks: {incomplete.join(", ")}. Ask for changes rather than approving.
+          Some parts no longer pass the checks: {incomplete.map((id) => STEPS.find((s) => s.id === id)?.label ?? id).join(", ")}. Ask
+          for changes rather than approving.
+        </Alert>
+      ) : null}
+      {workspaceError ? (
+        <Alert tone="warning" title="The checklist and notes did not load" className="mb-6">
+          The application itself is fine. Reload to see the staff checklist and notes.
+        </Alert>
+      ) : null}
+      {fileAccess === "denied" ? (
+        <Alert tone="warning" title="Files cannot be opened" className="mb-6">
+          {NO_FILE_ACCESS}
         </Alert>
       ) : null}
       {app.status === "changes_requested" ? (
@@ -501,7 +552,7 @@ export default function ApplicationReview({ uid }: { uid: string }) {
 
         <div className="space-y-6 xl:sticky xl:top-6 xl:self-start">
           <Card title="Photo">
-            {app.photo.path ? <PrivateImage path={app.photo.path} alt={`Photo of ${name}`} /> : <p className="text-[14px] text-[var(--muted)]">No photo.</p>}
+            {app.photo.path ? <PrivateImage uid={uid} path={app.photo.path} alt={`Photo of ${name}`} access={fileAccess} /> : <p className="text-[14px] text-[var(--muted)]">No photo.</p>}
           </Card>
 
           <Card title="Documents" aside={<span className="text-[12.5px] text-[var(--muted)]">{app.documents.length}</span>}>

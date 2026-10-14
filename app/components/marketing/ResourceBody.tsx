@@ -1,61 +1,22 @@
+import RichText, { type RichTextClasses } from "@/lib/content/richText";
+
 /**
- * Minimal renderer for resource copy.
+ * An article's words, drawn by the site content's own renderer
+ * (lib/content/richText): "## " headings, bold, italics, links and lists,
+ * from the small markdown staff write in the article editor.
  *
- * The seed content uses a deliberately tiny subset of Markdown — `## ` headings
- * and `**bold**` runs — so a fifteen-line parser beats adding a Markdown
- * dependency and a sanitiser to the bundle. If the admin CMS later accepts
- * richer input from untrusted authors, replace this with a real parser plus
- * sanitisation; do not extend it by pattern-matching more syntax.
- *
- * Note this never sets `dangerouslySetInnerHTML`, so nothing in the content
- * can inject markup.
+ * That renderer builds React elements from a parsed tree and never sets
+ * dangerouslySetInnerHTML, so nothing an author types can become markup or
+ * a script, and links go only to this site or to https addresses.
  */
 
-function InlineText({ text }: { text: string }) {
-  // Split on **bold** runs, keeping the delimiters via a capturing group.
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
-
-  return (
-    <>
-      {parts.map((part, i) =>
-        part.startsWith("**") && part.endsWith("**") ? (
-          <strong key={i} className="font-medium text-[var(--foreground)]">
-            {part.slice(2, -2)}
-          </strong>
-        ) : (
-          <span key={i}>{part}</span>
-        ),
-      )}
-    </>
-  );
-}
+const CLASSES: RichTextClasses = {
+  heading: "mt-12 first:mt-0 text-[22px] md:text-[26px] leading-tight font-display font-medium",
+  paragraph: "mt-5 first:mt-0 text-[15px] md:text-[16px] leading-relaxed text-[var(--muted)]",
+  list: "mt-5 first:mt-0 list-disc space-y-2 pl-5 text-[15px] md:text-[16px] leading-relaxed text-[var(--muted)]",
+  orderedList: "mt-5 first:mt-0 list-decimal space-y-2 pl-5 text-[15px] md:text-[16px] leading-relaxed text-[var(--muted)]",
+};
 
 export default function ResourceBody({ body }: { body: string }) {
-  const blocks = body.split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
-
-  return (
-    <div className="max-w-[680px]">
-      {blocks.map((block, i) => {
-        if (block.startsWith("## ")) {
-          return (
-            <h2
-              key={i}
-              className="mt-12 first:mt-0 text-[22px] md:text-[26px] leading-tight font-display font-medium"
-            >
-              {block.slice(3)}
-            </h2>
-          );
-        }
-
-        return (
-          <p
-            key={i}
-            className="mt-5 first:mt-0 text-[15px] md:text-[16px] leading-relaxed text-[var(--muted)]"
-          >
-            <InlineText text={block} />
-          </p>
-        );
-      })}
-    </div>
-  );
+  return <RichText source={body} headings className="max-w-[680px]" classes={CLASSES} />;
 }

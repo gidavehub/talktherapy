@@ -2,21 +2,24 @@
 
 import StartLink from "../StartLink";
 import { ArchStack } from "../ui/Card";
+import type { HomeContent } from "../../lib/content/schema";
 import Reveal from "./Reveal";
 
 /**
  * The closing band, in two moods: terracotta ("Whatever you're carrying…",
  * the home page) and sage ("Not sure who to choose?", the providers page).
+ * Its words are the site content's (home.cta, providers.cta); where the
+ * button leads is StartLink's to decide.
  */
 export default function CtaBand({
   tone = "terracotta",
-  lines,
-  text,
+  content,
 }: {
   tone?: "terracotta" | "sage";
-  lines: [string, string];
-  text: string;
+  /** Two heading lines, a sentence, the button's words. */
+  content: HomeContent["cta"];
 }) {
+  const { lines, text, button } = content;
   const terracotta = tone === "terracotta";
   return (
     <section
@@ -40,7 +43,7 @@ export default function CtaBand({
                 : "bg-[var(--accent)] text-white hover:bg-[var(--accent-deep)]"
             }`}
           >
-            Begin with TALK
+            {button}
           </StartLink>
         </Reveal>
       </div>

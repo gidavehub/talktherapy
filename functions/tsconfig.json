@@ -29,6 +29,18 @@
     "../app/lib/models.ts",
     "../app/lib/money.ts",
     "../app/lib/payouts.ts",
-    "../app/lib/providerApplication.ts"
+    "../app/lib/providerApplication.ts",
+    "../app/lib/adminOps.ts",
+    "../app/lib/adminStatsCore.ts",
+    "../app/lib/contrast.ts",
+    "../app/lib/content/schema.ts",
+    "../app/lib/content/validate.ts",
+    "../app/lib/content/tokens.ts",
+    "../app/lib/content/theme.ts",
+    "../app/lib/content/links.ts",
+    "../app/lib/content/markdown.ts",
+    "../app/lib/content/resources.ts",
+    "../app/lib/resources-seed.ts",
+    "../app/lib/accountDeletion.ts"
   ]
 }

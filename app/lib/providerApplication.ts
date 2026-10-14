@@ -62,6 +62,9 @@ export function isEditable(status: ApplicationStatus): boolean {
   return status === "draft" || status === "changes_requested";
 }
 
+/** The two states in which an application is waiting on staff. */
+export const AWAITING_STAFF: readonly ApplicationStatus[] = ["submitted", "in_review"];
+
 // -------------------------------------------------------------------- steps
 
 export type StepId =
@@ -212,8 +215,43 @@ export const DOC_TYPE_HINTS: Record<DocType, string> = {
 
 /** What the server accepts. Mirrors storage.rules. */
 export const DOC_ACCEPT = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
-export const DOC_MAX_BYTES = 10 * 1024 * 1024;
+/** At most this many bytes, this one included — "10 MB" as phones count it. storage.rules says the same. */
+export const DOC_MAX_BYTES = 10_000_000;
 export const MAX_DOCUMENTS = 12;
+
+const TYPE_BY_EXTENSION: Record<string, string> = {
+  pdf: "application/pdf",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+};
+
+/**
+ * What a chosen file really is, as one of DOC_ACCEPT, or null. Some phones and
+ * older Windows set-ups hand a file over with no type at all; the drop area
+ * lets those through by their name, so the upload has to name the type too —
+ * Storage refuses a file whose type it is not told.
+ */
+export function documentContentType(fileName: string, declared: string): string | null {
+  if (DOC_ACCEPT.includes(declared)) return declared;
+  if (declared) return null;
+  const ext = fileName.toLowerCase().split(".").pop() ?? "";
+  return TYPE_BY_EXTENSION[ext] ?? null;
+}
+
+/**
+ * Whether `path` is one of this applicant's own private files: exactly one
+ * plain file name under provider-credentials/{uid}/. Anything else — another
+ * person's folder, a sub-folder, "..", an empty name — is not theirs to point
+ * the application at, and approving it would copy or show somebody else's.
+ */
+export function isOwnCredentialPath(path: string, uid: string): boolean {
+  const prefix = `provider-credentials/${uid}/`;
+  if (!uid || !path.startsWith(prefix)) return false;
+  const name = path.slice(prefix.length);
+  return /^[A-Za-z0-9_-][A-Za-z0-9._-]{0,99}$/.test(name) && !name.includes("..");
+}
 
 export const DAYS = [
   { value: 1, short: "Mon", label: "Monday" },
@@ -305,7 +343,7 @@ export type ProfessionalSection = {
   ageGroups: AgeGroup[];
   formats: ApplicationFormat[];
   languages: Locale[];
-  /** Any other languages, in their words — Jola, Serahule, French… */
+  /** Any other languages, in their words — Jola, Serahule, Serer, Arabic… */
   otherLanguages: string;
 };
 
@@ -673,7 +711,9 @@ export function checkPersonal(p: PersonalSection, now: number): Problems {
   if (!between(p.displayName, 2, 60)) out.displayName = "The name people will see — two letters at least.";
   if (!p.gender) out.gender = "Choose one. 'Rather not say' is fine.";
   const age = ageOn(p.dateOfBirth, now);
-  if (age == null) out.dateOfBirth = "Your date of birth.";
+  // All three parts chosen and still not a date: the 31st of a short month.
+  if (age == null && /^\d{4}-\d{2}-\d{2}$/.test(p.dateOfBirth)) out.dateOfBirth = "That date does not exist — check the day.";
+  else if (age == null) out.dateOfBirth = "Your date of birth.";
   else if (age < 18) out.dateOfBirth = "Providers on TALK are 18 or older.";
   else if (age > 100) out.dateOfBirth = "Check the year.";
   if (!gambianPhone(p.phone)) out.phone = "A Gambian mobile number — seven digits, like 700 0000.";
@@ -742,7 +782,7 @@ export function checkFee(f: FeeSection): Problems {
 
 export function checkPhoto(p: PhotoSection, uid: string): Problems {
   if (!p.path) return { path: "Add a photo of yourself." };
-  if (!p.path.startsWith(`provider-credentials/${uid}/`)) return { path: "Upload the photo again." };
+  if (!isOwnCredentialPath(p.path, uid)) return { path: "Upload the photo again." };
   return {};
 }
 
@@ -753,7 +793,7 @@ export function checkDocuments(docs: ApplicationDocument[], uid: string): Proble
   if (!docs.some((d) => d.type === "degree" || d.type === "licence"))
     out.qualification = "At least one certificate or licence.";
   docs.forEach((d, i) => {
-    if (!d.path.startsWith(`provider-credentials/${uid}/`)) out[`${i}`] = "Upload this one again.";
+    if (!isOwnCredentialPath(d.path, uid)) out[`${i}`] = "Upload this one again.";
     else if (!DOC_ACCEPT.includes(d.contentType)) out[`${i}`] = "PDF, JPG, PNG or WebP only.";
     else if (d.bytes <= 0 || d.bytes > DOC_MAX_BYTES) out[`${i}`] = "10 MB at most.";
   });

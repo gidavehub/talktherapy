@@ -67,9 +67,11 @@ export const CHART_INK = {
 /**
  * Small-cell suppression. Any count under this is withheld so that a person
  * cannot be picked out of a small group; charts draw a hatched placeholder
- * labelled "<10" instead of a value.
+ * labelled "<5" instead of a value. The same five as K_ANONYMITY in
+ * lib/adminStatsCore.ts, which withholds the counts before they reach a
+ * chart: the label has to say what was actually done to the number.
  */
-export const SUPPRESSION_THRESHOLD = 10;
+export const SUPPRESSION_THRESHOLD = 5;
 export const SUPPRESSED_LABEL = `<${SUPPRESSION_THRESHOLD}`;
 
 /** The hatch for suppressed marks: 45 degree strokes on the nested surface. */

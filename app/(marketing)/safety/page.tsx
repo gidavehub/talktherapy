@@ -4,67 +4,31 @@ import PageIntro from "@/components/marketing/PageIntro";
 import { Section, FeatureGrid, CTABlock } from "@/components/marketing/Sections";
 import { SectionHeading } from "@/components/ui/Typography";
 import { Alert } from "@/components/ui/Feedback";
+import { getContent, pageMetadata } from "@/lib/content/server";
 
-export const metadata: Metadata = {
-  title: "Safety & ethics",
-  description:
-    "How TALK protects the people who use it — professional verification, crisis escalation, AI boundaries and human oversight.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return pageMetadata("safety");
+}
 
-const COMMITMENTS = [
-  {
-    title: "Professional verification",
-    body: "Providers submit identity documents and qualification evidence before their profile can go live. An administrator reviews every application. An unverified profile is invisible to patients — not merely flagged.",
-  },
-  {
-    title: "Human oversight of AI",
-    body: "The AI companion supports; it does not treat. Its scope is explicit, its limits are stated on screen, and escalation to a human is built into the end of every conversation.",
-  },
-  {
-    title: "Crisis escalation",
-    body: "Where a conversation indicates possible immediate risk, emergency contacts are shown immediately and synchronously. We do not rely on a queue being watched to keep someone safe.",
-  },
-  {
-    title: "Confidentiality by default",
-    body: "Journal entries and mood check-ins are visible only to you. Providers see what you choose to share in a session, and nothing else.",
-  },
-  {
-    title: "Reporting",
-    body: "Any session, professional or interaction can be reported. Reports are reviewed, and a provider can be suspended from the directory pending investigation.",
-  },
-  {
-    title: "Ongoing review",
-    body: "AI responses are audited for safety, bias and cultural relevance. Safeguarding protocols are developed with clinical input rather than written by engineers alone.",
-  },
-];
-
-export default function SafetyPage() {
+// "Not an emergency service", the emergency notice and what happens if
+// someone is at risk stay in code on this page: they are safety wording, not
+// copy, and must never be one edit away from being wrong.
+export default async function SafetyPage() {
+  const { intro, commitments, limits, cta } = await getContent("safety");
   return (
     <>
-      <PageIntro
-        eyebrow="Safety & ethics"
-        lines={["Trust is", "the product."]}
-        lede="TALK handles some of the most sensitive information a person can share. Safety is treated as a foundational design requirement rather than something added once the features work."
-        stamp="SAFE"
-      />
+      <PageIntro {...intro} stamp="SAFE" />
 
       <Section tone="surface">
-        <SectionHeading
-          eyebrow="Our commitments"
-          lines={["Six things we hold", "ourselves to."]}
-        />
+        <SectionHeading eyebrow={commitments.eyebrow} lines={commitments.lines} />
         <div className="mt-12 md:mt-16">
-          <FeatureGrid items={COMMITMENTS} columns={3} />
+          <FeatureGrid items={commitments.items} columns={3} />
         </div>
       </Section>
 
       <Section>
         <div className="max-w-[820px]">
-          <SectionHeading
-            eyebrow="Limits"
-            lines={["What TALK", "cannot do."]}
-            lede="Being clear about this is part of being safe. A platform that overstates its reach puts people at risk."
-          />
+          <SectionHeading eyebrow={limits.eyebrow} lines={limits.lines} lede={limits.lede} />
 
           <div className="mt-10 space-y-5 text-[14px] md:text-[15px] leading-relaxed text-[var(--muted)]">
             <p>
@@ -75,21 +39,12 @@ export default function SafetyPage() {
               intervene. If you are in danger, the fastest route to help is a
               phone call to the emergency services, not a message here.
             </p>
-            <p>
-              <strong className="font-medium text-[var(--foreground)]">
-                The AI cannot assess risk reliably.
-              </strong>{" "}
-              Automated detection misses things and over-triggers on others. It
-              is a prompt to surface help, never a clinical judgement.
-            </p>
-            <p>
-              <strong className="font-medium text-[var(--foreground)]">
-                Verification is not a guarantee of outcome.
-              </strong>{" "}
-              We check that a provider is who they say they are and holds the
-              qualifications they claim. We cannot guarantee that any particular
-              professional is the right fit for you — and you are free to change.
-            </p>
+            {limits.items.map((limit, i) => (
+              <p key={i}>
+                <strong className="font-medium text-[var(--foreground)]">{limit.lead}</strong>{" "}
+                {limit.body}
+              </p>
+            ))}
           </div>
 
           <Alert tone="crisis" title="In immediate danger?" className="mt-10">
@@ -128,13 +83,7 @@ export default function SafetyPage() {
         </div>
       </Section>
 
-      <CTABlock
-        eyebrow="Related"
-        lines={["How your data", "is handled."]}
-        body="Data minimisation, encryption, retention and your rights — written to be read."
-        primary={{ label: "Privacy policy", href: "/privacy" }}
-        secondary={{ label: "Report a concern", href: "/support" }}
-      />
+      <CTABlock {...cta} />
     </>
   );
 }

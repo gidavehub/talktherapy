@@ -24,7 +24,7 @@ export default function ApplyHeader() {
         <div className="flex items-center gap-2">
           <Link
             href="/support"
-            className="hidden h-10 items-center rounded-full px-4 text-[13.5px] text-[var(--muted)] transition-colors hover:text-[var(--foreground)] sm:flex"
+            className="hidden h-11 items-center rounded-full px-4 text-[13.5px] text-[var(--muted)] transition-colors hover:text-[var(--foreground)] sm:flex"
           >
             Questions? Ask us
           </Link>
@@ -32,14 +32,14 @@ export default function ApplyHeader() {
             <button
               type="button"
               onClick={() => void signOutToHome(router)}
-              className="flex h-10 items-center rounded-full border-[1.5px] border-[var(--dark)] px-5 text-[13.5px] font-medium transition-colors hover:bg-[var(--dark)] hover:text-[var(--cream)]"
+              className="flex h-11 items-center rounded-full border-[1.5px] border-[var(--dark)] px-5 text-[13.5px] font-medium transition-colors hover:bg-[var(--dark)] hover:text-[var(--cream)]"
             >
               Sign out
             </button>
           ) : (
             <Link
               href="/for-providers"
-              className="flex h-10 items-center rounded-full border-[1.5px] border-[var(--dark)] px-5 text-[13.5px] font-medium transition-colors hover:bg-[var(--dark)] hover:text-[var(--cream)]"
+              className="flex h-11 items-center rounded-full border-[1.5px] border-[var(--dark)] px-5 text-[13.5px] font-medium transition-colors hover:bg-[var(--dark)] hover:text-[var(--cream)]"
             >
               Back
             </Link>

@@ -16,22 +16,18 @@ import {
 } from "@/lib/providerApplication";
 import type { StepProps } from "./types";
 
-/** Every half hour from 06:00 to 23:00. */
+/**
+ * Every half hour from 06:00 to 23:00, on the 24-hour clock — the way the
+ * review screens show them, and short enough for two to sit side by side on
+ * a small phone.
+ */
 const TIMES = Array.from({ length: 35 }, (_, i) => {
   const minutes = 6 * 60 + i * 30;
   const hh = String(Math.floor(minutes / 60)).padStart(2, "0");
   const mm = String(minutes % 60).padStart(2, "0");
   return `${hh}:${mm}`;
 });
-
-function timeLabel(t: string): string {
-  const m = minutesOf(t);
-  if (m == null) return t;
-  const h = Math.floor(m / 60);
-  const suffix = h < 12 ? "am" : "pm";
-  const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${h12}${m % 60 ? `:${String(m % 60).padStart(2, "0")}` : ""}${suffix}`;
-}
+const TIME_OPTIONS = TIMES.map((t) => ({ value: t, label: t }));
 
 const WEEKDAYS = [1, 2, 3, 4, 5];
 
@@ -100,12 +96,14 @@ export default function AvailabilityStep({ value, onChange, problems }: StepProp
           return (
             <li
               key={day.value}
-              className={`rounded-[22px] border p-4 transition-colors md:p-5 ${
+              className={`rounded-[22px] border p-3 transition-colors sm:p-4 md:p-5 ${
                 mine.length ? "border-[var(--sage)]/40 bg-[var(--surface)]" : "border-[var(--dark)]/10 bg-transparent"
               }`}
             >
-              <div className="flex items-start gap-4">
-                <div className="w-[88px] shrink-0 pt-2.5">
+              {/* On a phone the day sits above its hours, so two times fit
+                  side by side; from sm up it is a column of its own. */}
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-4">
+                <div className="flex items-baseline justify-between gap-3 px-1 sm:block sm:w-[88px] sm:shrink-0 sm:px-0 sm:pt-2.5">
                   <p className="text-[14px] font-medium">{day.label}</p>
                   <p className="text-[12px] text-[var(--muted)]">
                     {mine.length ? `${mine.reduce((n, { r }) => n + startsIn(r).length, 0)} sessions` : "Not working"}
@@ -122,31 +120,33 @@ export default function AvailabilityStep({ value, onChange, problems }: StepProp
                         exit={{ opacity: 0, height: 0 }}
                         transition={SPRING_SOFT}
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 sm:gap-2">
                           <Dropdown
                             label={`${day.label} from`}
                             hideLabel
                             size="sm"
                             value={r.start}
                             onChange={(start) => update(r.id, { start })}
-                            options={TIMES.map((t) => ({ value: t, label: timeLabel(t) }))}
+                            options={TIME_OPTIONS}
                             className="min-w-0 flex-1"
                           />
-                          <span className="text-[12.5px] text-[var(--muted)]">to</span>
+                          <span aria-hidden className="text-[12.5px] text-[var(--muted)]">
+                            –
+                          </span>
                           <Dropdown
                             label={`${day.label} until`}
                             hideLabel
                             size="sm"
                             value={r.end}
                             onChange={(end) => update(r.id, { end })}
-                            options={TIMES.map((t) => ({ value: t, label: timeLabel(t) }))}
+                            options={TIME_OPTIONS}
                             className="min-w-0 flex-1"
                           />
                           <button
                             type="button"
                             onClick={() => remove(r.id)}
-                            aria-label={`Remove ${day.label} ${timeLabel(r.start)} to ${timeLabel(r.end)}`}
-                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--muted)] transition-colors hover:bg-[var(--sand)] hover:text-[var(--danger)]"
+                            aria-label={`Remove ${day.label} ${r.start} to ${r.end}`}
+                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[var(--muted)] transition-colors hover:bg-[var(--sand)] hover:text-[var(--danger)]"
                           >
                             <IconTrash size={15} />
                           </button>
@@ -160,7 +160,7 @@ export default function AvailabilityStep({ value, onChange, problems }: StepProp
                   <button
                     type="button"
                     onClick={() => add(day.value)}
-                    className="flex h-10 items-center rounded-full px-1 text-[13px] font-medium text-[var(--accent-deep)] hover:underline"
+                    className="flex h-11 items-center rounded-full px-1 text-[13px] font-medium text-[var(--accent-deep)] hover:underline"
                   >
                     + {mine.length ? "Add more hours" : "Add hours"}
                   </button>

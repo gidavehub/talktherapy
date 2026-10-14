@@ -29,7 +29,7 @@ import type { ChartTableData } from "./ChartCard";
  * reader gets without the key. No numbers in the cells (168 numbers is a
  * spreadsheet, not a picture); the tooltip and the table carry them.
  *
- * A `null` cell is suppressed — fewer than ten — and wears the hatch, so it
+ * A `null` cell is suppressed — fewer than five — and wears the hatch, so it
  * can never be mistaken for a pale "low" cell.
  *
  * One tab stop for the whole grid; the arrow keys move between cells the way

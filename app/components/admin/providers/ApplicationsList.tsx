@@ -6,10 +6,17 @@ import DataTable, { type DataColumn } from "../../ui/DataTable";
 import SearchField from "../../ui/SearchField";
 import { Pill } from "../../ui/Feedback";
 import StatCard from "../../ui/StatCard";
+import { PageBar } from "../../ui/AppShell";
 import StatusBadge from "./StatusBadge";
 import { useNow } from "@/lib/useNow";
 import { watchApplications } from "@/lib/providerApplication-client";
-import { LOCALE_LABELS, STATUS_LABELS, type ApplicationStatus, type ProviderApplication } from "@/lib/providerApplication";
+import {
+  AWAITING_STAFF,
+  LOCALE_LABELS,
+  STATUS_LABELS,
+  type ApplicationStatus,
+  type ProviderApplication,
+} from "@/lib/providerApplication";
 import { SERVICE_LABELS } from "@/lib/matching";
 
 /**
@@ -31,7 +38,7 @@ const FILTERS: { id: Filter; label: string }[] = [
 const DAY = 86_400_000;
 
 function matches(filter: Filter, app: ProviderApplication): boolean {
-  return filter === "waiting" ? app.status === "submitted" || app.status === "in_review" : app.status === filter;
+  return filter === "waiting" ? AWAITING_STAFF.includes(app.status) : app.status === filter;
 }
 
 function initials(name: string): string {
@@ -167,6 +174,13 @@ export default function ApplicationsList() {
 
   return (
     <div className="space-y-6">
+      {/* Pinned in the top bar, so the search is under the thumb however far
+          down the list a reviewer has scrolled. */}
+      <PageBar>
+        <span className="font-display hidden shrink-0 text-[20px] font-medium sm:block">Providers</span>
+        <SearchField value={search} onChange={setSearch} placeholder="Search by name, town or service" />
+      </PageBar>
+
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="Waiting for a decision" value={apps ? counts.waiting : "—"} />
         <StatCard label="Longest wait" value={apps ? (counts.waiting ? `${oldestWait} d` : "—") : "—"} />
@@ -174,19 +188,19 @@ export default function ApplicationsList() {
         <StatCard label="Being filled in" value={apps ? counts.draft + counts.changes_requested : "—"} />
       </div>
 
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" role="group" aria-label="Show applications that are">
-          {FILTERS.map((f) => (
-            <Pill key={f.id} active={filter === f.id} onClick={() => setFilter(f.id)} className="shrink-0">
-              {f.label}
-              <span className={`tabular-nums ${filter === f.id ? "text-white/80" : "text-[var(--muted)]"}`}>{counts[f.id]}</span>
-            </Pill>
-          ))}
-        </div>
-        <SearchField value={search} onChange={setSearch} placeholder="Search by name, town or service" className="lg:w-[320px]" />
+      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" role="group" aria-label="Show applications that are">
+        {FILTERS.map((f) => (
+          <Pill key={f.id} active={filter === f.id} onClick={() => setFilter(f.id)} className="shrink-0">
+            {f.label}
+            <span className={`tabular-nums ${filter === f.id ? "text-white/80" : "text-[var(--muted)]"}`}>{counts[f.id]}</span>
+          </Pill>
+        ))}
       </div>
 
+      {/* Keyed by the filter: each one opens on its own first page, sorted
+          the way that list is read (DataTable takes its sort only once). */}
       <DataTable
+        key={filter}
         columns={columns}
         rows={rows}
         rowKey={(a) => a.uid}
@@ -202,6 +216,7 @@ export default function ApplicationsList() {
               : "No applications are in this state.",
         }}
         pageSize={25}
+        stickyOffset={64}
         caption="Applications"
         csv={{ filename: "provider-applications.csv" }}
       />

@@ -32,9 +32,11 @@ import {
   signedIn,
 } from "./staff";
 import {
+  DOC_ACCEPT,
   STATUS_LABELS,
   incompleteSteps,
   isEditable,
+  isOwnCredentialPath,
   qualificationLine,
   slotTimesFrom,
   SLOT_MINUTES,
@@ -60,6 +62,20 @@ const publicPhotoPath = (uid: string) => `avatars/${uid}/provider.jpg`;
 
 function stepLabel(id: string): string {
   return STEPS.find((s) => s.id === id)?.label ?? id;
+}
+
+/** What the public photo may be: the three image types of DOC_ACCEPT. */
+const PHOTO_TYPES = DOC_ACCEPT.filter((t) => t.startsWith("image/"));
+
+/** A stored file's own content type, or null when there is no such file. */
+async function storedType(path: string): Promise<string | null> {
+  try {
+    const [meta] = await getStorage().bucket(BUCKET).file(path).getMetadata();
+    return String(meta.contentType ?? "").split(";")[0].trim().toLowerCase();
+  } catch (error) {
+    if ((error as { code?: unknown })?.code === 404) return null;
+    throw error;
+  }
 }
 
 // ------------------------------------------------------------------ submit
@@ -92,20 +108,22 @@ export const submitProviderApplication = onCall(CALLABLE, async (request) => {
     );
   }
 
-  // Every file the application points at must really be there. An upload
-  // that failed half-way leaves its line in the draft and nothing in Storage,
-  // and a reviewer opening a missing passport learns nothing from it.
-  const bucket = getStorage().bucket(BUCKET);
+  // Every file the application points at must really be there, and really be
+  // what a reviewer can open. An upload that failed half-way leaves its line
+  // in the draft and nothing in Storage. And the type written in the draft is
+  // only what the browser said: the file's own type is the one checked here,
+  // because files uploaded under older rules (any image/*, SVG included) can
+  // still be in the applicant's folder.
   const files = [
-    { name: "your photo", path: first.photo.path as string },
-    ...first.documents.map((d) => ({ name: d.name || "a document", path: d.path })),
+    { name: "your photo", path: first.photo.path as string, types: PHOTO_TYPES },
+    ...first.documents.map((d) => ({ name: d.name || "a document", path: d.path, types: DOC_ACCEPT })),
   ];
-  const present = await Promise.all(files.map((f) => bucket.file(f.path).exists().then(([e]) => e)));
-  const lost = files.filter((_, i) => !present[i]);
+  const stored = await Promise.all(files.map((f) => storedType(f.path)));
+  const lost = files.filter((f, i) => !f.types.includes(stored[i] ?? ""));
   if (lost.length > 0) {
     throw new HttpsError(
       "failed-precondition",
-      `This did not finish uploading — please add it again: ${lost.map((f) => f.name).join(", ")}.`,
+      `This did not upload properly — please add it again: ${lost.map((f) => f.name).join(", ")}.`,
     );
   }
 
@@ -281,7 +299,7 @@ export const reviewProviderApplication = onCall(CALLABLE, async (request) => {
   const action = String(request.data?.action ?? "") as Action;
   const message = String(request.data?.message ?? "").trim().slice(0, 1500);
 
-  if (!uid) throw new HttpsError("invalid-argument", "Which application?");
+  if (!uid || uid.includes("/")) throw new HttpsError("invalid-argument", "Which application?");
   if (!ACTIONS.includes(action)) throw new HttpsError("invalid-argument", "Unknown decision.");
   if (NEEDS_MESSAGE.includes(action) && message.length < 10) {
     throw new HttpsError("invalid-argument", "Say what the applicant needs to know — a sentence at least.");
@@ -303,71 +321,107 @@ export const reviewProviderApplication = onCall(CALLABLE, async (request) => {
 
   const now = Date.now();
   const bucket = getStorage().bucket(BUCKET);
+  const profileRef = db().collection(PROFILES).doc(uid);
+  const userRef = db().collection(USERS).doc(uid);
+  const listedBefore = (await profileRef.get()).exists;
 
-  // Approval needs the photo where the directory reads it BEFORE the listing
-  // that points at it is written, or the first person to see the new profile
-  // sees a broken image.
-  if (action === "approve") {
-    if (incompleteSteps(app, now).length > 0) {
-      throw new HttpsError("failed-precondition", "This application is incomplete. Ask for changes instead.");
+  // A listing is written by approval, and by reinstating a provider whose
+  // listing has since gone. Either way the photo has to be where the
+  // directory reads it BEFORE the listing that points at it, or the first
+  // person to see the profile sees a broken image.
+  const publishes = action === "approve" || (action === "reinstate" && !listedBefore);
+  if (action === "approve" && incompleteSteps(app, now).length > 0) {
+    throw new HttpsError("failed-precondition", "This application is incomplete. Ask for changes instead.");
+  }
+  if (publishes) {
+    // Checked again here, not only on sending: a path outside the applicant's
+    // own folder would publish somebody else's file as their face, and a file
+    // that is not one of the three picture types has no business in public.
+    const photo = app.photo.path && isOwnCredentialPath(app.photo.path, uid) ? app.photo.path : null;
+    if (!photo || !PHOTO_TYPES.includes((await storedType(photo)) ?? "")) {
+      throw new HttpsError("failed-precondition", "There is no photo of theirs to publish.");
     }
-    if (!app.photo.path) throw new HttpsError("failed-precondition", "There is no photo to publish.");
-    await bucket.file(app.photo.path).copy(bucket.file(publicPhotoPath(uid)));
+    await bucket.file(photo).copy(bucket.file(publicPhotoPath(uid)));
   }
 
-  await db().runTransaction(async (tx) => {
-    const current = toApplication(uid, (await tx.get(ref)).data() ?? {});
-    if (current.status !== app.status) {
-      throw new HttpsError("aborted", "Somebody else has just changed this application. Reload it.");
-    }
-    const profileRef = db().collection(PROFILES).doc(uid);
-    const profile = (await tx.get(profileRef)).data();
-    const userRef = db().collection(USERS).doc(uid);
+  try {
+    await db().runTransaction(async (tx) => {
+      const current = toApplication(uid, (await tx.get(ref)).data() ?? {});
+      if (current.status !== app.status) {
+        throw new HttpsError("aborted", "Somebody else has just changed this application. Reload it.");
+      }
+      const profile = (await tx.get(profileRef)).data();
+      const account = (await tx.get(userRef)).data();
+      // Going live needs the provider account it belongs to. Anything that
+      // takes somebody OUT of the directory goes ahead without one: an account
+      // deleted since must not keep a listing up.
+      if ((action === "approve" || action === "reinstate") && account?.role !== "provider") {
+        throw new HttpsError("failed-precondition", "This account is no longer a provider account, so it cannot go live.");
+      }
 
-    const event: HistoryEvent = {
-      at: now,
-      type: EVENT[action],
-      by: staffUid,
-      ...(NEEDS_MESSAGE.includes(action) ? { message } : {}),
-    };
-    tx.update(ref, {
-      status: TO[action],
-      updatedAt: now,
-      history: FieldValue.arrayUnion(event),
-      ...(action === "start_review" ? { reviewerId: staffUid } : {}),
-      ...(action === "start_review" ? {} : { decidedAt: now, decidedBy: staffUid }),
-      // The message the applicant sees on their status page. Cleared when the
-      // decision does not carry one, so an old request for changes is not
-      // still shown under "approved".
-      message: NEEDS_MESSAGE.includes(action) ? message : null,
+      const event: HistoryEvent = {
+        at: now,
+        type: EVENT[action],
+        by: staffUid,
+        ...(NEEDS_MESSAGE.includes(action) ? { message } : {}),
+      };
+      tx.update(ref, {
+        status: TO[action],
+        updatedAt: now,
+        history: FieldValue.arrayUnion(event),
+        ...(action === "start_review" ? { reviewerId: staffUid } : {}),
+        ...(action === "start_review" ? {} : { decidedAt: now, decidedBy: staffUid }),
+        // The message the applicant sees on their status page. Cleared when the
+        // decision does not carry one, so an old request for changes is not
+        // still shown under "approved".
+        message: NEEDS_MESSAGE.includes(action) ? message : null,
+      });
+
+      if (action === "approve" || (action === "reinstate" && !profile)) {
+        // Written whole from what was checked; ratings and the first listing
+        // date carry over from a listing that was already there.
+        tx.set(profileRef, listingFrom(current, profile, now));
+      } else if (action === "reinstate") {
+        tx.update(profileRef, { status: "verified", updatedAt: now });
+      } else if ((action === "suspend" || action === "reject") && profile) {
+        tx.update(profileRef, { status: action === "suspend" ? "suspended" : "rejected", updatedAt: now });
+      }
+      // Out of the directory and back to the application screens, together —
+      // or into the provider's side of the app, together.
+      if (account && (action === "approve" || action === "reinstate")) {
+        tx.update(userRef, { verified: true, updatedAt: now });
+      } else if (account && (action === "suspend" || action === "reject")) {
+        tx.update(userRef, { verified: false, updatedAt: now });
+      }
+
+      const notice = applicantNotice(action, message);
+      tx.set(
+        db().collection(NOTIFICATIONS).doc(),
+        notification(uid, notice.title, notice.body, action === "approve" || action === "reinstate" ? "/chats" : "/apply/status"),
+      );
+      tx.set(
+        db().collection(AUDIT_LOGS).doc(),
+        auditEntry(staffUid, `provider_application.${action}`, `${APPLICATIONS}/${uid}`, {
+          from: app.status,
+          to: TO[action],
+          ...(message ? { message } : {}),
+        }),
+      );
     });
-
-    if (action === "approve") {
-      tx.set(profileRef, listingFrom(current, profile, now));
-      tx.update(userRef, { verified: true, updatedAt: now });
-    } else if (action === "reinstate") {
-      if (profile) tx.update(profileRef, { status: "verified", updatedAt: now });
-      tx.update(userRef, { verified: true, updatedAt: now });
-    } else if (action === "suspend" || action === "reject") {
-      // Out of the directory and back to the application screens, together.
-      if (profile) tx.update(profileRef, { status: action === "suspend" ? "suspended" : "rejected", updatedAt: now });
-      tx.update(userRef, { verified: false, updatedAt: now });
+  } catch (error) {
+    // The photo was made public for a listing that was then never written —
+    // somebody else decided first, or the account had gone. Take it back
+    // down, unless a listing points at it: one from before, or one written a
+    // moment ago by whoever decided first (two staff approving together would
+    // otherwise have the loser delete the winner's photo).
+    if (publishes && !listedBefore && !(await profileRef.get().then((s) => s.exists, () => true))) {
+      await bucket
+        .file(publicPhotoPath(uid))
+        .delete({ ignoreNotFound: true })
+        .catch((cleanup) => console.error(`reviewProviderApplication: could not remove the photo for ${uid}`, cleanup));
     }
-
-    const notice = applicantNotice(action, message);
-    tx.set(
-      db().collection(NOTIFICATIONS).doc(),
-      notification(uid, notice.title, notice.body, action === "approve" || action === "reinstate" ? "/chats" : "/apply/status"),
-    );
-    tx.set(
-      db().collection(AUDIT_LOGS).doc(),
-      auditEntry(staffUid, `provider_application.${action}`, `${APPLICATIONS}/${uid}`, {
-        from: app.status,
-        to: TO[action],
-        ...(message ? { message } : {}),
-      }),
-    );
-  });
+    throw error;
+  }
 
   // Bookable times come after the listing is live. A failure here leaves an
   // approved provider with an empty calendar, which they can fill themselves

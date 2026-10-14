@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import DescriptionList, { type DescriptionItem } from "../../ui/DescriptionList";
 import Button from "../../ui/Button";
 import { Alert } from "../../ui/Feedback";
@@ -28,7 +27,7 @@ import {
 } from "@/lib/providerApplication";
 import { PAYOUT_NETWORK_LABELS } from "@/lib/payouts";
 import { formatDalasi } from "@/lib/money";
-import { privateFileUrl } from "@/lib/providerApplication-client";
+import { usePrivateFile } from "../usePrivateFile";
 
 function dob(value: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
@@ -60,10 +59,10 @@ function Section({
       }`}
     >
       <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
           <span
             aria-hidden
-            className={`flex h-6 w-6 items-center justify-center rounded-full ${
+            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
               incomplete ? "bg-[var(--accent-soft)] text-[var(--accent-deep)]" : "bg-[var(--sage)] text-white"
             }`}
           >
@@ -74,7 +73,8 @@ function Section({
         </div>
         <Link
           href={`/apply/${id}`}
-          className="flex h-9 items-center rounded-full border border-[var(--border)] px-4 text-[12.5px] font-medium transition-colors hover:bg-[var(--sand)]"
+          aria-label={`Edit ${step?.label ?? "this part"}`}
+          className="flex h-11 shrink-0 items-center rounded-full border border-[var(--border)] px-4 text-[12.5px] font-medium transition-colors hover:bg-[var(--sand)]"
         >
           Edit
         </Link>
@@ -85,20 +85,8 @@ function Section({
 }
 
 function PhotoThumb({ path }: { path: string | null }) {
-  const [shown, setShown] = useState<{ path: string; src: string } | null>(null);
-  useEffect(() => {
-    if (!path) return;
-    let cancelled = false;
-    privateFileUrl(path)
-      .then((src) => {
-        if (!cancelled) setShown({ path, src });
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [path]);
-  const src = path && shown?.path === path ? shown.src : null;
+  const file = usePrivateFile(path);
+  const src = file.status === "ready" ? file.src : null;
   return (
     <span className="arch relative block h-[120px] w-[100px] overflow-hidden rounded-b-2xl bg-[var(--peach)]">
       {src ? (
@@ -182,7 +170,7 @@ export default function ReviewStep({
               <Link
                 key={id}
                 href={`/apply/${id}`}
-                className="rounded-full bg-[var(--surface)] px-3 py-1.5 text-[12.5px] font-medium underline-offset-4 hover:underline"
+                className="inline-flex min-h-11 items-center rounded-full bg-[var(--surface)] px-4 text-[12.5px] font-medium underline-offset-4 hover:underline"
               >
                 {STEPS.find((s) => s.id === id)?.label}
               </Link>

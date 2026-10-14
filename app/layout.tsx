@@ -5,6 +5,8 @@ import { AuthProvider } from "./components/AuthProvider";
 import { ToastProvider } from "./components/ui/Toast";
 import MotionProvider from "./components/MotionProvider";
 import VoiceUnlock from "./components/VoiceUnlock";
+import TrafficBeacon from "./lib/analytics/TrafficBeacon";
+import { getThemeCss, siteMetadata } from "./lib/content/server";
 
 /** Text: a soft geometric sans. */
 const poppins = Poppins({
@@ -25,32 +27,38 @@ const fraunces = Fraunces({
   style: ["normal", "italic"],
 });
 
-export const metadata: Metadata = {
-  // The template brands every page that sets its own title, so page titles
-  // should name the page only ("Pricing", not "Pricing — TALK").
-  title: {
-    default: "TALK — listen, support, heal, grow",
-    template: "%s · TALK",
-  },
-  description:
-    "Private conversations with TALK and qualified providers, in English, Wolof, Mandinka or Pulaar. Culturally rooted mental wellbeing support for The Gambia.",
-  icons: {
-    icon: "/brand/icon.png",
-    shortcut: "/brand/icon.png",
-    apple: "/brand/icon.png",
-  },
-};
+/**
+ * The title and description staff set for the front page (the seo section of
+ * the site content), which every page without its own falls back to. The
+ * template brands every page that sets its own title, so page titles name the
+ * page only ("Pricing", not "Pricing — TALK").
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    ...(await siteMetadata()),
+    icons: {
+      icon: "/brand/icon.png",
+      shortcut: "/brand/icon.png",
+      apple: "/brand/icon.png",
+    },
+  };
+}
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // The published palette, as overrides of the tokens in globals.css. Empty
+  // while it is the original — and only ever validated hex values, built by
+  // themeCss, never a string from the database.
+  const themeCss = await getThemeCss();
   return (
     <html
       lang="en"
       className={`${poppins.variable} ${geistMono.variable} ${fraunces.variable} antialiased`}
     >
+      <head>{themeCss ? <style id="site-theme">{themeCss}</style> : null}</head>
       <body
         className="min-h-screen bg-[var(--background)] text-[var(--foreground)]"
         // Browser extensions (e.g. NewVT, Grammarly, password managers) inject
@@ -64,6 +72,7 @@ export default function RootLayout({
             <ToastProvider>{children}</ToastProvider>
           </AuthProvider>
         </MotionProvider>
+        <TrafficBeacon />
       </body>
     </html>
   );

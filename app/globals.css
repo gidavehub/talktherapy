@@ -20,7 +20,7 @@
   --sage-pale: #DDE5D3;
   --dark: #4A3530;
   --dark-soft: #5B433C;
-  --stage: #2E221E; /* Talk's screen: the brown, deepened, so her particles glow */
+  --stage: #2E221E; /* The TALK screen: the brown, deepened, so her particles glow */
 
   /* Status colours. The terracotta accent cannot carry "confirmed / pending /
      cancelled / escalated" on its own, and a crisis banner must never read as

@@ -29,7 +29,8 @@ import {
   watchJournalEntries,
   watchMoodEntries,
 } from "@/lib/wellbeing";
-import { SEED_RESOURCES } from "@/lib/resources-seed";
+import { loadPublicResources } from "@/lib/content/resources-feed";
+import { resourceCatalogue, suggestResource, type PublicResource } from "@/lib/content/resources";
 import type { JournalEntry, MoodEntry } from "@/lib/models";
 
 /**
@@ -66,6 +67,18 @@ export default function DashboardPage() {
   const { open: openProvider, guardian } = useOpenProvider();
   const [moods, setMoods] = useState<MoodEntry[] | null>(null);
   const [journal, setJournal] = useState<JournalEntry[] | null>(null);
+  // The starter articles until the published ones arrive, so the card never waits.
+  const [resources, setResources] = useState<PublicResource[]>(() => resourceCatalogue(null));
+
+  useEffect(() => {
+    let current = true;
+    void loadPublicResources().then((found) => {
+      if (current) setResources(found);
+    });
+    return () => {
+      current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -85,14 +98,9 @@ export default function DashboardPage() {
   const firstName =
     (profile?.displayName ?? user?.displayName ?? "").split(" ")[0] || null;
 
-  // Suggest a resource matching what they said at intake, falling back to the
-  // first published one rather than showing nothing.
-  const suggested =
-    SEED_RESOURCES.find((r) =>
-      profile?.goals?.some((g) =>
-        r.topics.some((t) => t.includes(g) || g.includes(t.split("-")[0])),
-      ),
-    ) ?? SEED_RESOURCES[0];
+  // Suggest an article on what they told TALK about, falling back to the
+  // newest published one rather than showing nothing.
+  const suggested = suggestResource(resources, intake?.concerns ?? [], profile?.goals ?? []);
 
   return (
     <div className="space-y-8">
@@ -303,15 +311,17 @@ export default function DashboardPage() {
           <span className="arch h-11 w-10 rounded-b-lg bg-[var(--sage)] text-[var(--cream)] flex items-center justify-center">
             <IconResources />
           </span>
-          <h3 className="font-display mt-5 text-[20px] font-medium">{suggested.title}</h3>
+          <h3 className="font-display mt-5 text-[20px] font-medium">
+            {suggested ? suggested.title : "The resource centre"}
+          </h3>
           <p className="mt-2 text-[13px] text-[var(--muted)] leading-relaxed">
-            {suggested.summary}
+            {suggested ? suggested.summary : "Short reads and exercises for the things people carry."}
           </p>
           <Link
-            href={`/resources/${suggested.slug}`}
+            href={suggested ? `/resources/${suggested.slug}` : "/resources"}
             className="mt-4 inline-block text-[13.5px] font-medium text-[var(--accent)] underline-offset-4 hover:underline transition-colors"
           >
-            Read it
+            {suggested ? "Read it" : "Have a look"}
           </Link>
         </Card>
 

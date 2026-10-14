@@ -9,6 +9,7 @@ import AppShell from "../ui/AppShell";
 import LogoLoader from "../ui/LogoLoader";
 import { ADMIN_NAV, PATIENT_NAV, PROVIDER_NAV, PROVIDER_PENDING_NAV } from "../../lib/nav";
 import { useUnreadCount } from "../../lib/useUnread";
+import { useStaffQueues } from "../../lib/useStaffQueues";
 
 /**
  * Gate + chrome for the signed-in app, both sides of it.
@@ -61,6 +62,7 @@ export default function AppGate({ children }: { children: React.ReactNode }) {
   const unread = useUnreadCount();
   const router = useRouter();
   const pathname = usePathname();
+  const queues = useStaffQueues(profile?.role === "admin", pathname);
 
   useEffect(() => {
     if (!ready) return;
@@ -110,7 +112,8 @@ export default function AppGate({ children }: { children: React.ReactNode }) {
     return <Splash label="Opening your application" />;
   }
 
-  // Messages carries the count of what is waiting, on both sides of the app.
+  // Messages carries the count of what is waiting, on both sides of the app;
+  // for staff, so do the queues that wait on them.
   const roleNav = isProvider
     ? profile.verified
       ? PROVIDER_NAV
@@ -118,9 +121,16 @@ export default function AppGate({ children }: { children: React.ReactNode }) {
     : profile.role === "admin"
       ? ADMIN_NAV
       : PATIENT_NAV;
-  const nav = roleNav.map((item) =>
-    item.href === "/chats" && unread > 0 ? { ...item, badge: unread } : item,
-  );
+  const counts: Record<string, number> = {
+    "/chats": unread,
+    "/admin/providers": queues.providers,
+    "/admin/support": queues.support,
+    "/admin/review": queues.review,
+  };
+  const nav = roleNav.map((item) => {
+    const badge = counts[item.href] ?? 0;
+    return badge > 0 ? { ...item, badge } : item;
+  });
 
   // Staff pages are tables and charts; they get the wide column.
   const staffPage = pathname === "/admin" || pathname.startsWith("/admin/");

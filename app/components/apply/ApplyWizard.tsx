@@ -44,34 +44,62 @@ import ReviewStep from "./steps/ReviewStep";
  * Saving is automatic. A change is kept on screen at once and written a
  * moment after they stop typing — or straight away for things that have
  * already happened elsewhere, like a file that has just finished uploading.
- * Moving to another step writes anything still waiting first, so nothing is
+ * Moving to another step sends anything still waiting first, so nothing is
  * lost between steps, and leaving the page with something unsaved asks first.
+ *
+ * How the writes stay right:
+ *  - Every write is sent the moment it is due, never queued behind the one
+ *    before. Firestore applies one browser's writes in the order they were
+ *    sent, and a sent write is already in this tab's copy of the application,
+ *    so the next step opens with it even on a connection that has dropped.
+ *  - A write that is refused does not put its old values back. The sections
+ *    it carried are marked unsaved again, and whatever goes next carries
+ *    their LATEST values — so a retry can never undo a newer change.
  */
 
 type SaveState = "saved" | "waiting" | "saving" | "error";
+
+/** How long moving to another step waits for the server before going anyway. */
+const MOVE_WAIT_MS = 4_000;
+/** How long sending waits for the last changes to land. */
+const SUBMIT_WAIT_MS = 15_000;
+
+/** Resolves with `fallback` if `promise` takes longer than `ms`. */
+function within<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(fallback), ms);
+    void promise.then((value) => {
+      clearTimeout(timer);
+      resolve(value);
+    });
+  });
+}
 
 function sectionsOf(app: ProviderApplication): ApplicationSections {
   const { personal, professional, qualifications, practice, fee, photo, documents, availability, payout, agreements } = app;
   return { personal, professional, qualifications, practice, fee, photo, documents, availability, payout, agreements };
 }
 
-function SaveIndicator({ state, onRetry }: { state: SaveState; onRetry: () => void }) {
+/** Where saving has got to. `compact` is the phone's bottom bar, where it sits between two buttons. */
+function SaveIndicator({ state, onRetry, compact = false }: { state: SaveState; onRetry: () => void; compact?: boolean }) {
   if (state === "error") {
     return (
-      <button type="button" onClick={onRetry} className="text-[12.5px] font-medium text-[var(--danger)] underline underline-offset-4">
-        Not saved — try again
+      <button type="button" onClick={onRetry} className="inline-flex min-h-11 items-center text-[12.5px] font-medium text-[var(--danger)] underline underline-offset-4">
+        {compact ? "Not saved — retry" : "Not saved — try again"}
       </button>
     );
   }
+  const words =
+    state === "saved" ? (compact ? "Saved" : "All changes saved") : state === "saving" ? "Saving…" : compact ? "Saving soon" : "Saving shortly";
   return (
-    <span aria-live="polite" className="inline-flex items-center gap-2 text-[12.5px] text-[var(--muted)]">
+    <span aria-live="polite" className="inline-flex min-w-0 items-center gap-2 text-[12.5px] text-[var(--muted)]">
       <span
         aria-hidden
         className={`h-2 w-2 rounded-full ${
           state === "saved" ? "bg-[var(--sage)]" : state === "saving" ? "animate-pulse bg-[var(--accent)]" : "bg-[var(--peach)]"
         }`}
       />
-      {state === "saved" ? "All changes saved" : state === "saving" ? "Saving…" : "Saving shortly"}
+      <span className="truncate">{words}</span>
     </span>
   );
 }
@@ -85,53 +113,86 @@ function WizardBody({ uid, app, step }: { uid: string; app: ProviderApplication;
   const [stepsOpen, setStepsOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // The step being left, while its changes are sent. Kept by step, so it
+  // means nothing once the next one is open.
+  const [movingFrom, setMovingFrom] = useState<StepId | null>(null);
+  const moving = movingFrom === step;
   const topRef = useRef<HTMLDivElement>(null);
 
-  // What is waiting to be written, the timer that will write it, and the
-  // write in flight — so two writes never race and none is dropped.
-  const pending = useRef<Partial<ApplicationSections>>({});
+  // The application as it now stands (the draft, without waiting for a
+  // render), the sections changed since they were last sent, the timer that
+  // will send them, the writes on their way, and whether the last one was
+  // refused.
+  const latest = useRef<ApplicationSections>(draft);
+  const dirty = useRef<Set<SectionId>>(new Set());
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const inflight = useRef<Promise<boolean> | null>(null);
+  const writes = useRef<Set<Promise<boolean>>>(new Set());
+  const failing = useRef(false);
   const stepRef = useRef(step);
 
   useEffect(() => {
     stepRef.current = step;
   }, [step]);
 
-  async function flush(): Promise<boolean> {
+  /** True once every write sent so far has landed and nothing is left unsent. */
+  async function settled(): Promise<boolean> {
+    let ok = true;
+    while (writes.current.size > 0) {
+      if ((await Promise.all([...writes.current])).includes(false)) ok = false;
+    }
+    return ok && dirty.current.size === 0;
+  }
+
+  /** Send every unsaved section now, with its latest value. */
+  function flush(): Promise<boolean> {
     if (timer.current) {
       clearTimeout(timer.current);
       timer.current = null;
     }
-    while (inflight.current) await inflight.current;
-    const batch = pending.current;
-    if (Object.keys(batch).length === 0) return true;
-    pending.current = {};
-    setSave("saving");
-    const write = saveSections(uid, batch, stepRef.current)
-      .then(() => {
-        setSave(Object.keys(pending.current).length ? "waiting" : "saved");
-        return true;
-      })
-      .catch(() => {
-        // Put it back underneath anything newer, so "try again" sends it.
-        pending.current = { ...batch, ...pending.current };
-        setSave("error");
-        return false;
+    const keys = [...dirty.current];
+    if (keys.length > 0) {
+      dirty.current.clear();
+      const batch = Object.fromEntries(keys.map((key) => [key, latest.current[key]])) as Partial<ApplicationSections>;
+      setSave("saving");
+      const write = saveSections(uid, batch, stepRef.current).then(
+        () => true,
+        () => {
+          // Unsaved again. The next write sends them as they are by then.
+          for (const key of keys) dirty.current.add(key);
+          return false;
+        },
+      );
+      writes.current.add(write);
+      void write.then((ok) => {
+        writes.current.delete(write);
+        if (!ok) failing.current = true;
+        else if (dirty.current.size === 0) failing.current = false;
+        if (failing.current) setSave("error");
+        else if (writes.current.size > 0) setSave("saving");
+        else setSave(dirty.current.size > 0 ? "waiting" : "saved");
       });
-    inflight.current = write;
-    const ok = await write;
-    inflight.current = null;
-    return ok;
+    }
+    return settled();
   }
 
-  function change<K extends SectionId>(key: K, next: ApplicationSections[K], options?: { immediate?: boolean }) {
-    setDraft((d) => ({ ...d, [key]: next }));
-    pending.current = { ...pending.current, [key]: next };
+  /**
+   * A step's change. With `immediate` it is sent at once, and the promise
+   * says whether it landed — so a step can, say, delete an old file only
+   * once nothing points at it any more.
+   */
+  function change<K extends SectionId>(
+    key: K,
+    next: ApplicationSections[K],
+    options?: { immediate?: boolean },
+  ): Promise<boolean> {
+    latest.current = { ...latest.current, [key]: next };
+    setDraft(latest.current);
+    dirty.current.add(key);
     setSave("waiting");
     if (timer.current) clearTimeout(timer.current);
-    if (options?.immediate) void flush();
-    else timer.current = setTimeout(() => void flush(), 800);
+    if (options?.immediate) return flush();
+    timer.current = setTimeout(() => void flush(), 800);
+    return Promise.resolve(true);
   }
 
   // Remember the step they are on, so "continue" brings them back here.
@@ -139,11 +200,11 @@ function WizardBody({ uid, app, step }: { uid: string; app: ProviderApplication;
     void saveLastStep(uid, step).catch(() => {});
   }, [uid, step]);
 
-  // Leaving with something unsaved: write it on the way out, and ask the
-  // browser to hold the page while that happens.
+  // Leaving with something unsaved: send it on the way out, and ask the
+  // browser to hold the page while it goes.
   useEffect(() => {
     const warn = (e: BeforeUnloadEvent) => {
-      if (Object.keys(pending.current).length || inflight.current) {
+      if (dirty.current.size > 0 || writes.current.size > 0) {
         void flush();
         e.preventDefault();
       }
@@ -180,7 +241,17 @@ function WizardBody({ uid, app, step }: { uid: string; app: ProviderApplication;
 
   async function go(to: StepId) {
     setStepsOpen(false);
-    await flush();
+    setMovingFrom(step);
+    // Sent before leaving, so the next step opens with it. Waiting for the
+    // server is only to hear a refusal: on a slow connection the write is
+    // already on its way, and they should not be held here for it.
+    const saved = await within(flush(), MOVE_WAIT_MS, true);
+    if (!saved) {
+      // Refused (the indicator says so, with a way to try again). Staying
+      // keeps the change on screen rather than leaving it behind.
+      setMovingFrom(null);
+      return;
+    }
     router.push(`/apply/${to}`);
   }
 
@@ -196,7 +267,7 @@ function WizardBody({ uid, app, step }: { uid: string; app: ProviderApplication;
   async function submit() {
     setSubmitting(true);
     setSubmitError(null);
-    const saved = await flush();
+    const saved = await within(flush(), SUBMIT_WAIT_MS, false);
     if (!saved) {
       setSubmitError("Your latest changes have not saved yet. Check your connection and try again.");
       setSubmitting(false);
@@ -284,7 +355,7 @@ function WizardBody({ uid, app, step }: { uid: string; app: ProviderApplication;
               <button
                 type="button"
                 onClick={() => setStepsOpen(true)}
-                className="flex h-9 items-center rounded-full border border-[var(--border)] px-4 text-[12.5px] font-medium"
+                className="flex h-11 items-center rounded-full border border-[var(--border)] px-4 text-[12.5px] font-medium"
               >
                 All steps
               </button>
@@ -335,7 +406,11 @@ function WizardBody({ uid, app, step }: { uid: string; app: ProviderApplication;
               <span className="lg:hidden">
                 <SaveIndicator state={save} onRetry={() => void flush()} />
               </span>
-              {next ? <Button onClick={() => void onContinue()}>Save and continue</Button> : null}
+              {next ? (
+                <Button loading={moving} onClick={() => void onContinue()}>
+                  Save and continue
+                </Button>
+              ) : null}
             </div>
           </div>
         </div>
@@ -343,23 +418,25 @@ function WizardBody({ uid, app, step }: { uid: string; app: ProviderApplication;
 
       {/* Phone: the way on is always under the thumb. */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--dark)]/10 bg-[var(--surface)]/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 backdrop-blur md:hidden">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-2">
           {prev ? (
-            <Button variant="ghost" size="sm" onClick={() => void go(prev.id)}>
+            <Button variant="ghost" onClick={() => void go(prev.id)}>
               Back
             </Button>
           ) : (
-            <Button variant="ghost" size="sm" href="/apply">
+            <Button variant="ghost" href="/apply">
               Overview
             </Button>
           )}
-          <SaveIndicator state={save} onRetry={() => void flush()} />
+          <span className="flex min-w-0 flex-1 justify-center">
+            <SaveIndicator state={save} onRetry={() => void flush()} compact />
+          </span>
           {next ? (
-            <Button size="sm" onClick={() => void onContinue()}>
+            <Button loading={moving} onClick={() => void onContinue()}>
               Continue
             </Button>
           ) : (
-            <span className="w-[72px]" />
+            <span aria-hidden className="w-[72px]" />
           )}
         </div>
       </div>

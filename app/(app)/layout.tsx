@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import AppGate from "@/components/app/AppGate";
+import PresenceHeartbeat from "@/lib/analytics/PresenceHeartbeat";
 
 /**
  * Authenticated patient area.
@@ -14,5 +15,11 @@ export const metadata: Metadata = {
 };
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  return <AppGate>{children}</AppGate>;
+  return (
+    <AppGate>
+      {/* "In the app now", for the staff numbers. See usePresence. */}
+      <PresenceHeartbeat />
+      {children}
+    </AppGate>
+  );
 }

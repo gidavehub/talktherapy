@@ -6,19 +6,21 @@ import { motion } from "motion/react";
 import { SPRING_SOFT } from "../motion/primitives";
 import { Badge, EmptyState, Pill } from "../ui/Feedback";
 import Button from "../ui/Button";
+import { ArchPortrait } from "../ui/Arch";
 import { IconResources } from "../ui/icons";
 import {
   RESOURCE_TOPIC_LABELS,
   type Resource,
   type ResourceTopic,
 } from "../../lib/models";
+import type { PublicResource } from "../../lib/content/resources";
 
 /**
  * Resource centre listing.
  *
- * Content is passed in from the server rather than fetched here — it is static
- * seed data today and public Firestore documents later, and in both cases the
- * list should render without waiting on the client.
+ * Content is passed in from the server rather than fetched here — the
+ * published articles and the starter set (getResources in
+ * lib/content/server), so the list renders without waiting on the client.
  */
 
 const FORMAT_LABELS: Record<Resource["format"], string> = {
@@ -32,8 +34,8 @@ export default function ResourceLibrary({
   resources,
 }: {
   resources: Pick<
-    Resource,
-    "id" | "slug" | "title" | "summary" | "format" | "topics" | "readingMinutes"
+    PublicResource,
+    "id" | "slug" | "title" | "summary" | "format" | "topics" | "readingMinutes" | "cover"
   >[];
 }) {
   const [topic, setTopic] = useState<ResourceTopic | null>(null);
@@ -84,6 +86,19 @@ export default function ResourceLibrary({
             whileHover={{ y: -4 }}
             className="relative rounded-[28px] bg-[var(--surface)] shadow-[0_18px_40px_-22px_rgba(74,53,48,0.25)] p-6 flex flex-col"
           >
+            {resource.cover.src ? (
+              // The pictures that ship with the site are cut-outs that stand
+              // in the arch; an uploaded photo fills it.
+              <ArchPortrait
+                src={resource.cover.src}
+                alt={resource.cover.alt}
+                tone="var(--sage-soft)"
+                cutout={resource.cover.src.startsWith("/people/")}
+                aspect={4 / 3}
+                sizes="(min-width: 1024px) 360px, (min-width: 768px) 45vw, 90vw"
+                className="mb-6 aspect-[16/10] w-full"
+              />
+            ) : null}
             <div className="flex items-center gap-2">
               <Badge tone={resource.format === "exercise" ? "accent" : "neutral"}>
                 {FORMAT_LABELS[resource.format]}

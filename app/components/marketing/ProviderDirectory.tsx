@@ -20,6 +20,7 @@ import {
   type DirectoryFilters,
   type Specialization,
 } from "../../lib/providers";
+import type { ContentOf } from "../../lib/content/schema";
 
 /**
  * The provider directory — the redesign's providers page: "Find someone who
@@ -30,6 +31,9 @@ import {
  * Browsable signed-out on purpose: making someone create an account before
  * they can see whether anyone here speaks Wolof is exactly the kind of friction
  * the platform exists to remove.
+ *
+ * The top band's words are the site content's (providers.intro); the filters,
+ * cards and empty states are the directory's own, in code.
  */
 
 const LANGUAGES: Locale[] = ["en", "wo", "mnk", "ff"];
@@ -126,7 +130,7 @@ function toggleIn<T>(list: T[], value: T): T[] {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 }
 
-export default function ProviderDirectory() {
+export default function ProviderDirectory({ intro }: { intro: ContentOf<"providers">["intro"] }) {
   const [profiles, setProfiles] = useState<ProviderProfile[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<DirectoryFilters>(EMPTY_FILTERS);
@@ -214,11 +218,7 @@ export default function ProviderDirectory() {
 
   return (
     <>
-      <PageIntro
-        eyebrow="Our providers"
-        lines={["Find someone who", "understands you."]}
-        lede="Browse qualified providers by language, specialty and who you feel most comfortable with."
-      >
+      <PageIntro eyebrow={intro.eyebrow} lines={intro.lines} lede={intro.lede}>
         <form
           role="search"
           onSubmit={(e) => {
@@ -232,7 +232,7 @@ export default function ProviderDirectory() {
             type="search"
             value={query}
             onChange={(e) => search(e.target.value)}
-            placeholder="Search by name, specialty or language"
+            placeholder={intro.searchPlaceholder}
             aria-label="Search providers"
             className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-[var(--muted)]"
           />

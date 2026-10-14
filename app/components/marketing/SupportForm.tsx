@@ -55,8 +55,10 @@ export default function SupportForm() {
       }
 
       await addDoc(collection(firestore(), COLLECTIONS.supportRequests), {
-        name: name.trim(),
-        email: email.trim(),
+        // What the fields show: a signed-in sender's own name and email
+        // fill them until edited, and those are what staff need to reply.
+        name: (name || profile?.displayName || "").trim(),
+        email: (email || user?.email || "").trim(),
         topic,
         message: message.trim(),
         userId: user?.uid ?? null,

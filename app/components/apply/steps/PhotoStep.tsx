@@ -3,36 +3,40 @@
 import { useEffect, useRef, useState } from "react";
 import ImageUploader from "../../ui/ImageUploader";
 import { IconCheck, IconClose } from "../../ui/icons";
-import { deleteStoredFile, privateFileUrl, uploadApplicationPhoto } from "@/lib/providerApplication-client";
+import { deleteStoredFile, uploadApplicationPhoto } from "@/lib/providerApplication-client";
+import { usePrivateFile } from "../usePrivateFile";
+import { DOC_MAX_BYTES } from "@/lib/providerApplication";
 import type { StepProps } from "./types";
 
 const DO = ["Your face, looking at the camera", "Eyes open, a natural expression", "Good light — face a window", "A plain wall behind you"];
 const DONT = ["Sunglasses, filters or stickers", "Group photos or cropped friends", "Logos, text or certificates", "Somebody else's photo"];
 
 export default function PhotoStep({ uid, value, onChange, problems }: StepProps<"photo">) {
-  // What is on screen. For a photo already saved it is fetched through the
-  // Storage rules as a local blob, never a shareable link.
-  const [preview, setPreview] = useState<{ path: string; src: string } | null>(null);
-  const [loadFailed, setLoadFailed] = useState(false);
-  const uploaded = useRef<string | null>(null);
+  // A photo just chosen is shown from the file on this device; one saved
+  // before is fetched through the Storage rules. Either way a local object
+  // URL, revoked as soon as it is off screen.
+  const [local, setLocal] = useState<{ path: string; src: string } | null>(null);
+  const showingLocal = local !== null && local.path === value.path;
+  const saved = usePrivateFile(value.path, !showingLocal);
+  // The file that has just finished uploading, between the upload and the
+  // uploader handing it back.
+  const landed = useRef<{ path: string; file: File } | null>(null);
 
   useEffect(() => {
-    const path = value.path;
-    if (!path || preview?.path === path) return;
-    let cancelled = false;
-    privateFileUrl(path)
-      .then((src) => {
-        if (!cancelled) setPreview({ path, src });
-      })
-      .catch(() => {
-        if (!cancelled) setLoadFailed(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [value.path, preview?.path]);
+    if (!local) return;
+    const src = local.src;
+    return () => URL.revokeObjectURL(src);
+  }, [local]);
 
-  const shown = value.path && preview?.path === value.path ? { src: preview.src, alt: "" } : null;
+  const shown = showingLocal ? { src: local.src, alt: "" } : saved.status === "ready" ? { src: saved.src, alt: "" } : null;
+
+  /** Point the application at `next`, and only once it does, delete the photo it replaced. */
+  function keep(next: string | null) {
+    const old = value.path;
+    void onChange({ path: next }, { immediate: true }).then((ok) => {
+      if (ok && old && old !== next) void deleteStoredFile(old).catch(() => {});
+    });
+  }
 
   return (
     <div className="grid grid-cols-1 gap-8 md:grid-cols-[minmax(0,280px)_1fr]">
@@ -42,30 +46,35 @@ export default function PhotoStep({ uid, value, onChange, problems }: StepProps<
         tone="var(--peach)"
         describe={false}
         dropLabel="Add your photo"
-        maxBytes={10 * 1024 * 1024}
+        maxBytes={DOC_MAX_BYTES}
         value={shown}
         onUpload={async (file, onProgress) => {
           const path = await uploadApplicationPhoto(uid, file, onProgress);
-          uploaded.current = path;
-          return { src: URL.createObjectURL(file) };
+          landed.current = { path, file };
+          return { src: path };
         }}
         onChange={(next) => {
-          if (next && uploaded.current) {
-            setPreview({ path: uploaded.current, src: next.src });
-            setLoadFailed(false);
-            onChange({ path: uploaded.current }, { immediate: true });
-          } else if (!next) {
-            const old = value.path;
-            setPreview(null);
-            onChange({ path: null }, { immediate: true });
-            if (old) void deleteStoredFile(old);
+          if (next) {
+            const up = landed.current;
+            if (!up || up.path !== next.src) return;
+            landed.current = null;
+            setLocal({ path: up.path, src: URL.createObjectURL(up.file) });
+            keep(up.path);
+          } else {
+            setLocal(null);
+            keep(null);
           }
         }}
         hint="JPG, PNG or WebP. We resize it for you."
       />
 
       <div className="space-y-6">
-        {loadFailed && value.path && !shown ? (
+        {saved.status === "loading" ? (
+          <p aria-live="polite" className="text-[13px] text-[var(--muted)]">
+            Loading your saved photo…
+          </p>
+        ) : null}
+        {saved.status === "failed" ? (
           <p className="rounded-2xl bg-[var(--warning-soft)] px-4 py-3 text-[13px] text-[var(--warning)]">
             Your saved photo could not be shown just now. It is still saved — reload to try again.
           </p>

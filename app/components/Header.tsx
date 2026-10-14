@@ -8,6 +8,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { SPRING_SOFT, SPRING_SNAP } from "./motion/primitives";
 import { useAuth } from "./AuthProvider";
 import Logo from "./Logo";
+import type { HeaderContent } from "../lib/content/schema";
 
 /**
  * Public site header: the TALK mark, four links with a terracotta underline on
@@ -21,29 +22,28 @@ import Logo from "./Logo";
  *
  * The menu carries the rest of the site and the urgent-help link — always
  * one tap away. On a phone it is also where the four links go.
+ *
+ * The words are the site content's (the header section); the layout pairs
+ * each label with its route on the server, so this file never loads the
+ * content schema into the browser. The urgent-help link stays in code.
  */
 
-const PRIMARY_LINKS = [
-  { href: "/providers", label: "Providers" },
-  { href: "/how-it-works", label: "How it works" },
-  { href: "/plans", label: "Pricing" },
-  { href: "/support", label: "Support" },
-];
+export type NavLink = { href: string; label: string };
 
-const SECONDARY_LINKS = [
-  { href: "/resources", label: "Resources" },
-  { href: "/about", label: "About" },
-  { href: "/safety", label: "Safety & ethics" },
-  { href: "/for-providers", label: "For providers" },
-  { href: "/for-institutions", label: "For institutions" },
-  { href: "/community", label: "Community" },
-];
+type HeaderNav = {
+  /** Along the top on a computer, and large in the menu. */
+  primary: NavLink[];
+  /** Under "More" in the menu. */
+  more: NavLink[];
+  actions: HeaderContent["actions"];
+};
 
 function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export default function Header() {
+export default function Header({ nav }: { nav: HeaderNav }) {
+  const { primary, more, actions } = nav;
   const [open, setOpen] = useState(false);
   const { user, ready } = useAuth();
   const pathname = usePathname();
@@ -80,7 +80,7 @@ export default function Header() {
       }}
       className="inline-flex h-11 items-center rounded-full bg-[var(--accent)] px-6 text-[14px] font-medium text-white shadow-[var(--shadow-accent)] transition-colors hover:bg-[var(--accent-deep)]"
     >
-      {user ? "Your dashboard" : "Begin with TALK"}
+      {user ? actions.dashboard : actions.begin}
     </Link>
   );
 
@@ -106,7 +106,7 @@ export default function Header() {
           </Link>
 
           <nav aria-label="Main" className="hidden items-center gap-9 lg:flex">
-            {PRIMARY_LINKS.map((link) => {
+            {primary.map((link) => {
               const active = isActive(pathname, link.href);
               return (
                 <Link
@@ -139,7 +139,7 @@ export default function Header() {
               }}
               className="hidden text-[14.5px] font-medium text-[var(--foreground)] hover:text-[var(--accent)] sm:inline"
             >
-              {user ? "Dashboard" : "Sign in"}
+              {user ? actions.dashboardShort : actions.signIn}
             </Link>
             <div className="hidden sm:block">{begin}</div>
             <motion.button
@@ -198,7 +198,7 @@ export default function Header() {
                 className="mt-10 grid flex-1 grid-cols-1 gap-10 md:grid-cols-[1.2fr_1fr] md:gap-16"
               >
                 <div className="flex flex-col gap-1">
-                  {PRIMARY_LINKS.map((link) => (
+                  {primary.map((link) => (
                     <motion.div
                       key={link.href}
                       variants={{ hidden: { x: -24, opacity: 0 }, show: { x: 0, opacity: 1, transition: SPRING_SOFT } }}
@@ -216,8 +216,8 @@ export default function Header() {
                   ))}
                 </div>
                 <div className="flex flex-col gap-3 md:pt-3">
-                  <p className="eyebrow mb-1">More</p>
-                  {SECONDARY_LINKS.map((link) => (
+                  <p className="eyebrow mb-1">{actions.moreHeading}</p>
+                  {more.map((link) => (
                     <motion.div
                       key={link.href}
                       variants={{ hidden: { x: -16, opacity: 0 }, show: { x: 0, opacity: 1, transition: SPRING_SOFT } }}
@@ -245,7 +245,7 @@ export default function Header() {
                     }}
                     className="text-[15px] font-medium"
                   >
-                    Sign in
+                    {actions.signIn}
                   </Link>
                 )}
                 {/* Always one tap away, from every page, signed in or not. */}

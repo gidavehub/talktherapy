@@ -6,46 +6,24 @@ import { Section, FAQ } from "@/components/marketing/Sections";
 import SupportForm from "@/components/marketing/SupportForm";
 import { SectionHeading } from "@/components/ui/Typography";
 import { Alert, Spinner } from "@/components/ui/Feedback";
+import { getContent, pageMetadata } from "@/lib/content/server";
 
-export const metadata: Metadata = {
-  title: "Support",
-  description:
-    "Get in touch with the TALK team — questions about your account, bookings, joining as a provider, or funding sessions for your organisation.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return pageMetadata("support");
+}
 
-const FAQS = [
-  {
-    q: "How quickly will you reply?",
-    a: "We aim to reply within two working days. This inbox is not monitored around the clock, so please do not use it for anything urgent.",
-  },
-  {
-    q: "I want to report a provider or a session.",
-    a: "Choose 'Reporting a concern' above and tell us what happened. Reports are reviewed by an administrator, and a provider can be suspended from the directory while we investigate.",
-  },
-  {
-    q: "I need to delete my account and my data.",
-    a: "You can do this yourself from Settings once signed in — it removes your profile, journal entries and mood history. If you are having trouble, write to us and we will handle it.",
-  },
-  {
-    q: "Can I get support in Wolof, Mandinka or Pulaar?",
-    a: "Yes. TALK speaks all three, as well as English, and you can filter the provider directory by language to find providers who work in them. Write to us in whichever is easiest, and we will do our best to reply in it.",
-  },
-];
-
-export default function SupportPage() {
+// The form and the emergency notice beside it stay in code; the words around
+// them are the site content.
+export default async function SupportPage() {
+  const { intro, form, also, faq } = await getContent("support");
   return (
     <>
-      <PageIntro
-        eyebrow="Support"
-        lines={["Ask us anything."]}
-        lede="Questions about your account, a booking, joining as a provider, or bringing TALK to your organisation — this reaches a person."
-        stamp="HELP"
-      />
+      <PageIntro {...intro} stamp="HELP" />
 
       <Section tone="surface">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-12 lg:gap-20 items-start">
           <div>
-            <SectionHeading eyebrow="Get in touch" lines={["Send us a message."]} />
+            <SectionHeading eyebrow={form.eyebrow} lines={form.lines} />
             <div className="mt-10">
               <Suspense
                 fallback={
@@ -71,41 +49,30 @@ export default function SupportPage() {
               .
             </Alert>
 
-            <div className="rounded-[28px] bg-[var(--background)] p-6">
-              <p className="eyebrow">
-                You might also want
-              </p>
-              <ul className="mt-5 space-y-3 text-[14px]">
-                <li>
-                  <Link href="/how-it-works" className="underline underline-offset-4 hover:text-[var(--accent)] transition-colors">
-                    How TALK works
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/plans" className="underline underline-offset-4 hover:text-[var(--accent)] transition-colors">
-                    Pricing
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/for-providers" className="underline underline-offset-4 hover:text-[var(--accent)] transition-colors">
-                    Joining as a provider
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/privacy" className="underline underline-offset-4 hover:text-[var(--accent)] transition-colors">
-                    How we handle your data
-                  </Link>
-                </li>
-              </ul>
-            </div>
+            {also.links.length > 0 ? (
+              <div className="rounded-[28px] bg-[var(--background)] p-6">
+                <p className="eyebrow">
+                  {also.eyebrow}
+                </p>
+                <ul className="mt-5 space-y-3 text-[14px]">
+                  {also.links.map((link, i) => (
+                    <li key={i}>
+                      <Link href={link.href} className="underline underline-offset-4 hover:text-[var(--accent)] transition-colors">
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </aside>
         </div>
       </Section>
 
       <Section>
-        <SectionHeading eyebrow="Before you write" lines={["Quick answers."]} />
+        <SectionHeading eyebrow={faq.eyebrow} lines={faq.lines} />
         <div className="mt-12">
-          <FAQ items={FAQS} />
+          <FAQ items={faq.items} />
         </div>
       </Section>
     </>

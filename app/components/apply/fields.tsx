@@ -172,7 +172,7 @@ export function ToggleChips<T extends string>({
               aria-pressed={on}
               disabled={blocked}
               onClick={() => onChange(on ? value.filter((v) => v !== option.value) : [...value, option.value])}
-              className={`inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] px-4 text-[13px] transition-colors outline-none focus-visible:ring-4 focus-visible:ring-[var(--accent)]/15 disabled:opacity-40 ${
+              className={`inline-flex h-11 items-center gap-2 rounded-full border-[1.5px] px-4 text-[13px] transition-colors outline-none focus-visible:ring-4 focus-visible:ring-[var(--accent)]/15 disabled:opacity-40 ${
                 on
                   ? "border-[var(--accent)] bg-[var(--accent)] text-white"
                   : "border-[var(--dark)]/25 bg-transparent hover:bg-[var(--sand)]"

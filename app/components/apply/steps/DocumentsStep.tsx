@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import FileDropzone, { formatBytes } from "../../ui/FileDropzone";
 import { Dropdown } from "../../ui/Dropdown";
 import { ProgressBar } from "../../ui/Stepper";
 import { IconCheck, IconClose, IconFile, IconTrash } from "../../ui/icons";
 import { SPRING_SOFT } from "../../motion/primitives";
-import { deleteStoredFile, privateFileUrl, uploadDocument } from "@/lib/providerApplication-client";
+import { deleteStoredFile, newId, openPrivateFile, uploadDocument } from "@/lib/providerApplication-client";
 import {
   DOC_ACCEPT,
   DOC_MAX_BYTES,
@@ -51,56 +51,59 @@ export default function DocumentsStep({ uid, value, onChange, problems }: StepPr
   const [notice, setNotice] = useState<string | null>(null);
   const room = MAX_DOCUMENTS - value.length - uploading.filter((u) => !u.failed).length;
 
-  // Finished uploads are added to whatever the list is BY THEN — a type
-  // changed or a file removed while they were uploading must not be undone.
+  // The list as it now stands. Every change starts from this, not from the
+  // last render: two uploads finishing together, or a file removed while
+  // another was still going up, must each land on top of the other. This
+  // step is the only thing that changes the list, so after the first render
+  // it is only ever updated here, never copied back from a render that may
+  // already be behind it.
   const latest = useRef(value);
-  useEffect(() => {
-    latest.current = value;
-  }, [value]);
 
-  async function take(files: File[]) {
+  function commit(next: ApplicationDocument[]): Promise<boolean> {
+    latest.current = next;
+    return onChange(next, { immediate: true });
+  }
+
+  function take(files: File[]) {
     setNotice(null);
     const accepted = files.slice(0, Math.max(0, room));
     if (files.length > accepted.length) setNotice(`Only ${MAX_DOCUMENTS} documents fit — some were left out.`);
-    const docs: ApplicationDocument[] = [];
-    await Promise.all(
-      accepted.map(async (file, i) => {
-        const key = `${file.name}-${file.size}-${i}`;
-        setUploading((list) => [...list, { key, name: file.name, progress: 0, failed: false }]);
-        try {
-          const doc = await uploadDocument(uid, file, nextType, (progress) =>
-            setUploading((list) => list.map((u) => (u.key === key ? { ...u, progress } : u))),
-          );
-          docs.push(doc);
-          setUploading((list) => list.filter((u) => u.key !== key));
-        } catch {
-          setUploading((list) => list.map((u) => (u.key === key ? { ...u, failed: true } : u)));
-        }
-      }),
-    );
-    if (docs.length) onChange([...latest.current, ...docs], { immediate: true });
+    const type = nextType;
     setType(null);
+    for (const file of accepted) {
+      const key = newId("u");
+      setUploading((list) => [...list, { key, name: file.name, progress: 0, failed: false }]);
+      // Each file is saved the moment it arrives, so one slow upload never
+      // holds the others back — or loses them if they leave this step.
+      uploadDocument(uid, file, type, (progress) =>
+        setUploading((list) => list.map((u) => (u.key === key ? { ...u, progress } : u))),
+      ).then(
+        (doc) => {
+          setUploading((list) => list.filter((u) => u.key !== key));
+          void commit([...latest.current, doc]);
+        },
+        () => setUploading((list) => list.map((u) => (u.key === key ? { ...u, failed: true } : u))),
+      );
+    }
   }
 
   function remove(doc: ApplicationDocument) {
-    onChange(
-      value.filter((d) => d.id !== doc.id),
-      { immediate: true },
-    );
-    void deleteStoredFile(doc.path);
+    // The file goes only once the application no longer lists it: a list
+    // pointing at a deleted file would stop it being sent.
+    void commit(latest.current.filter((d) => d.id !== doc.id)).then((ok) => {
+      if (ok) void deleteStoredFile(doc.path).catch(() => {});
+    });
+  }
+
+  function retype(doc: ApplicationDocument, type: DocType) {
+    void commit(latest.current.map((d) => (d.id === doc.id ? { ...d, type } : d)));
   }
 
   async function open(doc: ApplicationDocument) {
     setOpening(doc.id);
-    // Opened first, filled in after: a window opened once the file has
-    // downloaded is no longer "in response to a tap" and gets blocked.
-    const tab = window.open("", "_blank");
     try {
-      const url = await privateFileUrl(doc.path);
-      if (tab) tab.location.href = url;
-      else window.location.assign(url);
+      await openPrivateFile(doc.path);
     } catch {
-      tab?.close();
       setNotice("That document could not be opened. Check your connection and try again.");
     } finally {
       setOpening(null);
@@ -133,7 +136,7 @@ export default function DocumentsStep({ uid, value, onChange, problems }: StepPr
             accept={DOC_ACCEPT}
             maxBytes={DOC_MAX_BYTES}
             multiple
-            onFiles={(files) => void take(files)}
+            onFiles={take}
             onReject={(errors) => setNotice(errors.join(" "))}
             label={`Add your ${DOC_TYPE_LABELS[nextType].toLowerCase()}`}
             hint="PDF, JPG, PNG or WebP, up to 10 MB each. A clear photo from your phone is fine."
@@ -169,7 +172,7 @@ export default function DocumentsStep({ uid, value, onChange, problems }: StepPr
                 {u.failed ? (
                   <button
                     type="button"
-                    className="text-[12.5px] text-[var(--danger)] underline"
+                    className="min-h-11 shrink-0 text-[12.5px] text-[var(--danger)] underline"
                     onClick={() => setUploading((list) => list.filter((x) => x.key !== u.key))}
                   >
                     Did not upload — dismiss
@@ -199,21 +202,21 @@ export default function DocumentsStep({ uid, value, onChange, problems }: StepPr
                     <span className="block text-[12px] text-[var(--muted)]">{formatBytes(doc.bytes)}</span>
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 items-center gap-1.5">
                   <Dropdown<DocType>
-                    label="Type"
+                    label={`What ${doc.name} is`}
                     hideLabel
                     size="sm"
                     value={doc.type}
-                    onChange={(t) => onChange(value.map((d) => (d.id === doc.id ? { ...d, type: t } : d)), { immediate: true })}
+                    onChange={(t) => retype(doc, t)}
                     options={TYPE_OPTIONS}
-                    className="w-[200px]"
+                    className="min-w-0 flex-1 sm:w-[200px] sm:flex-none"
                   />
                   <button
                     type="button"
                     onClick={() => void open(doc)}
                     disabled={opening === doc.id}
-                    className="h-10 rounded-full px-4 text-[13px] font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--sand)] disabled:opacity-50"
+                    className="h-11 shrink-0 rounded-full px-3.5 text-[13px] font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--sand)] disabled:opacity-50"
                   >
                     {opening === doc.id ? "Opening…" : "View"}
                   </button>
@@ -221,7 +224,7 @@ export default function DocumentsStep({ uid, value, onChange, problems }: StepPr
                     type="button"
                     onClick={() => remove(doc)}
                     aria-label={`Remove ${doc.name}`}
-                    className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--muted)] transition-colors hover:bg-[var(--sand)] hover:text-[var(--danger)]"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[var(--muted)] transition-colors hover:bg-[var(--sand)] hover:text-[var(--danger)]"
                   >
                     <IconTrash size={16} />
                   </button>

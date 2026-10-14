@@ -370,3 +370,11 @@ export const IconHistory = (p: IconProps) => (
     <path d="M12 8v4l2.8 1.8" />
   </Svg>
 );
+
+/** Notifications: something the app has to tell you. */
+export const IconBell = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z" />
+    <path d="M10 20.5a2.2 2.2 0 0 0 4 0" />
+  </Svg>
+);

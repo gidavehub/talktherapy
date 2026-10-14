@@ -66,13 +66,23 @@ service firebase.storage {
     // the application. Both read with getBlob(), which these rules govern —
     // never a download URL, which is a capability anyone it is forwarded to
     // could use. PDF and the three image types a reviewer's browser can
-    // show, at most 10 MB: DOC_ACCEPT and DOC_MAX_BYTES in
-    // app/lib/providerApplication.ts say the same.
+    // show, at most 10 MB (10,000,000 bytes, as a phone counts them):
+    // DOC_ACCEPT and DOC_MAX_BYTES in app/lib/providerApplication.ts say the
+    // same.
+    //
+    // Created, never overwritten. Every upload gets a new name, so a document
+    // a reviewer has checked cannot be swapped for another under the same
+    // name afterwards. Deleting stays the owner's (taking a file off a draft
+    // is ordinary, and these rules cannot see whether the application has
+    // been sent); a document deleted after sending simply will not open for
+    // the reviewer, who asks for it again.
     match /provider-credentials/{uid}/{fileName} {
       allow read: if isOwner(uid) || isStaff();
-      allow create, update: if isOwner(uid)
-        && underMB(10)
+      allow create: if isOwner(uid)
+        && request.resource.size > 0
+        && request.resource.size <= 10000000
         && request.resource.contentType.matches('application/pdf|image/jpeg|image/png|image/webp');
+      allow update: if false;
       allow delete: if isOwner(uid);
     }
 
@@ -90,8 +100,29 @@ service firebase.storage {
       allow delete: if isOwner(uid);
     }
 
-    // ==== SITE MEDIA (track: content) ====
-    // ==== END SITE MEDIA ====
+    // ------------------------------------------------------------ site media
+    // Pictures staff upload for the public site (app/lib/content). Public,
+    // like the pages that show them, and served by a plain address with no
+    // download token. Only staff add them: one of the four image types a
+    // browser shows well — never SVG, which can carry script — at most 8 MB
+    // (MEDIA_MAX_BYTES in app/lib/content/schema.ts), under a new name each
+    // time and never overwritten, so an address on the live site always
+    // shows the picture it was published with. The registerSiteMedia
+    // function checks the finished file again before the library lists it.
+    match /site-media/{fileName} {
+      // Any one picture, by its address. Listing the folder is for staff:
+      // the library is siteMedia in Firestore.
+      allow get: if true;
+      allow list: if isStaff();
+      // Create only: an existing name is an update, and that is refused.
+      allow create: if isStaff()
+        && fileName.matches('[A-Za-z0-9_-]{6,64}[.](jpg|jpeg|png|webp|avif)')
+        && request.resource.contentType.matches('image/(jpeg|png|webp|avif)')
+        && request.resource.size > 0
+        && request.resource.size <= 8 * 1024 * 1024;
+      allow update: if false;
+      allow delete: if isStaff();
+    }
 
     // ------------------------------------------------------ session artefacts
     // Files exchanged inside a consultation. Deliberately NOT readable by path

@@ -37,10 +37,10 @@ import type { ChartTableData } from "./ChartCard";
  * Every bar is one colour: colouring bars darker-where-bigger would spend the
  * only free channel saying what the length already says.
  *
- * Small-cell suppression: a row marked `suppressed` is a group under ten
- * people. It draws as a hatched placeholder up to the threshold, labelled
- * "<10", and its value is never shown, because a precise small count can be
- * enough to identify somebody.
+ * Small-cell suppression: a row marked `suppressed` is a group under the
+ * threshold (five people). It draws as a hatched placeholder up to the
+ * threshold, labelled "<5", and its value is never shown, because a precise
+ * small count can be enough to identify somebody.
  *
  * Marks: bars at most 24px thick (16px horizontal), 4px rounded at the data
  * end and square on the baseline. Each bar's hover and focus target is its
@@ -89,6 +89,7 @@ export default function BarChart({
   valueFormat = formatValue,
   height = 240,
   label = "Bar chart",
+  shareOf,
 }: {
   data: BarDatum[];
   orientation?: "horizontal" | "vertical";
@@ -99,6 +100,14 @@ export default function BarChart({
   height?: number;
   /** What the chart shows, for screen readers. */
   label?: string;
+  /**
+   * What each bar's share is a share of. Left out, the bars are the parts of
+   * one whole and it is their shown total. Give the real total and what it
+   * counts when the bars are not parts of it — answers where somebody could
+   * pick several ("37% of people") — or null where a share means nothing,
+   * as for the same people counted day after day.
+   */
+  shareOf?: { total: number; label: string } | null;
 }) {
   const { ref, node, width } = useContainerWidth<HTMLDivElement>();
   const [active, setActive] = useState<number | null>(null);
@@ -108,6 +117,9 @@ export default function BarChart({
 
   const shown = data.filter((d) => !d.suppressed);
   const total = shown.reduce((sum, d) => sum + d.value, 0);
+  const whole = shareOf === undefined ? { total, label: "total" } : shareOf;
+  const shareText = (value: number) =>
+    whole && whole.total ? `${formatShare(value / whole.total)} of ${whole.label}` : null;
   const anySuppressed = shown.length < data.length;
   // A suppressed bar is drawn up to the threshold, so the scale must reach it.
   const max = Math.max(0, ...shown.map((d) => d.value), anySuppressed ? SUPPRESSION_THRESHOLD : 0);
@@ -116,9 +128,9 @@ export default function BarChart({
 
   function ariaFor(i: number) {
     const d = data[i];
-    return d.suppressed
-      ? `${d.label}: fewer than ${SUPPRESSION_THRESHOLD}, hidden to protect privacy`
-      : `${d.label}: ${valueText[i]}${total ? `, ${formatShare(d.value / total)} of the total` : ""}`;
+    if (d.suppressed) return `${d.label}: fewer than ${SUPPRESSION_THRESHOLD}, hidden to protect privacy`;
+    const share = shareText(d.value);
+    return `${d.label}: ${valueText[i]}${share ? `, ${share}` : ""}`;
   }
 
   function tooltipRows(i: number): TooltipRow[] {
@@ -135,7 +147,7 @@ export default function BarChart({
     return [
       {
         value: valueText[i],
-        label: total ? `${formatShare(d.value / total)} of total` : undefined,
+        label: shareText(d.value) ?? undefined,
         color,
         key: "square",
       },

@@ -6,7 +6,7 @@ import { UtteranceCapture } from "../audio/capture";
 import { StreamPlayer } from "../audio/player";
 import type { AudioFeed } from "../audio/analysis";
 import type { BlobState } from "../../components/voice/TalkBlob";
-import { EMPTY_INTAKE, missingFields, type Intake } from "../matching";
+import { EMPTY_INTAKE, missingFields, type Intake, type Specialization } from "../matching";
 import {
   FOLD_TURNS,
   LANGUAGE_ALIASES,
@@ -116,6 +116,12 @@ export function useConversation({
   const [lines, setLines] = useState<Line[]>([]);
   /** Highest risk seen this session. Sticky: help stays on screen once needed. */
   const [risk, setRisk] = useState<Risk>("none");
+  /**
+   * What this conversation has been about so far, as TALK tagged its turns
+   * from the fixed list of concerns (companion mode only). For the staff
+   * numbers; begins empty with each conversation.
+   */
+  const [topics, setTopics] = useState<readonly Specialization[]>([]);
   const [heardLanguage, setLanguage] = useState<Language | null>(null);
   const [error, setError] = useState<ConversationError | null>(null);
   const [talkFeed, setTalkFeed] = useState<AudioFeed | null>(null);
@@ -395,6 +401,10 @@ export function useConversation({
             // answered something she misunderstood.
             setLines((prev) => [...prev, ...heard, ...(setAside ? [] : said)]);
             setRisk((prev) => (RISK_RANK[ev.risk] > RISK_RANK[prev] ? ev.risk : prev));
+            if (ev.topics?.length) {
+              const heardTopics = ev.topics;
+              setTopics((prev) => [...new Set([...prev, ...heardTopics])]);
+            }
 
             if (ev.intake) {
               intakeRef.current = ev.intake;
@@ -639,6 +649,7 @@ export function useConversation({
     doneRef.current = false;
     startedAtRef.current = Date.now();
     setStartedAt(startedAtRef.current);
+    setTopics([]);
     consentedRef.current = false;
     // Resume from whatever is known: the saved intake, or this session's.
     intakeRef.current = opts.current.intake;
@@ -823,6 +834,7 @@ export function useConversation({
     feed,
     lines,
     risk,
+    topics,
     language,
     intake,
     error,

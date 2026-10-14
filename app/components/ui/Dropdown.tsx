@@ -435,9 +435,11 @@ const FIELD_SIZES = {
   md: "h-12 px-4 text-[14px]",
 };
 
+// A pill looks 36 or 40px tall, but an invisible band above and below makes
+// the part a finger can hit 44px, the smallest comfortable tap target.
 const PILL_SIZES = {
-  sm: "h-9 px-3.5 text-[13px]",
-  md: "h-10 px-4 text-[13.5px]",
+  sm: "relative h-9 px-3.5 text-[13px] after:absolute after:inset-x-0 after:-inset-y-1 after:content-['']",
+  md: "relative h-10 px-4 text-[13.5px] after:absolute after:inset-x-0 after:-inset-y-0.5 after:content-['']",
 };
 
 function CheckCircle({ on }: { on: boolean }) {

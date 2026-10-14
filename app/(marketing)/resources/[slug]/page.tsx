@@ -2,18 +2,26 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import ResourceBody from "@/components/marketing/ResourceBody";
+import { ArchPortrait } from "@/components/ui/Arch";
 import { Badge, Alert } from "@/components/ui/Feedback";
 import Button from "@/components/ui/Button";
 import { RESOURCE_TOPIC_LABELS } from "@/lib/models";
-import { SEED_RESOURCES, findSeedResource } from "@/lib/resources-seed";
+import { getResource, getResources } from "@/lib/content/server";
 
 /**
- * Static generation: the seed set is known at build time, so every resource
- * prerenders. Once Firestore-backed resources exist this gains a
- * `dynamicParams` fallback rather than losing the static path.
+ * One article from the resource centre.
+ *
+ * Every article published when the site is built is drawn then. One
+ * published since is drawn the first time somebody opens it (dynamicParams),
+ * and every one is drawn again when staff change the resource centre — the
+ * article editor refreshes the "content:resources" tag through
+ * /api/revalidate — or within five minutes. An address no article has is a
+ * 404.
  */
-export function generateStaticParams() {
-  return SEED_RESOURCES.map((r) => ({ slug: r.slug }));
+export const dynamicParams = true;
+
+export async function generateStaticParams() {
+  return (await getResources()).map((r) => ({ slug: r.slug }));
 }
 
 // Next 16: params is a Promise in generateMetadata too.
@@ -21,7 +29,7 @@ export async function generateMetadata(
   props: PageProps<"/resources/[slug]">,
 ): Promise<Metadata> {
   const { slug } = await props.params;
-  const resource = findSeedResource(slug);
+  const resource = await getResource(slug);
 
   if (!resource) return { title: "Resource not found" };
 
@@ -33,7 +41,7 @@ export async function generateMetadata(
 
 export default async function ResourcePage(props: PageProps<"/resources/[slug]">) {
   const { slug } = await props.params;
-  const resource = findSeedResource(slug);
+  const resource = await getResource(slug);
 
   if (!resource) notFound();
 
@@ -50,34 +58,51 @@ export default async function ResourcePage(props: PageProps<"/resources/[slug]">
           Resource centre
         </Link>
 
-        <header className="mt-10 max-w-[760px]">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge tone={resource.format === "exercise" ? "accent" : "neutral"}>
-              {resource.format}
-            </Badge>
-            <span className="text-[12px] text-[var(--muted)]">
-              {resource.readingMinutes} min read
-            </span>
-          </div>
-
-          <h1 className="mt-5 text-[32px] sm:text-[40px] md:text-[52px] leading-[1.06] font-display font-medium">
-            {resource.title}
-          </h1>
-
-          <p className="mt-5 text-[15px] md:text-[17px] leading-relaxed text-[var(--muted)]">
-            {resource.summary}
-          </p>
-
-          <div className="mt-7 flex flex-wrap gap-2">
-            {resource.topics.map((t) => (
-              <span
-                key={t}
-                className="inline-flex h-7 items-center rounded-full border border-[var(--border)] px-3 text-[11px] text-[var(--muted)]"
-              >
-                {RESOURCE_TOPIC_LABELS[t]}
+        <header className="mt-10 flex flex-col gap-10 md:flex-row md:items-end md:justify-between">
+          <div className="max-w-[760px]">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone={resource.format === "exercise" ? "accent" : "neutral"}>
+                {resource.format}
+              </Badge>
+              <span className="text-[12px] text-[var(--muted)]">
+                {resource.readingMinutes} min read
               </span>
-            ))}
+            </div>
+
+            <h1 className="mt-5 text-[32px] sm:text-[40px] md:text-[52px] leading-[1.06] font-display font-medium">
+              {resource.title}
+            </h1>
+
+            <p className="mt-5 text-[15px] md:text-[17px] leading-relaxed text-[var(--muted)]">
+              {resource.summary}
+            </p>
+
+            <div className="mt-7 flex flex-wrap gap-2">
+              {resource.topics.map((t) => (
+                <span
+                  key={t}
+                  className="inline-flex h-7 items-center rounded-full border border-[var(--border)] px-3 text-[11px] text-[var(--muted)]"
+                >
+                  {RESOURCE_TOPIC_LABELS[t]}
+                </span>
+              ))}
+            </div>
           </div>
+
+          {resource.cover.src ? (
+            // A picture that shipped with the site is a cut-out standing in
+            // the arch; an uploaded photo fills it.
+            <ArchPortrait
+              src={resource.cover.src}
+              alt={resource.cover.alt}
+              tone="var(--sage-soft)"
+              cutout={resource.cover.src.startsWith("/people/")}
+              aspect={4 / 3}
+              sizes="(min-width: 768px) 300px, 70vw"
+              priority
+              className="aspect-[4/5] w-[70%] max-w-[300px] shrink-0 self-center md:w-[300px] md:self-end"
+            />
+          ) : null}
         </header>
 
         <div className="mt-14 md:mt-16">

@@ -11,6 +11,7 @@ import {
   addDoc,
   collection,
   doc,
+  getCountFromServer,
   getDoc,
   limit,
   onSnapshot,
@@ -19,15 +20,20 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
+  where,
 } from "firebase/firestore";
 import { deleteObject, getBlob, ref as storageRef, uploadBytesResumable } from "firebase/storage";
 import { httpsCallable } from "firebase/functions";
-import { firebaseConfigured, firebaseFunctions, firebaseStorage, firestore } from "./firebase";
+import { firebaseAuth, firebaseConfigured, firebaseFunctions, firebaseStorage, firestore } from "./firebase";
+import { ensureAdminClaim } from "./adminOps-client";
 import { fileToCompressedDataUrl } from "./base64";
 import { areaOf, type Area } from "./matching";
 import { HUMAN_RATE_MAX_MINOR, HUMAN_RATE_MIN_MINOR, type Locale } from "./models";
 import {
+  AWAITING_STAFF,
+  DOC_ACCEPT,
   EMPTY_SECTIONS,
+  documentContentType,
   toApplication,
   type ApplicationDocument,
   type ApplicationSections,
@@ -151,6 +157,10 @@ const EXTENSIONS: Record<string, string> = {
 /**
  * Upload one document. Resolves with the line to add to the application —
  * which the caller saves, so a file is only ever listed once it has arrived.
+ *
+ * Every upload is a new file with a new name: storage.rules lets a file here
+ * be created and never overwritten, so a document a reviewer has checked
+ * cannot be swapped for another underneath them.
  */
 export function uploadDocument(
   uid: string,
@@ -158,9 +168,11 @@ export function uploadDocument(
   type: DocType,
   onProgress: (fraction: number) => void,
 ): Promise<ApplicationDocument> {
+  const contentType = documentContentType(file.name, file.type);
+  if (!contentType) return Promise.reject(new Error("PDF, JPG, PNG or WebP only."));
   const id = newId("d");
-  const path = `provider-credentials/${uid}/${id}.${EXTENSIONS[file.type] ?? "bin"}`;
-  const task = uploadBytesResumable(storageRef(firebaseStorage(), path), file, { contentType: file.type });
+  const path = `provider-credentials/${uid}/${id}.${EXTENSIONS[contentType]}`;
+  const task = uploadBytesResumable(storageRef(firebaseStorage(), path), file, { contentType });
   return new Promise((resolve, reject) => {
     task.on(
       "state_changed",
@@ -172,7 +184,7 @@ export function uploadDocument(
           type,
           name: file.name.slice(0, 200),
           path,
-          contentType: file.type,
+          contentType,
           bytes: file.size,
           uploadedAt: Date.now(),
         }),
@@ -185,6 +197,11 @@ export function uploadDocument(
  * (a phone's 4 MB original is a slow upload on a Gambian connection, and
  * nobody needs it), then stored privately with the documents. It is copied to
  * the public directory only when the application is approved.
+ *
+ * A new name every time, like the documents: files here are never
+ * overwritten, and the old photo is deleted only once the application points
+ * at the new one. (One shared name let a slow delete of the old photo remove
+ * the new one that had just landed in its place.)
  */
 export async function uploadApplicationPhoto(
   uid: string,
@@ -193,7 +210,7 @@ export async function uploadApplicationPhoto(
 ): Promise<string> {
   const dataUrl = await fileToCompressedDataUrl(file, { maxDimension: 800, quality: 0.86, mime: "image/jpeg" });
   const blob = await (await fetch(dataUrl)).blob();
-  const path = `provider-credentials/${uid}/photo.jpg`;
+  const path = `provider-credentials/${uid}/${newId("photo-")}.jpg`;
   const task = uploadBytesResumable(storageRef(firebaseStorage(), path), blob, { contentType: "image/jpeg" });
   await new Promise<void>((resolve, reject) => {
     task.on(
@@ -220,10 +237,40 @@ export async function deleteStoredFile(path: string): Promise<void> {
  * A private file, to show or open: fetched through the Storage rules (owner
  * or staff) and handed back as a local object URL. Never a download URL —
  * that is a link anyone it is forwarded to could open, for ever.
+ *
+ * The URL keeps the whole file in memory until it is revoked, so whoever asks
+ * for one revokes it (usePrivateFile does, for pictures on screen).
  */
 export async function privateFileUrl(path: string): Promise<string> {
   const blob = await getBlob(storageRef(firebaseStorage(), path));
-  return URL.createObjectURL(blob);
+  // Only the four types a reviewer is meant to see, whatever the file says it
+  // is. The address is on this site, so an HTML page or an SVG opened from it
+  // would run its script as whoever opened it — a member of staff. The rules
+  // refuse those types now; files uploaded under the older rules, which took
+  // any image/*, are still in people's folders, and a draft can point at them.
+  const type = blob.type.split(";")[0].trim().toLowerCase();
+  if (!DOC_ACCEPT.includes(type)) throw new Error(`Not a type that is opened here: ${type || "unknown"}`);
+  return URL.createObjectURL(blob.slice(0, blob.size, type));
+}
+
+/**
+ * Open a private file in a new tab. Call it straight from the tap: the tab is
+ * opened at once and filled in when the file arrives, because a window opened
+ * after a download is no longer "in response to a tap" and gets blocked.
+ */
+export async function openPrivateFile(path: string): Promise<void> {
+  const tab = window.open("", "_blank");
+  try {
+    const url = await privateFileUrl(path);
+    if (tab) tab.location.href = url;
+    else window.location.assign(url);
+    // The other tab has the file well within a minute; this page need not
+    // keep a second copy of somebody's passport in memory after that.
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  } catch (error) {
+    tab?.close();
+    throw error;
+  }
 }
 
 // ------------------------------------------------------------------ sending
@@ -263,6 +310,16 @@ export function watchApplications(
   );
 }
 
+/**
+ * How many applications are waiting on staff, counted by the server: the
+ * number on Providers in the staff menu, without downloading the
+ * applications themselves.
+ */
+export async function countApplicationsAwaitingStaff(): Promise<number> {
+  const waiting = query(collection(firestore(), APPLICATIONS), where("status", "in", [...AWAITING_STAFF]));
+  return (await getCountFromServer(waiting)).data().count;
+}
+
 export type ReviewDecision = "start_review" | "request_changes" | "approve" | "reject" | "suspend" | "reinstate";
 
 export async function decideApplication(
@@ -278,6 +335,25 @@ export async function decideApplication(
     return { ok: true, slots: result.data.slots ?? 0 };
   } catch (error) {
     return { ok: false, error: callableMessage(error, "That did not go through. Try again.") };
+  }
+}
+
+/**
+ * Whether this staff member's sign-in carries the `admin` claim, which is how
+ * storage.rules lets staff open an applicant's photo and documents (Storage
+ * rules cannot read the role in Firestore). ensureAdminClaim — the same
+ * once-a-session check the staff layout makes — asks syncAdminClaim to set it
+ * when it is missing and takes a fresh token; this then reads the answer.
+ * True when the files can be opened.
+ */
+export async function ensureStaffFileAccess(): Promise<boolean> {
+  const user = firebaseAuth().currentUser;
+  if (!user) return false;
+  await ensureAdminClaim(user);
+  try {
+    return (await user.getIdTokenResult()).claims.admin === true;
+  } catch {
+    return false;
   }
 }
 
@@ -299,23 +375,39 @@ export type StaffReview = {
   documents: Record<string, DocVerdict>;
 };
 
-export function watchStaffReview(uid: string, onChange: (review: StaffReview) => void): () => void {
-  return onSnapshot(doc(firestore(), REVIEWS, uid), (snap) => {
-    const data = snap.data() ?? {};
-    onChange({
-      checks: (data.checks ?? {}) as StaffReview["checks"],
-      documents: (data.documents ?? {}) as StaffReview["documents"],
-    });
-  });
+export function watchStaffReview(
+  uid: string,
+  onChange: (review: StaffReview) => void,
+  onError?: (error: Error) => void,
+): () => void {
+  return onSnapshot(
+    doc(firestore(), REVIEWS, uid),
+    (snap) => {
+      const data = snap.data() ?? {};
+      onChange({
+        checks: (data.checks ?? {}) as StaffReview["checks"],
+        documents: (data.documents ?? {}) as StaffReview["documents"],
+      });
+    },
+    (error) => onError?.(error),
+  );
 }
 
+/**
+ * Record what staff made of part of an application. Merged into what is
+ * there, maps included, so a patch names only the entries that changed.
+ */
 export async function saveStaffReview(uid: string, patch: Partial<StaffReview>, by: string): Promise<void> {
   await setDoc(doc(firestore(), REVIEWS, uid), { ...patch, updatedAt: Date.now(), updatedBy: by }, { merge: true });
 }
 
 export type ReviewNote = { id: string; authorId: string; authorName: string; body: string; createdAt: number };
 
-export function watchReviewNotes(uid: string, onChange: (notes: ReviewNote[]) => void): () => void {
+export function watchReviewNotes(
+  uid: string,
+  onChange: (notes: ReviewNote[]) => void,
+  onError?: (error: Error) => void,
+): () => void {
   return onSnapshot(
     query(collection(firestore(), REVIEWS, uid, "notes"), orderBy("createdAt", "asc"), limit(200)),
     (snap) =>
@@ -327,10 +419,12 @@ export function watchReviewNotes(uid: string, onChange: (notes: ReviewNote[]) =>
             authorId: String(data.authorId ?? ""),
             authorName: String(data.authorName ?? "Staff"),
             body: String(data.body ?? ""),
-            createdAt: typeof data.createdAt?.toMillis === "function" ? data.createdAt.toMillis() : Date.now(),
+            // "estimate" gives a note still on its way the local time.
+            createdAt: typeof data.createdAt?.toMillis === "function" ? data.createdAt.toMillis() : 0,
           };
         }),
       ),
+    (error) => onError?.(error),
   );
 }
 

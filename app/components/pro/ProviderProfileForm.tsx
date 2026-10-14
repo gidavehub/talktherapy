@@ -76,7 +76,7 @@ function StatusNote({ profile }: { profile: ProviderProfile | null }) {
   if (profile.status === "suspended") {
     return (
       <Alert tone="warning" title="Your profile is not being shown">
-        It has been taken out of the directory. Talk to us before changing anything here.
+        It has been taken out of the directory. Write to us before changing anything here.
       </Alert>
     );
   }

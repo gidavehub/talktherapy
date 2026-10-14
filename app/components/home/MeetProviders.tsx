@@ -9,13 +9,15 @@ import { Skeleton } from "../ui/Feedback";
 import { LOCALE_LABELS, type ProviderProfile } from "../../lib/models";
 import { listVerifiedProviders } from "../../lib/providers";
 import { SERVICE_LABELS, SPECIALIZATION_LABELS, type Specialization } from "../../lib/matching";
+import type { HomeContent } from "../../lib/content/schema";
 import Reveal from "./Reveal";
 
 /**
  * "Meet your providers" — four of the people in the directory, each in their
- * arch, and the way to all of them.
+ * arch, and the way to all of them. The heading and button words are the site
+ * content's (home.providers); the people are the live directory.
  */
-export default function MeetProviders() {
+export default function MeetProviders({ content }: { content: HomeContent["providers"] }) {
   const [providers, setProviders] = useState<ProviderProfile[] | null>(null);
 
   useEffect(() => {
@@ -38,11 +40,8 @@ export default function MeetProviders() {
     <section className="bg-[var(--background)] py-16 md:py-20">
       <div className="mx-auto max-w-[1200px] px-5 md:px-10">
         <Reveal className="text-center">
-          <h2 className="font-display text-[34px] font-medium leading-tight md:text-[42px]">Meet your providers</h2>
-          <p className="mx-auto mt-3 max-w-[560px] text-[15px] text-[var(--muted)]">
-            Qualified people who understand your world. Choose by language, specialty, and who you feel most comfortable
-            with.
-          </p>
+          <h2 className="font-display text-[34px] font-medium leading-tight md:text-[42px]">{content.heading}</h2>
+          <p className="mx-auto mt-3 max-w-[560px] text-[15px] text-[var(--muted)]">{content.lede}</p>
         </Reveal>
 
         <div className="mt-10 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
@@ -84,7 +83,7 @@ export default function MeetProviders() {
                     href={`/providers/${p.uid}`}
                     className="mt-4 inline-flex h-9 items-center rounded-full border-[1.5px] border-[var(--dark)] px-4 text-[13px] font-medium transition-colors hover:bg-[var(--dark)] hover:text-[var(--cream)] sm:mt-5 sm:h-10 sm:px-6"
                   >
-                    View profile
+                    {content.profileLabel}
                   </Link>
                 </motion.div>
               ))}
@@ -96,7 +95,7 @@ export default function MeetProviders() {
             href="/providers"
             className="mt-4 inline-flex h-12 items-center rounded-full bg-[var(--accent)] px-8 text-[14.5px] font-medium text-white shadow-[var(--shadow-accent)] transition-colors hover:bg-[var(--accent-deep)]"
           >
-            View all providers
+            {content.allLabel}
           </Link>
         </Reveal>
       </div>

@@ -176,8 +176,9 @@ export default function DateRangePicker({
               aria-controls={preset === "custom" && custom ? panelId : undefined}
               onClick={() => choose(preset)}
               // The offset keeps the ring readable around the filled pill,
-              // where an accent ring would otherwise merge into the fill.
-              className={`inline-flex h-9 items-center rounded-full border-[1.5px] px-4 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)] ${
+              // where an accent ring would otherwise merge into the fill. The
+              // invisible band makes the 36px pill a 44px tap target.
+              className={`relative inline-flex h-9 items-center after:absolute after:inset-x-0 after:-inset-y-1 after:content-[''] rounded-full border-[1.5px] px-4 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)] ${
                 active
                   ? "border-[var(--accent)] bg-[var(--accent)] text-white"
                   : "border-[var(--dark)]/25 text-[var(--foreground)] hover:bg-[var(--sand)]"

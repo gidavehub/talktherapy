@@ -12,7 +12,13 @@ import { ArchPortrait } from "../ui/Arch";
 import { SPRING_SOFT } from "../motion/primitives";
 import { useApplicant } from "./useApplicant";
 import { useNow } from "@/lib/useNow";
-import { markNotificationRead, watchNotifications, type AppNotification } from "@/lib/notifications";
+import {
+  isUnread,
+  markNotificationRead,
+  noticeTime,
+  watchNotifications,
+  type AppNotification,
+} from "@/lib/notifications";
 import { incompleteSteps, type ApplicationStatus as Status, type HistoryEvent } from "@/lib/providerApplication";
 
 /**
@@ -71,16 +77,6 @@ const EVENT: Record<HistoryEvent["type"], { title: string; tone: TimelineTone }>
   reinstated: { title: "Profile live again", tone: "positive" },
 };
 
-function when(ms: number): string {
-  return new Date(ms).toLocaleString("en-GB", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "UTC",
-  });
-}
-
 function Notifications({ uid }: { uid: string }) {
   const [items, setItems] = useState<AppNotification[] | null>(null);
   useEffect(() => watchNotifications(uid, setItems, 10), [uid]);
@@ -89,31 +85,35 @@ function Notifications({ uid }: { uid: string }) {
     <section className="rounded-[26px] bg-[var(--surface)] p-6 shadow-[var(--shadow-card)] md:p-7">
       <h2 className="font-display text-[22px] font-medium">Messages from TALK</h2>
       <ul className="mt-4 divide-y divide-[var(--dark)]/8">
-        {items.map((n) => (
-          <li key={n.id} className="flex gap-3 py-4 first:pt-1 last:pb-0">
-            <span
-              aria-hidden
-              className={`mt-2 h-2 w-2 shrink-0 rounded-full ${n.readAt ? "bg-[var(--sand)]" : "bg-[var(--accent)]"}`}
-            />
-            <div className="min-w-0 flex-1">
-              <p className="text-[14px] font-medium">
-                {n.title}
-                {n.readAt ? null : <span className="sr-only"> (new)</span>}
-              </p>
-              <p className="mt-0.5 whitespace-pre-line text-[13.5px] leading-relaxed text-[var(--muted)]">{n.body}</p>
-              <p className="mt-1 text-[11.5px] text-[var(--muted)]">{when(n.createdAt)} · Banjul time</p>
-            </div>
-            {n.readAt ? null : (
-              <button
-                type="button"
-                onClick={() => void markNotificationRead(n.id).catch(() => {})}
-                className="h-9 shrink-0 self-start rounded-full px-3 text-[12px] text-[var(--muted)] hover:bg-[var(--sand)]"
-              >
-                Mark read
-              </button>
-            )}
-          </li>
-        ))}
+        {items.map((n) => {
+          const unread = isUnread(n, uid);
+          return (
+            <li key={n.id} className="flex gap-3 py-4 first:pt-1 last:pb-0">
+              <span
+                aria-hidden
+                className={`mt-2 h-2 w-2 shrink-0 rounded-full ${unread ? "bg-[var(--accent)]" : "bg-[var(--sand)]"}`}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-[14px] font-medium">
+                  {n.title}
+                  {unread ? <span className="sr-only"> (new)</span> : null}
+                </p>
+                <p className="mt-0.5 whitespace-pre-line text-[13.5px] leading-relaxed text-[var(--muted)]">{n.body}</p>
+                <p className="mt-1 text-[11.5px] text-[var(--muted)]">{noticeTime(n.createdAt)} · Banjul time</p>
+              </div>
+              {unread ? (
+                <button
+                  type="button"
+                  onClick={() => void markNotificationRead(n, uid).catch(() => {})}
+                  aria-label={`Mark "${n.title}" read`}
+                  className="h-11 shrink-0 self-start rounded-full px-3 text-[12px] text-[var(--muted)] hover:bg-[var(--sand)]"
+                >
+                  Mark read
+                </button>
+              ) : null}
+            </li>
+          );
+        })}
       </ul>
     </section>
   );

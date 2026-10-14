@@ -38,6 +38,8 @@ import { useVoice, voice } from "@/lib/audio/lines";
 import { useConsultation } from "@/lib/payments/consultation";
 import { afterSignIn, isSettled, safeNext } from "@/lib/routing";
 import { AI_TIERS, type AiTierId } from "@/lib/models";
+import { useTalkSessionReport } from "@/lib/analytics/reportTalkSession";
+import { usePresence } from "@/lib/analytics/usePresence";
 
 /**
  * Talk — the voice surface, and for a new person, the whole onboarding.
@@ -314,6 +316,27 @@ function Talk() {
   const price = formatDalasi(AI_TIERS[tier].amountMinor);
   const payLines = PAY_LINES[tier];
   const { start } = talk;
+
+  // For the staff numbers: that a conversation happened, how long it ran and
+  // how it ended — never what was said. Stored with no uid.
+  const talkReport = useTalkSessionReport({
+    getToken,
+    enabled: profile?.role === "patient",
+    active: talk.active,
+    kind: intakeMode ? "intake" : "companion",
+    tier,
+    language: talk.language,
+    turns: talk.lines.filter((line) => line.role === "user").length,
+    textOnly: talk.textOnly,
+    intakeDone: Boolean(finished),
+    matched: Boolean(shortlist?.length),
+    paid: paid === true,
+    concerns: talk.intake.concerns,
+    topics: talk.topics,
+    safetyFlagged: risky,
+    risk: talk.risk,
+  });
+  usePresence({ uid, role: profile?.role ?? null, area: "talk" });
 
   // Providers and staff are never put through the door: on to where they
   // were going (?next), or their own home. The same rule as onSignedIn, so
@@ -620,7 +643,7 @@ function Talk() {
    * the providers themselves, and tapping one opens the conversation with
    * them — the same place saying their name goes.
    */
-  function handleChoice(choice: { id: string; label: string }) {
+  function handleChoice(choice: { id: string; label: string }, { tapped = false }: { tapped?: boolean } = {}) {
     // A tap while the options are being read out ends the reading — and with
     // it the hush — rather than leaving it to talk over Talk's answer.
     stopReading();
@@ -630,6 +653,7 @@ function Talk() {
       return;
     }
     talk.choose(choice);
+    if (tapped) talkReport.typed();
   }
 
   function submitDraft(e: React.FormEvent) {
@@ -637,6 +661,7 @@ function Talk() {
     if (!draft.trim()) return;
     stopReading();
     talk.sendText(draft);
+    talkReport.typed();
     setDraft("");
   }
 
@@ -799,7 +824,7 @@ function Talk() {
                 <motion.button
                   key={choice.id}
                   type="button"
-                  onClick={() => handleChoice(choice)}
+                  onClick={() => handleChoice(choice, { tapped: true })}
                   whileHover={{ y: -2 }}
                   whileTap={{ scale: 0.97 }}
                   transition={SPRING_SNAP}

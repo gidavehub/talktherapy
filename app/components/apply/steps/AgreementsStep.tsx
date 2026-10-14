@@ -35,22 +35,28 @@ export default function AgreementsStep({ value, onChange, problems, draft, now }
                 accepted ? "border-[var(--sage)]/50 bg-[var(--sage-pale)]/50" : problems[agreement.id] ? "border-[var(--accent)]" : "border-[var(--dark)]/10 bg-[var(--surface)]"
               }`}
             >
-              <div className="flex items-start gap-4 p-5">
+              <div className="flex items-start gap-3 p-4 sm:gap-4 sm:p-5">
+                {/* A 44-pixel target around a 28-pixel circle: easy to hit,
+                    and the ring shows where keyboard focus is. */}
                 <button
                   type="button"
                   role="checkbox"
                   aria-checked={accepted}
                   aria-label={`I agree: ${agreement.title}`}
                   onClick={() => commit({ ...value, accepted: { ...value.accepted, [agreement.id]: !accepted } })}
-                  className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors outline-none focus-visible:ring-4 focus-visible:ring-[var(--accent)]/15 ${
-                    accepted ? "border-[var(--sage)] bg-[var(--sage)] text-white" : "border-[var(--dark)]/30 bg-[var(--surface)]"
-                  }`}
+                  className="group -m-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full outline-none"
                 >
-                  {accepted ? (
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" aria-hidden>
-                      <path d="M5 12l5 5L20 7" />
-                    </svg>
-                  ) : null}
+                  <span
+                    className={`flex h-7 w-7 items-center justify-center rounded-full border-[1.5px] transition-colors group-focus-visible:ring-4 group-focus-visible:ring-[var(--accent)]/15 ${
+                      accepted ? "border-[var(--sage)] bg-[var(--sage)] text-white" : "border-[var(--dark)]/30 bg-[var(--surface)]"
+                    }`}
+                  >
+                    {accepted ? (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" aria-hidden>
+                        <path d="M5 12l5 5L20 7" />
+                      </svg>
+                    ) : null}
+                  </span>
                 </button>
                 <div className="min-w-0 flex-1">
                   <p className="font-display text-[19px] font-medium leading-snug">{agreement.title}</p>
@@ -59,7 +65,7 @@ export default function AgreementsStep({ value, onChange, problems, draft, now }
                     type="button"
                     aria-expanded={expanded}
                     onClick={() => setOpen(expanded ? null : agreement.id)}
-                    className="mt-2 text-[13px] font-medium text-[var(--accent-deep)] underline-offset-4 hover:underline"
+                    className="mt-1 inline-flex min-h-11 items-center text-[13px] font-medium text-[var(--accent-deep)] underline-offset-4 hover:underline"
                   >
                     {expanded ? "Hide the detail" : "Read it in full"}
                   </button>

@@ -4,42 +4,24 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { SPRING_SNAP } from "../motion/primitives";
 import Reveal from "./Reveal";
-import { AI_TIERS } from "../../lib/models";
-import { formatDalasi } from "../../lib/money";
+import type { HomeContent } from "../../lib/content/schema";
 
-/** "Questions, answered" — two columns of plain answers. */
+/**
+ * "Questions, answered" — two columns of plain answers. The questions are the
+ * site content's (home.faq), prices already filled in by the server.
+ */
 
-// Prices and lengths come from the constants the checkout uses, so an answer
-// can never quote a number the payment does not take.
-const FIRST = AI_TIERS.initial;
-const LONGER = AI_TIERS.extended;
+type Question = { q: string; a: string };
 
-const QUESTIONS: { q: string; a: string }[] = [
-  {
-    q: "What happens in my first conversation?",
-    a: `You talk with TALK for up to ${FIRST.durationSec / 60} minutes — in English, Wolof, Mandinka or Pulaar — by voice or by tapping. It costs ${formatDalasi(FIRST.amountMinor)}. TALK then introduces you to providers who fit.`,
-  },
-  {
-    q: "Do I have to speak to a person?",
-    a: `No. You can keep talking with TALK — a longer talk is ${formatDalasi(LONGER.amountMinor)} for up to ${LONGER.durationSec / 60} minutes. When you are ready, a provider is one message away.`,
-  },
-  {
-    q: "What if I am in danger?",
-    a: "Call 117 for the police, 116 for an ambulance, or 118 for fire and rescue — free from any phone. TALK is not an emergency service and nobody is watching the app, but if you tell her you are in danger she will give you these numbers straight away.",
-  },
-  {
-    q: "Who can see my journal and mood?",
-    a: "Only you. Providers never see your journal or mood check-ins — only what you choose to send them.",
-  },
-  {
-    q: "How do I pay?",
-    a: "With Wave or another mobile money wallet, or a card. No plans, no subscription: you see the price first, and pay per conversation.",
-  },
-  {
-    q: "Can I choose a male or female provider?",
-    a: "Yes. TALK asks who you would feel more comfortable with, and you can filter the providers by it too.",
-  },
-];
+/**
+ * Set in code, never content: the emergency numbers must not be one edit away
+ * from being wrong. Always third, where it has always been.
+ */
+const DANGER: Question = {
+  q: "What if I am in danger?",
+  a: "Call 117 for the police, 116 for an ambulance, or 118 for fire and rescue — free from any phone. TALK is not an emergency service and nobody is watching the app, but if you tell her you are in danger she will give you these numbers straight away.",
+};
+const DANGER_AT = 2;
 
 function Item({ q, a, open, onToggle }: { q: string; a: string; open: boolean; onToggle: () => void }) {
   return (
@@ -82,15 +64,16 @@ function Item({ q, a, open, onToggle }: { q: string; a: string; open: boolean; o
   );
 }
 
-export default function Faq() {
+export default function Faq({ content }: { content: HomeContent["faq"] }) {
   const [open, setOpen] = useState(0);
-  const half = Math.ceil(QUESTIONS.length / 2);
-  const columns = [QUESTIONS.slice(0, half), QUESTIONS.slice(half)];
+  const questions = [...content.items.slice(0, DANGER_AT), DANGER, ...content.items.slice(DANGER_AT)];
+  const half = Math.ceil(questions.length / 2);
+  const columns = [questions.slice(0, half), questions.slice(half)];
   return (
     <section className="bg-[var(--cream)] py-16 md:py-20">
       <div className="mx-auto max-w-[1100px] px-5 md:px-10">
         <Reveal className="text-center">
-          <h2 className="font-display text-[34px] font-medium leading-tight md:text-[42px]">Questions, answered</h2>
+          <h2 className="font-display text-[34px] font-medium leading-tight md:text-[42px]">{content.heading}</h2>
         </Reveal>
         <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5">
           {columns.map((col, c) => (
@@ -98,7 +81,7 @@ export default function Faq() {
               {col.map((item, i) => {
                 const index = c * half + i;
                 return (
-                  <Reveal key={item.q} delay={i * 0.05}>
+                  <Reveal key={index} delay={i * 0.05}>
                     <Item {...item} open={open === index} onToggle={() => setOpen(open === index ? -1 : index)} />
                   </Reveal>
                 );

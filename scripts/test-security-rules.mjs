@@ -75,6 +75,20 @@ const listing = {
   ratingCount: 0,
 };
 
+/** A patient's own user document, as sign-up writes it. */
+const userProfile = { uid: PATIENT, role: "patient", verified: true, displayName: "Fatou", locale: "en" };
+
+/** A provider whose role staff changed through adminSetRole. */
+const roleChanged = {
+  uid: PROVIDER,
+  role: "provider",
+  verified: true,
+  displayName: "Awa Ceesay",
+  previousRole: "patient",
+  roleChangedAt: 1791900000000,
+  roleChangedBy: ADMIN,
+};
+
 /** An hour a provider is offering. */
 const slot = {
   providerId: PROVIDER,
@@ -264,6 +278,30 @@ const CASES = [
   // --- the one that was already broken once ------------------------------
   ["a stranger reading somebody's user document", "DENY", STRANGER, "get", `${DOCS}/users/${PATIENT}`,
     { uid: PATIENT, role: "patient", displayName: "Fatou" }],
+
+  // --- roles change only through adminSetRole ----------------------------
+  // That function keeps the last admin, syncs the admin claim and writes the
+  // audit log. A browser write — even a staff member's — would skip all three.
+  ["changing your own name", "ALLOW", PATIENT, "update", `${DOCS}/users/${PATIENT}`,
+    userProfile, { ...userProfile, displayName: "Fatou J." }],
+  ["making yourself an admin", "DENY", PATIENT, "update", `${DOCS}/users/${PATIENT}`,
+    userProfile, { ...userProfile, role: "admin" }],
+  ["staff changing somebody's role from the browser", "DENY", ADMIN, "update", `${DOCS}/users/${PATIENT}`,
+    userProfile, { ...userProfile, role: "provider", verified: false }],
+  ["staff editing somebody's profile from the browser", "DENY", ADMIN, "update", `${DOCS}/users/${PATIENT}`,
+    userProfile, { ...userProfile, displayName: "Someone else" }],
+  ["rewriting who last changed your role", "DENY", PROVIDER, "update", `${DOCS}/users/${PROVIDER}`,
+    roleChanged, { ...roleChanged, roleChangedBy: STRANGER }],
+  ["rewriting what your role was before", "DENY", PROVIDER, "update", `${DOCS}/users/${PROVIDER}`,
+    roleChanged, { ...roleChanged, previousRole: "admin" }],
+  ["dropping the role-change record", "DENY", PROVIDER, "update", `${DOCS}/users/${PROVIDER}`,
+    roleChanged, { uid: PROVIDER, role: "provider", verified: true, displayName: "Awa Ceesay" }],
+  ["editing your profile after a role change", "ALLOW", PROVIDER, "update", `${DOCS}/users/${PROVIDER}`,
+    roleChanged, { ...roleChanged, displayName: "Awa C." }],
+  ["signing up with a made-up role-change record", "DENY", PATIENT, "create", `${DOCS}/users/${PATIENT}`,
+    null, { ...userProfile, previousRole: "admin", roleChangedBy: ADMIN }],
+  ["signing up as a patient", "ALLOW", PATIENT, "create", `${DOCS}/users/${PATIENT}`,
+    null, userProfile],
 
   // --- payments ----------------------------------------------------------
   // Only the signed webhook may move payment state, and it runs with the
@@ -540,6 +578,8 @@ const testCase = ([, expectation, uid, method, path, existing, incoming]) => ({
     ? { functionMocks: [parentChatMock] }
     : {}),
   ...(path.includes("/providerProfiles/") ? { functionMocks: userDocMocks } : {}),
+  // The user document's own rules ask whether the caller is staff.
+  ...(/\/users\/[^/]+$/.test(path) ? { functionMocks: userDocMocks } : {}),
   // The group call room checks members against the chat as it is NOW —
   // including a group somebody has left since its room was opened.
   ...(path.includes("/groupCalls/")

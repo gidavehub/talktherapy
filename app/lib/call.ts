@@ -29,6 +29,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   onSnapshot,
   serverTimestamp,
@@ -254,9 +255,25 @@ export async function joinCall(
   // Both sides ensure the room exists. Whoever gets there first creates it;
   // the other merges into it. `participants` is written identically by both,
   // which is what the create rule checks against the booking.
+  //
+  // `startedAt` is rewritten by every join. `firstJoinedAt` is written only by
+  // whoever finds no room yet, so it keeps when the call first began, and
+  // with `endedAt` (the last hang-up) gives the staff numbers how long a
+  // session lasts. A room that does not exist cannot be read, so a refused
+  // read counts as none; two people joining in the same moment both write it,
+  // a fraction of a second apart.
+  const opened = await getDoc(room).then(
+    (snap) => snap.exists(),
+    () => false,
+  );
   await setDoc(
     room,
-    { participants, status: "active", startedAt: serverTimestamp() },
+    {
+      participants,
+      status: "active",
+      startedAt: serverTimestamp(),
+      ...(opened ? {} : { firstJoinedAt: serverTimestamp() }),
+    },
     { merge: true },
   );
 
@@ -330,7 +347,9 @@ export async function joinCall(
     handlers.onState("ended");
 
     // Best effort. The call is over for this person either way, and failing to
-    // write a status must never leave the screen stuck on a dead call.
+    // write a status must never leave the screen stuck on a dead call. The
+    // second person to leave moves `endedAt` on: the call ended when the room
+    // emptied.
     await updateDoc(room, { status: "ended", endedAt: serverTimestamp() }).catch(() => {});
   };
 

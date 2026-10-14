@@ -47,6 +47,7 @@ import {
 import { AI_PURPOSE, AI_TIERS, tierAlreadyHeld, tierForPurpose, type AiTierId } from "../../app/lib/models";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { resolveReview as decide } from "./review";
+import { audit, requireStaff } from "./staff";
 import { bookSlot, cancelBooking, reportMissedSession as reportMissed } from "./bookings";
 import { PAYOUT_HOLD_MS } from "../../app/lib/payouts";
 import {
@@ -774,24 +775,29 @@ export const reportMissedSession = onCall(CALLABLE, async (request) => {
   return { reported: true };
 });
 
+/** Where each kind of review decision lands, for the audit log's target. */
+const REVIEW_COLLECTION: Record<string, string> = {
+  payment: "payments",
+  payout: "payouts",
+  session: "bookings",
+};
+
 /**
  * A person's decision on something held for review. Staff only — read from
  * the user document, whose role the browser cannot change.
  */
 export const resolveReview = onCall(CALLABLE, async (request) => {
-  const uid = request.auth?.uid;
-  if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
-  const role = (await db().collection("users").doc(uid).get()).data()?.role;
-  if (role !== "admin") throw new HttpsError("permission-denied", "Staff only.");
-  const result = await decide(uid, {
-    kind: String(request.data?.kind ?? ""),
-    id: String(request.data?.id ?? "").trim(),
-    decision: String(request.data?.decision ?? ""),
-    note: String(request.data?.note ?? ""),
-  });
+  const uid = await requireStaff(request);
+  const kind = String(request.data?.kind ?? "");
+  const id = String(request.data?.id ?? "").trim();
+  const decision = String(request.data?.decision ?? "");
+  const result = await decide(uid, { kind, id, decision, note: String(request.data?.note ?? "") });
   if (!result.ok) throw new HttpsError("failed-precondition", result.reason);
   // A granted consultation is put on the account too, as the webhook does.
   if (result.grant) await grantClaim(result.grant);
+  // Money decisions belong in the staff audit log like every other staff
+  // write. The note stays on the item itself: it is free text.
+  await audit(uid, `review.${kind}`, `${REVIEW_COLLECTION[kind]}/${id}`, { decision });
   return { resolved: true };
 });
 
@@ -997,3 +1003,5 @@ export * from "./providers";
 export * from "./adminStats";
 export * from "./adminOps";
 export * from "./content";
+// Clearing up after a deleted account, across what every track keeps by uid.
+export * from "./accountDeletion";

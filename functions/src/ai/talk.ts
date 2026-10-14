@@ -32,6 +32,7 @@ import {
   missingFields,
   type Intake,
   type RequiredField,
+  type Specialization,
 } from "../../../app/lib/matching";
 
 /**
@@ -284,7 +285,7 @@ function systemFor(
     ? `\n\nEARLIER IN THIS CONVERSATION (your own summary — the recent turns follow as messages):\n${summary.trim()}`
     : "";
   // The consent turn is its own small job: the intake waits until it is done.
-  const task = awaitingConsent ? CONSENT_SECTION : mode === "intake" ? intakeSection(intake, remainingSec) : "";
+  const task = awaitingConsent ? CONSENT_SECTION : mode === "intake" ? intakeSection(intake, remainingSec) : TOPICS_SECTION;
   // In BOTH modes. Most returning people are in companion mode, and a child in
   // danger there needs this as much as one who is mid-intake.
   return SYSTEM + minorSafety(intake) + task + memory + LANGUAGE_REMINDER;
@@ -411,6 +412,17 @@ Fill "intake" with what THIS message tells you, null (or an empty list) for anyt
 - Safety comes first: if they share something heavy or unsafe, respond to that with care before any question, and follow the SAFETY rules.`;
 }
 
+/**
+ * An open conversation also tags what each message is about, from the same
+ * fixed list the intake files concerns under, for the staff numbers' chart
+ * of what people talk about. Tags only, never words; written after the reply
+ * (COMPANION_SCHEMA) so they cannot shape it.
+ */
+const TOPICS_SECTION = `
+
+TOPICS
+Also fill "topics": what their newest message is about, from this list only — ${SPECIALIZATIONS.join(", ")} ("depression" covers low mood; "youth" means they are young or a student). Usually one, sometimes two; an empty list for a greeting, small talk, or anything not about how they are. Topics are never shown or said to them.`;
+
 /** Talk has just spoken the consent and is waiting for the answer. */
 const CONSENT_SECTION = `
 
@@ -439,6 +451,17 @@ const CONSENT_SCHEMA = {
     "reply",
     "replyEnglish",
   ],
+};
+
+/** An open conversation's turn: the same, and the topics it touched (TOPICS_SECTION), last. */
+const COMPANION_SCHEMA = {
+  ...TURN_SCHEMA,
+  properties: {
+    ...TURN_SCHEMA.properties,
+    topics: { type: "ARRAY", items: { type: "STRING", enum: [...SPECIALIZATIONS] } },
+  },
+  required: [...TURN_SCHEMA.required, "topics"],
+  propertyOrdering: [...TURN_SCHEMA.propertyOrdering, "topics"],
 };
 
 const INTAKE_SCHEMA = {
@@ -544,6 +567,12 @@ export function speechRate(wpm: number | undefined): number {
   return Math.min(1.12, Math.max(0.9, bounded / PACE_DEFAULT_WPM));
 }
 
+/** Ids from the fixed list of concerns, each once; anything else the model wrote is dropped. */
+function cleanTopics(raw: unknown): Specialization[] {
+  if (!Array.isArray(raw)) return [];
+  return [...new Set(raw.filter((t): t is Specialization => (SPECIALIZATIONS as readonly unknown[]).includes(t)))].slice(0, 3);
+}
+
 /** Only the options for the question actually being asked survive. */
 function cleanChoices(raw: unknown, intake: Intake): Choice[] {
   if (!Array.isArray(raw)) return [];
@@ -604,7 +633,7 @@ export async function runTurn(input: TurnInput, signal?: AbortSignal): Promise<T
         temperature: 0.5,
         maxOutputTokens: 4096,
         responseMimeType: "application/json",
-        responseSchema: intakeMode ? INTAKE_SCHEMA : TURN_SCHEMA,
+        responseSchema: intakeMode ? INTAKE_SCHEMA : COMPANION_SCHEMA,
         // "low" measured ~5.6s against ~15s for the default; "minimal" is
         // rejected by this model and a zero budget is ignored.
         thinkingConfig: { thinkingLevel: "low" },
@@ -652,7 +681,11 @@ export async function runTurn(input: TurnInput, signal?: AbortSignal): Promise<T
     str(parsed.helpLine),
     isMinor(input.intake),
   );
-  // At their pace in every conversation, not only the intake.
+  // At their pace in every conversation, not only the intake. An open
+  // conversation's turn also says what it was about.
+  if (!intakeMode && transcript) {
+    return { ...result, topics: cleanTopics(parsed.topics), speechRate: speechRate(input.paceWpm) };
+  }
   if (!intakeMode || !transcript) return { ...result, speechRate: speechRate(input.paceWpm) };
 
   // Merge what this message told Talk into what was already known. The
