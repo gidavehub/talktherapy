@@ -24,7 +24,7 @@ import {
   stepComplete,
   type SectionId,
 } from "@/lib/providerApplication";
-import { formatDalasi, formatDalasiRange, PLATFORM_FEE_RATE, providerPayoutMinor } from "@/lib/money";
+import { formatDalasi, PLATFORM_FEE_RATE, providerPayoutMinor } from "@/lib/money";
 import { HUMAN_RATE_MAX_MINOR, HUMAN_RATE_MIN_MINOR } from "@/lib/models";
 
 /**
@@ -99,7 +99,7 @@ function SignedOut() {
           </p>
           <ul className="mt-8 space-y-3 text-[14.5px]">
             {[
-              `Set your own fee, from ${formatDalasiRange(HUMAN_RATE_MIN_MINOR, HUMAN_RATE_MAX_MINOR)} a session`,
+              `Set your own fee, between ${formatDalasi(HUMAN_RATE_MIN_MINOR)} and ${formatDalasi(HUMAN_RATE_MAX_MINOR)} a session`,
               "Choose the hours you work",
               "Paid to your mobile-money wallet",
             ].map((line) => (
