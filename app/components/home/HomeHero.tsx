@@ -5,6 +5,8 @@ import { motion } from "motion/react";
 import { SPRING_SOFT } from "../motion/primitives";
 import StartLink from "../StartLink";
 import { ArchPortrait } from "../ui/Arch";
+import { AI_TIERS } from "../../lib/models";
+import { formatDalasi } from "../../lib/money";
 
 /**
  * The landing hero: "Talk it through, your own way." beside three arches,
@@ -57,8 +59,8 @@ export default function HomeHero() {
               <span className="display-accent block">your own way.</span>
             </motion.h1>
             <motion.p {...rise(0.2)} className="mt-6 max-w-[440px] text-[16px] leading-relaxed text-[var(--foreground)]/80">
-              Private conversations with TALK and qualified providers, in the language you think in. Culturally rooted
-              care, for everyone.
+              Private conversations with TALK and qualified providers, in English, Wolof, Mandinka or Pulaar.
+              Culturally rooted care, for everyone.
             </motion.p>
             <motion.div {...rise(0.28)} className="mt-8 flex flex-wrap gap-3">
               <StartLink className="inline-flex h-12 items-center rounded-full bg-[var(--accent)] px-7 text-[14.5px] font-medium text-white shadow-[var(--shadow-accent)] transition-colors hover:bg-[var(--accent-deep)]">
@@ -117,10 +119,10 @@ export default function HomeHero() {
       <section aria-label="TALK at a glance" className="bg-[var(--dark)] text-[var(--cream)]">
         <dl className="mx-auto grid max-w-[1200px] grid-cols-2 md:grid-cols-4">
           {[
-            ["4", "languages"],
-            ["24/7", "always open"],
-            ["D200", "first conversation"],
-            ["Free", "urgent help, no account"],
+            ["4", "languages TALK speaks"],
+            ["24/7", "TALK, whenever you need her"],
+            [formatDalasi(AI_TIERS.initial.amountMinor), "first conversation"],
+            ["Free", "emergency numbers, no account"],
           ].map(([big, small], i) => (
             <div
               key={small}
@@ -130,7 +132,11 @@ export default function HomeHero() {
             >
               <dt className="sr-only">{small}</dt>
               <dd className="font-display text-[28px] font-medium leading-none md:text-[32px]">{big}</dd>
-              <dd className="mt-2 text-[12.5px] text-[var(--cream)]/70">{small}</dd>
+              {/* The same words as the hidden term above, shown under the
+                  figure; hidden here so a screen reader says them once. */}
+              <dd aria-hidden className="mt-2 text-[12.5px] text-[var(--cream)]/70">
+                {small}
+              </dd>
             </div>
           ))}
         </dl>

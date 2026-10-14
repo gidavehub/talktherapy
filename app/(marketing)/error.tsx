@@ -64,9 +64,9 @@ export default function MarketingError({
         ) : null}
 
         <p className="mt-6 text-[13px] text-[var(--muted)]">
-          Need urgent help?{" "}
+          In danger right now?{" "}
           <Link href="/crisis" className="underline underline-offset-4 text-[var(--foreground)]">
-            Crisis contacts
+            Emergency contacts
           </Link>
         </p>
       </div>

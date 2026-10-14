@@ -26,9 +26,14 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "Talk Therapy — AI-guided therapy matching",
+  // The template brands every page that sets its own title, so page titles
+  // should name the page only ("Pricing", not "Pricing — TALK").
+  title: {
+    default: "TALK — listen, support, heal, grow",
+    template: "%s · TALK",
+  },
   description:
-    "Calm your mind. Elevate your clarity. Talk Therapy uses conversational AI to match you with the right provider in minutes.",
+    "Private conversations with TALK and qualified providers, in English, Wolof, Mandinka or Pulaar. Culturally rooted mental wellbeing support for The Gambia.",
   icons: {
     icon: "/brand/icon.png",
     shortcut: "/brand/icon.png",

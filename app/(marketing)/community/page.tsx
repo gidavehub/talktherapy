@@ -7,7 +7,7 @@ import { Alert, BulletItem } from "@/components/ui/Feedback";
 export const metadata: Metadata = {
   title: "Community",
   description:
-    "Moderated peer support is on the Talk roadmap. Here is what we are planning, and why we are taking our time over it.",
+    "Moderated peer support is on the TALK roadmap. Here is what we are planning, and why we are taking our time over it.",
 };
 
 const PLANS = [
@@ -43,7 +43,7 @@ export default function CommunityPage() {
       <PageIntro
         eyebrow="Community"
         lines={["Not yet — and", "that is deliberate."]}
-        lede="Moderated peer support is on the Talk roadmap. It is not live, because an unmoderated mental health community causes more harm than it prevents, and we would rather build it properly than quickly."
+        lede="Moderated peer support is on the TALK roadmap. It is not live, because an unmoderated mental health community causes more harm than it prevents, and we would rather build it properly than quickly."
         stamp="TOGETHER"
       />
 

@@ -292,7 +292,7 @@ export function useConversation({
         if (!res.ok || !res.body) {
           const payload = (await res.json().catch(() => ({}))) as { error?: string };
           if (res.status === 401) {
-            setError({ kind: "auth", message: payload.error ?? "Sign in to talk to Talk." });
+            setError({ kind: "auth", message: payload.error ?? "Sign in to talk with TALK." });
             return; // the auth effect below ends the session
           }
           if (res.status === 402) {
@@ -301,14 +301,14 @@ export function useConversation({
             const { code } = payload as { code?: string };
             setError({
               kind: "payment",
-              message: payload.error ?? "Your consultation has not been paid for yet.",
+              message: payload.error ?? "This conversation has not been paid for yet.",
               code: code ?? "payment_required",
             });
             return;
           }
           setError({
             kind: res.status === 429 ? "busy" : "failed",
-            message: payload.error ?? "Talk couldn't respond just then. Please try again.",
+            message: payload.error ?? "TALK couldn't answer just then. Please try again.",
           });
           listen();
           return;
@@ -503,7 +503,7 @@ export function useConversation({
         void maybeFold();
       } catch (e) {
         if ((e as Error)?.name === "AbortError") return;
-        setError({ kind: "failed", message: "Talk couldn't be reached. Check your connection and try again." });
+        setError({ kind: "failed", message: "TALK couldn't be reached. Check your connection and try again." });
         player?.stop();
         listen();
       } finally {

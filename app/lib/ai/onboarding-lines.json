@@ -1,12 +1,12 @@
 {
-  "about": "What Talk says from recordings: the landing page before anybody has signed in, and the urgent-help page, which anybody can open. Spoken from pre-recorded files (public/voice/onboarding), never generated per visit. Edit the text here, then run `npm run build:voice`. English is the source. The Wolof was drafted by the model, back-translated to check the meaning, and is marked draft until a Gambian translator has checked it — correct `wo` here and set `woDraft` to false.",
+  "about": "What TALK says from recordings: the landing page before anybody has signed in, and the urgent-help page, which anybody can open. Spoken from pre-recorded files (public/voice/onboarding), never generated per visit. Edit the text here, then run `npm run build:voice`. English is the source. The Wolof was drafted by the model, back-translated to check the meaning, and is marked draft until a Gambian translator has checked it — correct `wo` here and set `woDraft` to false.",
   "lines": [
     {
       "id": "welcome",
-      "en": "Welcome to Talk Therapy.",
-      "wo": "Dalal ak jàmm ci Talk Therapy.",
+      "en": "Welcome to TALK.",
+      "wo": "Dalal ak jàmm ci TALK.",
       "woDraft": true,
-      "woBack": "Welcome to Talk Therapy."
+      "woBack": "Welcome to TALK."
     },
     {
       "id": "sign-in",

@@ -22,6 +22,7 @@ import { LOCALE_LABELS, type Locale, type ProviderProfile } from "@/lib/models";
 import { getOwnProviderProfile, saveProviderProfile, uploadProviderPhoto } from "@/lib/providers";
 import ProviderAvatar from "@/components/providers/ProviderAvatar";
 import { toMajor, toMinor } from "@/lib/money";
+import { SESSION_MINUTES } from "@/lib/booking";
 
 /**
  * A provider's own listing — the thing that decides whether anybody can find
@@ -115,7 +116,7 @@ function StatusNote({ profile }: { profile: ProviderProfile | null }) {
   if (profile.status === "verified") {
     return (
       <Alert tone="success" title="Your profile is live">
-        People looking for support can find you, and Talk can suggest you to
+        People looking for support can find you, and TALK can suggest you to
         someone whose needs match what you offer.
       </Alert>
     );
@@ -353,7 +354,7 @@ export default function ProviderProfileForm() {
         <div className="space-y-7">
           <Choices
             legend="What you offer"
-            hint="Matched directly against what someone asks Talk for."
+            hint="Matched directly against what someone asks TALK for."
             values={SERVICES}
             labels={SERVICE_LABELS}
             selected={services}
@@ -361,7 +362,7 @@ export default function ProviderProfileForm() {
           />
           <Choices
             legend="Languages you work in"
-            hint="The heaviest part of matching. Someone who speaks only Wolof will not be shown a provider who does not."
+            hint="The heaviest part of matching. Someone who asks for Wolof sees the providers who speak it first."
             values={LANGUAGE_OPTIONS}
             labels={LOCALE_LABELS}
             selected={languages}
@@ -382,14 +383,14 @@ export default function ProviderProfileForm() {
         <div className="space-y-5">
           <Select
             label="Where you are"
-            hint="Used to put you in front of people near you. Sessions still happen by video."
+            hint="Used to put you in front of people near you. Sessions still happen online, by video or voice call."
             options={TOWN_OPTIONS}
             value={town}
             onChange={(e) => setTown(e.target.value)}
           />
           <Select
             label="Your gender"
-            hint="Shown because many people ask for a woman or a man, and it is the one preference we honour exactly."
+            hint="Shown because many people ask for a woman or a man. It weighs on who is suggested, and the directory can be filtered by it."
             options={GENDER_OPTIONS}
             value={gender}
             onChange={(e) => setGender(e.target.value)}
@@ -404,7 +405,7 @@ export default function ProviderProfileForm() {
           />
           <Input
             label="Fee per session, in Dalasi"
-            hint="What one session with you costs. Talk's own D200 consultation is separate from this."
+            hint="What one session with you costs. A first conversation with TALK is paid for separately."
             type="number"
             min={0}
             inputMode="numeric"
@@ -432,7 +433,7 @@ export default function ProviderProfileForm() {
           {saving ? "Saving…" : existing ? "Save changes" : "Send for checking"}
         </Button>
         <p className="text-[12px] text-[var(--muted)] leading-relaxed">
-          Sessions happen by video inside Talk.
+          Sessions are {SESSION_MINUTES} minutes, by video or voice call, inside TALK.
         </p>
       </div>
     </div>

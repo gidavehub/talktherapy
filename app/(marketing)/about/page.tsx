@@ -5,9 +5,9 @@ import { SectionHeading } from "@/components/ui/Typography";
 import { BulletItem } from "@/components/ui/Feedback";
 
 export const metadata: Metadata = {
-  title: "About Talk",
+  title: "About",
   description:
-    "Talk is a mental wellbeing, counselling and psychosocial support platform for The Gambia — built so that asking for help becomes easier.",
+    "TALK is a mental wellbeing and psychosocial support platform for The Gambia — built so that asking for help becomes easier.",
 };
 
 const OBJECTIVES = [
@@ -42,7 +42,7 @@ export default function AboutPage() {
       <PageIntro
         eyebrow="About"
         lines={["Somewhere safe", "to begin."]}
-        lede="Talk is a mental wellbeing, counselling and psychosocial support platform for The Gambia. It exists to shorten the distance between the moment someone realises they need support and the moment they actually receive it."
+        lede="TALK is a mental wellbeing and psychosocial support platform for The Gambia. It exists to shorten the distance between the moment someone realises they need support and the moment they actually receive it."
         stamp="TALK"
       />
 
@@ -123,7 +123,7 @@ export default function AboutPage() {
         <SectionHeading
           eyebrow="The long view"
           lines={["Not another", "technology platform."]}
-          lede="Over time Talk could grow into a wider digital wellbeing ecosystem — multilingual support, locally relevant content, moderated peer communities, corporate and university programmes, and research partnerships. Expansion into other African markets could follow once the model has been responsibly validated at home."
+          lede="Over time TALK could grow into a wider digital wellbeing ecosystem — more Gambian languages, locally relevant content, moderated peer communities, corporate and university programmes, and research partnerships. Expansion into other African markets could follow once the model has been responsibly validated at home."
         />
         <p className="mt-10 text-[24px] md:text-[34px] leading-[1.15] font-display font-medium max-w-[760px]">
           The ambition is to build an environment where asking for help becomes

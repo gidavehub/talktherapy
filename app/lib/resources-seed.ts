@@ -239,7 +239,7 @@ Slowing your out-breath nudges the part of your nervous system responsible for s
   {
     id: "seed-first-session",
     slug: "what-actually-happens-in-a-first-counselling-session",
-    title: "What actually happens in a first counselling session",
+    title: "What actually happens in a first session with a provider",
     summary:
       "For anyone who has considered booking and stopped because they did not know what they were walking into.",
     format: "article",
@@ -267,7 +267,7 @@ There is no couch, no analysis of your childhood unless it is relevant to you, a
 
 ## You are allowed to say very little
 
-Some people talk for the full hour. Others say a few sentences and sit with long silences. Both are fine. You are not failing the session by finding it difficult.
+Some people talk for the whole session. Others say a few sentences and sit with long silences. Both are fine. You are not failing the session by finding it difficult.
 
 ## You will probably cry, or you will not
 
@@ -279,7 +279,7 @@ What you say stays between you and your provider. The exception, which any profe
 
 ## You can change your mind
 
-If it does not feel right, you are not committed. Fit matters enormously in counselling, and it is normal to try more than one person before finding someone you work well with. Choosing differently is not rudeness; it is the process working.
+If it does not feel right, you are not committed. Fit matters enormously in this kind of support, and it is normal to try more than one person before finding someone you work well with. Choosing differently is not rudeness; it is the process working.
 
 ## Afterwards
 

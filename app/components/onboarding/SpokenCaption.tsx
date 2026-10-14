@@ -42,7 +42,7 @@ export default function SpokenCaption({
             <Bars />
             <div className="min-w-0">
               <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--accent)]">
-                Talk · {LOCALE_NAMES[saying.locale]}
+                TALK · {LOCALE_NAMES[saying.locale]}
               </p>
               <p
                 lang={saying.locale === "wo" ? "wo" : "en"}

@@ -12,6 +12,15 @@ import {
   IconClock,
   IconWallet,
   IconShield,
+  IconGrid,
+  IconChart,
+  IconHeart,
+  IconBadge,
+  IconLifebuoy,
+  IconPen,
+  IconImage,
+  IconPalette,
+  IconHistory,
 } from "../components/ui/icons";
 
 /**
@@ -22,9 +31,10 @@ import {
  * phone is the default device here rather than the exception. Everything else
  * stays reachable through the menu.
  *
- * Only routes that actually exist are listed. Bookings land in a later phase
- * and get added here then; a nav item that 404s is worse than one that is not
- * there yet.
+ * Only routes that actually exist are listed; a nav item that 404s is worse
+ * than one that is not there yet. The staff rail is the one exception while
+ * it is being built: it is laid out in full up front so that the pages behind
+ * it can be added side by side without each one editing this list.
  */
 
 export const PATIENT_NAV: NavItem[] = [
@@ -35,7 +45,7 @@ export const PATIENT_NAV: NavItem[] = [
   // This takes the bottom bar to exactly five; anything added later has to
   // take a slot rather than extend the row.
   { href: "/chats", label: "Messages", icon: <IconChat />, primary: true },
-  { href: "/talk", label: "Talk", icon: <IconMic />, primary: true },
+  { href: "/talk", label: "TALK", icon: <IconMic />, primary: true },
   // Took the fifth slot from Settings. A session you have booked is something
   // you will check; settings is something you change once.
   { href: "/sessions", label: "Sessions", icon: <IconCalendar />, primary: true },
@@ -69,11 +79,38 @@ export const PROVIDER_NAV: NavItem[] = [
 ];
 
 /**
- * Staff. One job here: what is waiting for a person — payments held for
- * review, payouts flagged, sessions a patient said did not happen.
+ * Staff. Fifteen places, so the rail is grouped: how the service is doing,
+ * the people in it, the day-to-day work that waits for a person, the public
+ * site, and the staff member's own messages and settings.
+ *
+ * The bottom bar takes the five a person on a phone reaches for: the overview,
+ * the numbers, providers waiting to be approved, the review queue, and the
+ * site's words. Everything else is one tap away in the menu.
+ *
+ * Overview is `exact` because every staff page starts with "/admin" — without
+ * it, Overview would be lit on all of them.
+ *
+ * Audit log sits with the day-to-day work rather than on its own: it is where
+ * a decision made in Review or Payments is checked afterwards.
  */
 export const ADMIN_NAV: NavItem[] = [
-  { href: "/admin/review", label: "Review", icon: <IconShield />, primary: true },
-  { href: "/chats", label: "Messages", icon: <IconChat />, primary: true },
-  { href: "/settings", label: "Settings", icon: <IconSettings />, primary: true },
+  { href: "/admin", label: "Overview", icon: <IconGrid />, primary: true, exact: true, section: "At a glance" },
+  { href: "/admin/insights", label: "Insights", icon: <IconChart />, primary: true, section: "At a glance" },
+  { href: "/admin/insights/wellbeing", label: "Wellbeing", icon: <IconHeart />, section: "At a glance" },
+
+  { href: "/admin/users", label: "Users", icon: <IconPeople />, section: "People" },
+  { href: "/admin/providers", label: "Providers", icon: <IconBadge />, primary: true, section: "People" },
+  { href: "/admin/review", label: "Review", icon: <IconShield />, primary: true, section: "People" },
+
+  { href: "/admin/sessions", label: "Sessions", icon: <IconCalendar />, section: "Operations" },
+  { href: "/admin/payments", label: "Payments", icon: <IconWallet />, section: "Operations" },
+  { href: "/admin/support", label: "Support", icon: <IconLifebuoy />, section: "Operations" },
+  { href: "/admin/audit", label: "Audit log", icon: <IconHistory />, section: "Operations" },
+
+  { href: "/admin/content", label: "Content", icon: <IconPen />, primary: true, section: "Site" },
+  { href: "/admin/content/media", label: "Media", icon: <IconImage />, section: "Site" },
+  { href: "/admin/content/theme", label: "Theme", icon: <IconPalette />, section: "Site" },
+
+  { href: "/chats", label: "Messages", icon: <IconChat />, section: "You" },
+  { href: "/settings", label: "Settings", icon: <IconSettings />, section: "You" },
 ];

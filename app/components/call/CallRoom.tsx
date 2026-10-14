@@ -129,7 +129,7 @@ export default function CallRoom({ bookingId }: { bookingId: string }) {
         // Only the microphone can fail us now: a missing camera already fell
         // back to voice inside joinCall.
         setError(
-          "Talk could not reach your microphone. Check the permission in your browser and try again.",
+          "We could not reach your microphone. Check the permission in your browser and try again.",
         );
       }
     },

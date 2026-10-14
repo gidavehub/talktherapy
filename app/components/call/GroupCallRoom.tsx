@@ -326,8 +326,8 @@ export default function GroupCallRoom({ chatId }: { chatId: string }) {
       const media = e instanceof DOMException && ["NotAllowedError", "NotFoundError", "NotReadableError"].includes(e.name);
       setError(
         media
-          ? "Talk could not reach your microphone. Check the permission in your browser and try again."
-          : "Talk could not open the call. Check your connection and try again.",
+          ? "We could not reach your microphone. Check the permission in your browser and try again."
+          : "We could not open the call. Check your connection and try again.",
       );
     } finally {
       if (joiningRef.current === cancel) joiningRef.current = null;

@@ -70,7 +70,7 @@ export default function ReviewQueue() {
   }, [isAdmin]);
 
   if (!isAdmin) {
-    return <EmptyState icon={<IconShield />} title="Staff only" description="This page is for the Talk team." />;
+    return <EmptyState icon={<IconShield />} title="Staff only" description="This page is for the TALK team." />;
   }
 
   return (
@@ -91,7 +91,7 @@ export default function ReviewQueue() {
       />
       <Queue
         title="Payouts flagged"
-        explain="A provider may have been paid twice for a session, a transfer came back, or Talk's side refused it (key, balance, limits). Check Modem Pay, put it right there, then acknowledge."
+        explain="A provider may have been paid twice for a session, a transfer came back, or TALK's side refused it (key, balance, limits). Check Modem Pay, put it right there, then acknowledge."
         items={payouts}
         render={(p) => ({
           heading: `${formatDalasi(num(p.data.amountMinor))} to ${str(p.data.beneficiaryName)} · ${str(p.data.status)}`,

@@ -50,7 +50,9 @@ export default function MindPicker() {
       <div className="relative mx-auto max-w-[640px] px-5 text-center">
         <Reveal>
           <h2 className="font-display text-[34px] font-medium leading-tight md:text-[42px]">What&apos;s on your mind?</h2>
-          <p className="mt-3 text-[15px] text-[var(--muted)]">Pick a place to start. TALK will take it from there.</p>
+          <p className="mt-3 text-[15px] text-[var(--muted)]">
+            Have a think about what is weighing on you. TALK will ask about it, gently, in your own words.
+          </p>
         </Reveal>
 
         <Reveal delay={0.08}>

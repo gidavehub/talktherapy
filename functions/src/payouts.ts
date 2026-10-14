@@ -143,7 +143,7 @@ export type PayoutResult =
 
 const NOT_SENT_ACCOUNT = "The transfer was refused. Check your wallet number and the name on it, then try again.";
 const NOT_SENT_PLATFORM =
-  "Talk could not send it just now — the problem is on our side, not your details. Your sessions are back in what is ready to send.";
+  "TALK could not send it just now — the problem is on our side, not your details. Your sessions are back in what is ready to send.";
 const DID_NOT_GO = "The transfer did not go through. Your sessions are back in what is ready to send.";
 
 /**
@@ -228,7 +228,7 @@ async function send(ref: DocumentReference, transfer: TransferClient, callbackUr
     network: payout.network,
     accountNumber: payout.accountNumber,
     beneficiaryName: payout.beneficiaryName,
-    narration: "Talk — your sessions",
+    narration: "TALK — your sessions",
     metadata: { payout_id: ref.id, provider_id: payout.providerId },
     callbackUrl,
   });
@@ -322,7 +322,7 @@ async function release(
       failureReason: reason,
       lastError: detail.slice(0, 300),
       // Talk's own side failing is staff's to fix, not the provider's.
-      ...(platform ? { needsReview: true, reviewReason: "Refused on Talk's side (key, balance or limits)" } : {}),
+      ...(platform ? { needsReview: true, reviewReason: "Refused on TALK's side (key, balance or limits)" } : {}),
       updatedAt: Date.now(),
     });
     return "failed" as PayoutStatus;
@@ -384,7 +384,7 @@ async function reverse(payoutId: string, detail: string): Promise<PayoutStatus> 
     }
     tx.update(ref, {
       status: "reversed" satisfies PayoutStatus,
-      failureReason: "This came back to Talk after it was sent. Your sessions are back in what is ready to send.",
+      failureReason: "This came back to TALK after it was sent. Your sessions are back in what is ready to send.",
       lastError: detail.slice(0, 300),
       needsReview: true,
       reviewReason: "Reversed after it was sent",

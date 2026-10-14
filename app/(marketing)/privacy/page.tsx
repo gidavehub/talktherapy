@@ -7,16 +7,16 @@ import { Alert } from "@/components/ui/Feedback";
 export const metadata: Metadata = {
   title: "Privacy policy",
   description:
-    "How Talk collects, uses, stores and deletes your information — written to be read, not to be skipped.",
+    "How TALK collects, uses, stores and deletes your information — written to be read, not to be skipped.",
 };
 
-const LAST_UPDATED = "20 September 2026";
+const LAST_UPDATED = "14 October 2026";
 
 const SECTIONS = [
   {
     heading: "What we collect, and why",
     body: [
-      "We collect only what we need to run the service. That means your account details (name, email, and a profile photo if you add one), anything you choose to record in the platform (mood check-ins, journal entries, messages to the AI companion), booking and payment records, and basic technical information such as the device and browser you use.",
+      "We collect only what we need to run the service. That means your account details (name, email, and a profile photo if you add one), anything you choose to record in the platform (mood check-ins, journal entries, messages to your provider), what TALK learns about you to find you the right provider, booking and payment records, and basic technical information such as the device and browser you use.",
       "We use this to provide the service, to connect you with providers, to process payments, and to keep the platform safe. We do not use it for anything else.",
       "We do not sell your information. We do not share it with advertisers. Sensitive details you share with the AI companion or with a provider are never repurposed for marketing.",
     ],
@@ -25,8 +25,8 @@ const SECTIONS = [
     heading: "Who can see what",
     body: [
       "Your journal entries and mood check-ins are visible only to you. Providers cannot read them. Administrators cannot read them. They are stored under your account and the access rules enforce that at the database level, not merely in the interface.",
-      "A provider sees what you share during a session, plus any note you attach to a booking. Clinical notes a provider writes about a session are visible to that provider only.",
-      "Where your account is part of an institutional package, your organisation never sees who booked a session, when, or with whom. Reporting to organisations is aggregate and is suppressed entirely for small groups so that individuals cannot be identified.",
+      "A provider sees what you share during a session, the messages you send them, and any note you attach to a booking.",
+      "When institutional funding launches and an organisation pays for your sessions, it will never see who booked a session, when, or with whom. Any reporting to organisations will be aggregate, and suppressed entirely for small groups so that individuals cannot be identified.",
     ],
   },
   {
@@ -39,9 +39,9 @@ const SECTIONS = [
   {
     heading: "AI processing",
     body: [
-      "Conversations with the AI companion are processed by a third-party AI provider in order to generate a response. Those conversations are stored in your account so you can revisit them, and you can delete them.",
+      "Conversations with TALK are processed by a third-party AI provider so she can hear you and reply. The words themselves are not saved. What she learns to match you — the name you go by, your language, age range, area and gender, what you are going through, and the help you are looking for — is saved to your account, and deleted with it.",
       "The AI companion is always labelled as AI. It does not diagnose, prescribe or claim to be human.",
-      "Where a conversation suggests possible immediate risk, the platform surfaces crisis resources and may create an internal record so that a human can follow up. That record notes the category of concern, not the content of what you disclosed.",
+      "Where a conversation suggests possible immediate risk, TALK gives you the emergency numbers straight away. Nothing about it is sent to anyone.",
     ],
   },
   {
@@ -62,7 +62,7 @@ const SECTIONS = [
   {
     heading: "How long we keep things",
     body: [
-      "We keep your account data for as long as your account is open. When you delete your account, your profile, journal entries, mood history and companion conversations are deleted.",
+      "We keep your account data for as long as your account is open. When you delete your account, your profile, what TALK learned about you, journal entries and mood history are deleted.",
       "Records we are obliged to retain, such as transaction records, are kept for the statutory period. Anonymised, aggregated statistics that cannot be linked back to you may be retained.",
     ],
   },
@@ -82,7 +82,7 @@ const SECTIONS = [
   {
     heading: "Legal basis and jurisdiction",
     body: [
-      "Talk is designed to comply with The Gambia's Data Protection and Privacy Act, drawing on internationally recognised data protection standards where local guidance is still developing.",
+      "TALK is designed to comply with The Gambia's Data Protection and Privacy Act, drawing on internationally recognised data protection standards where local guidance is still developing.",
       "If you have a concern about how your data is handled, contact us and we will respond.",
     ],
   },
@@ -115,7 +115,7 @@ export default function PrivacyPage() {
       <CTABlock
         eyebrow="Related"
         lines={["Our safety", "commitments."]}
-        body="Professional verification, crisis escalation, AI boundaries and human oversight."
+        body="Professional verification, what happens in a crisis, AI boundaries and human oversight."
         primary={{ label: "Safety & ethics", href: "/safety" }}
         secondary={{ label: "Terms of service", href: "/terms" }}
       />

@@ -10,7 +10,7 @@ import { PLATFORM_FEE_RATE } from "@/lib/money";
 export const metadata: Metadata = {
   title: "For providers",
   description:
-    "Join Talk as a verified provider or psychosocial support professional. Set your own rate, manage your availability, and reach people who would not otherwise walk through a door.",
+    "Join TALK as a verified provider or psychosocial support professional. Set your own rate, manage your availability, and reach people who would not otherwise walk through a door.",
 };
 
 const BENEFITS = [
@@ -20,19 +20,19 @@ const BENEFITS = [
   },
   {
     title: "Control your calendar",
-    body: "Publish only the hours you want to work. Set session length, buffer time and how far ahead people can book.",
+    body: "Publish only the hours you want to work, up to two weeks ahead. Each session is 45 minutes.",
   },
   {
     title: "Reach people who would not come to you",
-    body: "Many of the people on Talk would never book an in-person appointment. Distance, cost and stigma stop them long before your waiting room does.",
+    body: "Many of the people on TALK would never book an in-person appointment. Distance, cost and stigma stop them long before your waiting room does.",
   },
   {
     title: "Practise, not paperwork",
-    body: "Booking, reminders, payment and session notes are handled in one place, so your admin time goes down rather than up.",
+    body: "Booking, payment, messages and calls are handled in one place, so your admin time goes down rather than up.",
   },
   {
     title: "A secure consultation room",
-    body: "Private video sessions run inside the platform. No third-party meeting links, no personal phone numbers exchanged.",
+    body: "Private video and voice calls run inside TALK — no personal phone numbers exchanged. If a call will not connect, you can add a Google Meet link as a fallback.",
   },
   {
     title: "Verified means something",
@@ -69,24 +69,24 @@ const FAQS = [
     a: "We work with qualified providers, psychologists, psychosocial support practitioners, social workers and other appropriately qualified professionals. You will need to evidence your qualification and identity. If you are unsure whether your background qualifies, apply and ask — we would rather have the conversation.",
   },
   {
-    q: "How much does Talk take?",
-    a: `Talk retains a ${Math.round(PLATFORM_FEE_RATE * 100)}% service fee on each completed session, which covers payment processing, the platform, verification and support. The remainder is yours.`,
+    q: "How much does TALK take?",
+    a: `TALK retains a ${Math.round(PLATFORM_FEE_RATE * 100)}% service fee on each completed session, which covers payment processing, the platform, verification and support. The remainder is yours.`,
   },
   {
     q: "How and when am I paid?",
-    a: "Session fees are collected at the time of booking and held until the session is completed. Payouts are made to your nominated account on a regular cycle, and your earnings dashboard shows what is pending and what is available.",
+    a: "People pay for a session before it happens. Twenty-four hours after it ends, your share is ready — send it from Earnings to your Wave, Afrimoney, QMoney or APS wallet whenever you like.",
   },
   {
-    q: "Am I employed by Talk?",
-    a: "No. You practise independently, set your own rate and hours, and remain responsible for your own professional registration, insurance and clinical judgement. Talk is the platform connecting you to clients, not your employer.",
+    q: "Am I employed by TALK?",
+    a: "No. You practise independently, set your own rate and hours, and remain responsible for your own professional registration, insurance and clinical judgement. TALK is the platform connecting you to clients, not your employer.",
   },
   {
     q: "What happens if a client is at risk?",
-    a: "Talk surfaces crisis resources to users automatically, and you have an escalation route from inside a session. Our safeguarding protocols are developed with clinical input, and we expect you to follow your own professional obligations alongside them.",
+    a: "TALK gives people the emergency numbers automatically when they may be in danger. In your own sessions, follow your professional obligations — and if you are worried about someone, contact us through support.",
   },
   {
-    q: "Can I practise in Wolof or another local language?",
-    a: "Yes, and we actively want you to. Language is listed on your profile and is one of the filters people use most, because support in a second language is rarely the same thing as support.",
+    q: "Can I work in Wolof, Mandinka or Pulaar?",
+    a: "Yes — and we want you to. Choose the languages you work in on your profile: English, Wolof, Mandinka, Pulaar. TALK matches people with providers who speak their language, and the directory can be filtered by it.",
   },
 ];
 
@@ -96,7 +96,7 @@ export default function ForProvidersPage() {
       <PageIntro
         eyebrow="For providers"
         lines={["Your practice,", "further reach."]}
-        lede="Talk connects qualified providers and psychosocial support professionals with people across The Gambia who need support and cannot easily get to it."
+        lede="TALK connects qualified providers and psychosocial support professionals with people across The Gambia who need support and cannot easily get to it."
         stamp="PRACTISE"
       >
         <div className="flex flex-col sm:flex-row gap-3">

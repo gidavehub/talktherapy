@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { SPRING_SOFT, SPRING_SNAP } from "../motion/primitives";
@@ -21,7 +21,8 @@ import Logo from "../Logo";
  * because phone is the default device for this audience, not the exception.
  *
  * Nav is injected rather than hardcoded so patient / provider / admin / org
- * all share one shell with four different rails.
+ * all share one shell with four different rails. A long rail — the staff one —
+ * is broken into labelled sections (NavItem.section) so it can be scanned.
  *
  * Messages is laid out like WhatsApp, edge to edge, and brings its own panes
  * (ChatsSplit). On a phone an open conversation IS the screen: its header is
@@ -68,12 +69,49 @@ export type NavItem = {
   /** Shown in the bottom bar on mobile. Keep to five or fewer. */
   primary?: boolean;
   badge?: number;
+  /**
+   * The group this item belongs to. The rail labels a group above its first
+   * item, so items sharing a section must sit next to each other in the list.
+   */
+  section?: string;
+  /**
+   * Lit only on this exact path, never on the pages beneath it. For a root
+   * like "/admin", which every staff page starts with.
+   */
+  exact?: boolean;
 };
 
-function isActive(pathname: string, href: string) {
-  // Exact match for the section root so "/journal" doesn't light up on
-  // "/journal/new" *and* its parent simultaneously.
-  return pathname === href || pathname.startsWith(`${href}/`);
+function isActive(pathname: string, item: NavItem) {
+  if (pathname === item.href) return true;
+  return !item.exact && pathname.startsWith(`${item.href}/`);
+}
+
+/**
+ * The one item to light up: the closest match, not every match. On
+ * "/admin/content/media" both Content and Media match by prefix, and only
+ * Media is where you are. In the bottom bar, where Media is absent, the same
+ * rule lights Content instead.
+ */
+function activeHref(pathname: string, items: NavItem[]) {
+  let best: string | null = null;
+  for (const item of items) {
+    if (isActive(pathname, item) && (best === null || item.href.length > best.length)) best = item.href;
+  }
+  return best;
+}
+
+/**
+ * The rail in runs of one section each, in list order. A list with no
+ * sections — the patient and provider ones — comes back as a single run.
+ */
+function sectionsOf(items: NavItem[]) {
+  const runs: { section?: string; items: NavItem[] }[] = [];
+  for (const item of items) {
+    const last = runs[runs.length - 1];
+    if (last && last.section === item.section) last.items.push(item);
+    else runs.push({ section: item.section, items: [item] });
+  }
+  return runs;
 }
 
 function NavLink({
@@ -96,7 +134,10 @@ function NavLink({
           onNavigate?.();
         }}
         aria-current={active ? "page" : undefined}
-        className={`flex items-center gap-3 rounded-full h-11 px-4 text-[13px] tracking-wide transition-colors ${
+        // The ring is drawn inside the pill: the rail scrolls, and a scroll
+        // box clips anything drawn outside it, so a browser outline on the
+        // first or last link would be cut in half.
+        className={`flex items-center gap-3 rounded-full h-11 px-4 text-[13px] tracking-wide outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--cream)]/60 ${
           active
             ? "bg-[var(--accent)] text-white"
             : "text-[var(--cream)]/70 hover:text-[var(--cream)] hover:bg-white/5"
@@ -146,10 +187,35 @@ export default function AppShell({
   const hasBar = bars > 0;
 
   const primary = nav.filter((item) => item.primary).slice(0, 5);
+  const railActive = activeHref(pathname, nav);
+  const barActive = activeHref(pathname, primary);
   const messages = inMessages(pathname);
   // One conversation open: it draws both bars itself.
   const conversation = pathname.startsWith("/chats/");
   const displayName = profile?.displayName ?? user?.displayName ?? user?.email ?? "You";
+  // A count on an item the bottom bar leaves out — staff Messages — would
+  // otherwise only be seen by someone who opened the menu, so the menu
+  // button carries it on a phone.
+  const menuBadge = nav.reduce((sum, item) => (primary.includes(item) ? sum : sum + (item.badge ?? 0)), 0);
+
+  // The phone menu behaves like the app's other overlays: focus goes into it
+  // when it opens and back to where it was when it closes, and Escape closes
+  // it, so a keyboard is not left tabbing through the page underneath.
+  const menuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const before = document.activeElement as HTMLElement | null;
+    const frame = requestAnimationFrame(() => menuRef.current?.focus());
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setMenuOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("keydown", onKey);
+      if (before && document.contains(before)) before.focus();
+    };
+  }, [menuOpen]);
 
   const rail = (
     <>
@@ -157,14 +223,40 @@ export default function AppShell({
         <Logo height={40} light />
       </Link>
 
-      <nav className="mt-10 flex flex-col gap-1">
-        {nav.map((item) => (
-          <NavLink
-            key={item.href}
-            item={item}
-            active={isActive(pathname, item.href)}
-            onNavigate={() => setMenuOpen(false)}
-          />
+      {/* Scrolls on its own when it outgrows the screen — the staff rail is
+          three times the length of a patient one — so the account card below
+          stays put. Pulled out into the padding so the hover nudge has room
+          and is not clipped by the scroll box. */}
+      <nav className="mt-10 -mx-6 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden px-6 [scrollbar-color:rgb(255_255_255/0.15)_transparent] [scrollbar-width:thin]">
+        {/* Each section is a named group, so a screen reader announces
+            "People" on the way into it; the visible label is the same word
+            and is hidden from it to avoid saying it twice. */}
+        {sectionsOf(nav).map((run, i) => (
+          <div
+            key={`${i}-${run.section ?? ""}`}
+            role={run.section ? "group" : undefined}
+            aria-label={run.section}
+            className="flex flex-col gap-1"
+          >
+            {run.section ? (
+              <p
+                aria-hidden
+                className={`px-4 pb-1 text-[10.5px] uppercase tracking-[0.28em] font-medium text-[var(--cream)]/50 ${
+                  i === 0 ? "" : "pt-5"
+                }`}
+              >
+                {run.section}
+              </p>
+            ) : null}
+            {run.items.map((item) => (
+              <NavLink
+                key={item.href}
+                item={item}
+                active={item.href === railActive}
+                onNavigate={() => setMenuOpen(false)}
+              />
+            ))}
+          </div>
         ))}
       </nav>
 
@@ -212,11 +304,16 @@ export default function AppShell({
               onClick={() => setMenuOpen(false)}
             />
             <motion.div
+              ref={menuRef}
+              tabIndex={-1}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Menu"
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={SPRING_SOFT}
-              className="absolute inset-y-0 right-0 w-[80%] max-w-[320px] bg-[var(--dark)] px-6 py-8 flex flex-col overflow-y-auto"
+              className="absolute inset-y-0 right-0 w-[80%] max-w-[320px] bg-[var(--dark)] px-6 py-8 flex flex-col overflow-y-auto outline-none"
             >
               {rail}
             </motion.div>
@@ -250,18 +347,28 @@ export default function AppShell({
                 {actions}
                 <motion.button
                   type="button"
-                  aria-label="Menu"
+                  aria-label={menuBadge > 0 ? `Menu, ${menuBadge} unread` : "Menu"}
                   aria-expanded={menuOpen}
                   onClick={() => setMenuOpen((v) => !v)}
                   whileTap={{ scale: 0.94 }}
                   transition={SPRING_SNAP}
-                  className="h-10 w-10 rounded-full border-[1.5px] border-[var(--dark)]/70 text-[var(--foreground)] flex items-center justify-center"
+                  className="relative h-10 w-10 rounded-full border-[1.5px] border-[var(--dark)]/70 text-[var(--foreground)] flex items-center justify-center"
                 >
-                  <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
+                  <svg width="16" height="12" viewBox="0 0 16 12" fill="none" aria-hidden>
                     <rect width="16" height="1.6" rx="0.8" fill="currentColor" />
                     <rect y="5.2" width="16" height="1.6" rx="0.8" fill="currentColor" />
                     <rect y="10.4" width="16" height="1.6" rx="0.8" fill="currentColor" />
                   </svg>
+                  {menuBadge > 0 ? (
+                    <motion.span
+                      key={menuBadge}
+                      aria-hidden
+                      initial={{ scale: 0.4, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={SPRING_SNAP}
+                      className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-[var(--accent)] ring-2 ring-[var(--background)]"
+                    />
+                  ) : null}
                 </motion.button>
               </div>
             </div>
@@ -311,7 +418,7 @@ export default function AppShell({
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-[var(--surface)] border-t border-[var(--border)] pb-[env(safe-area-inset-bottom)]">
         <div className="flex items-stretch">
           {primary.map((item) => {
-            const active = isActive(pathname, item.href);
+            const active = item.href === barActive;
             return (
               <Link
                 key={item.href}

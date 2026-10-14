@@ -254,7 +254,7 @@ export default function Header() {
                   onClick={() => setOpen(false)}
                   className="text-[14px] text-[var(--accent)] underline decoration-[var(--accent)]/40 underline-offset-4"
                 >
-                  Need urgent help right now?
+                  In danger? Free emergency numbers
                 </Link>
               </div>
             </div>

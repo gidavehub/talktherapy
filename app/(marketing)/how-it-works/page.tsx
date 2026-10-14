@@ -8,17 +8,24 @@ import {
   IconResources,
   IconMood,
 } from "@/components/ui/icons";
+import { AI_TIERS, HUMAN_RATE_MIN_MINOR } from "@/lib/models";
+import { formatDalasi } from "@/lib/money";
 
 export const metadata: Metadata = {
-  title: "How Talk works",
+  title: "How it works",
   description:
-    "From a difficult day to a booked session with a qualified provider — how Talk combines an AI companion, human professionals, and wellbeing resources.",
+    "From a difficult day to a session with a qualified provider — how TALK brings together an AI companion, human providers and free wellbeing resources.",
 };
+
+// Prices come from the same constants the checkout charges, so this page can
+// never quote a number the payment does not take.
+const FIRST = AI_TIERS.initial;
+const LONGER = AI_TIERS.extended;
 
 const STEPS = [
   {
     title: "Start wherever you are",
-    body: "You do not need a reason, a diagnosis, or the right words. Open Talk because today was hard, because something has been sitting with you for months, or because you simply want to check in with yourself.",
+    body: "You do not need a reason, a diagnosis, or the right words. Open TALK because today was hard, because something has been sitting with you for months, or because you simply want to check in with yourself.",
   },
   {
     title: "Talk it through with the companion",
@@ -30,7 +37,7 @@ const STEPS = [
   },
   {
     title: "Choose a provider and book",
-    body: "Browse verified professionals by specialisation, language and availability. See their qualifications and rates before you commit to anything.",
+    body: "Browse verified providers by language, specialty and who you would feel most comfortable with. See their qualifications and fee before you commit to anything.",
   },
   {
     title: "Meet securely",
@@ -45,7 +52,7 @@ const STEPS = [
 const PILLARS = [
   {
     title: "AI companion",
-    body: "A private space for emotional check-ins, guided reflection and grounding exercises — available in English, with Wolof and other local languages planned.",
+    body: "A private space to talk things through — by voice or by typing, in English, Wolof, Mandinka or Pulaar. Check-ins, reflection, and simple grounding when it helps.",
     icon: <IconOrb />,
   },
   {
@@ -55,7 +62,7 @@ const PILLARS = [
   },
   {
     title: "Resource centre",
-    body: "Free articles, audio exercises and guided reflections on stress, grief, relationships, work and study pressure.",
+    body: "Free articles and exercises on stress, grief, sleep, study pressure and more.",
     icon: <IconResources />,
   },
   {
@@ -72,7 +79,7 @@ const FAQS = [
   },
   {
     q: "Who can see what I share?",
-    a: "Your journal entries and mood check-ins are private to you. Providers do not have access to them unless you deliberately share something in a session. Conversations are encrypted in transit and at rest, and are never sold or used for advertising.",
+    a: "Your journal entries and mood check-ins are private to you. Providers do not have access to them unless you deliberately share something in a session. The words of your conversation with TALK are not saved — only what she learns to match you. Messages with your provider are encrypted in transit and at rest, and nothing you share is ever sold or used for advertising.",
   },
   {
     q: "How do I know a provider is qualified?",
@@ -80,11 +87,11 @@ const FAQS = [
   },
   {
     q: "What does it cost?",
-    a: "The resource centre is free. A first conversation with Talk is D200 for up to 8 minutes; a longer AI session is D500 for around 20 minutes. Human counselling sessions range from D700 to D3,000 depending on the professional. Pricing is set deliberately so that seeing a human is the more cost-effective path.",
+    a: `No plans, no subscription — you pay per conversation. The resource centre, mood check-ins and your journal are free. A first conversation with TALK is ${formatDalasi(FIRST.amountMinor)} for up to ${FIRST.durationSec / 60} minutes; a longer talk is ${formatDalasi(LONGER.amountMinor)} for up to ${LONGER.durationSec / 60} minutes. A 45-minute session with a provider costs what they set, from ${formatDalasi(HUMAN_RATE_MIN_MINOR)}. Minute for minute, a provider can cost less than TALK — on purpose.`,
   },
   {
     q: "What if I am in crisis?",
-    a: "Talk is not an emergency service. If you or someone else is in immediate danger, call 117 for police or 116 for an ambulance. Our crisis page lists the services that can help right now.",
+    a: "TALK is not an emergency service, and nobody is watching the app. If you or someone else is in immediate danger, call 117 for police or 116 for an ambulance — both are free to call. Our emergency contacts page lists every number.",
   },
 ];
 
@@ -94,7 +101,7 @@ export default function HowItWorksPage() {
       <PageIntro
         eyebrow="How it works"
         lines={["From a hard day", "to real support."]}
-        lede="Talk is built around one idea: the distance between needing help and getting it should be as short as possible. Here is what that looks like in practice."
+        lede="TALK is built around one idea: the distance between needing help and getting it should be as short as possible. Here is what that looks like in practice."
         stamp="LISTEN"
       />
 
@@ -102,7 +109,7 @@ export default function HowItWorksPage() {
         <SectionHeading
           eyebrow="The journey"
           lines={["Six steps, and you", "can stop at any of them."]}
-          lede="Nobody is pushed through a funnel. Plenty of people will open Talk, breathe for five minutes, and close it again. That is a valid use of this platform."
+          lede="Nobody is pushed through a funnel. Plenty of people will read one article, check in once, and close it again. That is a valid use of this platform."
         />
         <StepList steps={STEPS} />
       </Section>
@@ -111,7 +118,7 @@ export default function HowItWorksPage() {
         <SectionHeading
           eyebrow="What you get"
           lines={["Four ways in."]}
-          lede="Different days need different things. Talk is built so you can use only the part you need."
+          lede="Different days need different things. TALK is built so you can use only the part you need."
         />
         <div className="mt-12 md:mt-16">
           <FeatureGrid items={PILLARS} columns={4} />

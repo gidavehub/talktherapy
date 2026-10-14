@@ -177,7 +177,7 @@ export default function ChatList({ openId = null }: { openId?: string | null }) 
       <EmptyState
         icon={<IconChat />}
         title="Nobody has written to you yet"
-        description="When somebody picks you, their conversation appears here. You will see their name, what they told Talk they are going through, and whatever they write."
+        description="When somebody picks you, their conversation appears here, with their name and whatever they write."
         action={<Button href="/pro/profile">Check your profile</Button>}
         className="mx-4 mt-2"
       />

@@ -303,3 +303,70 @@ export const IconRetry = (p: IconProps) => (
     <path d="M4.5 4.5v4h4" />
   </Svg>
 );
+
+// ------------------------------------------------------------------ staff
+//
+// The admin rail. Each one has to be told apart from its neighbours at 16px
+// in a list of fifteen, so they differ in silhouette, not just in detail.
+
+/** Overview: the whole service on one screen, as tiles. */
+export const IconGrid = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3.5" y="3.5" width="7" height="7" rx="2" />
+    <rect x="13.5" y="3.5" width="7" height="7" rx="2" />
+    <rect x="3.5" y="13.5" width="7" height="7" rx="2" />
+    <rect x="13.5" y="13.5" width="7" height="7" rx="2" />
+  </Svg>
+);
+
+/** Wellbeing: how the people using TALK are doing, in aggregate. */
+export const IconHeart = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 20c-4.5-3-8-6.2-8-10a4.2 4.2 0 0 1 8-1.8A4.2 4.2 0 0 1 20 10c0 3.8-3.5 7-8 10z" />
+  </Svg>
+);
+
+/** Providers: a person with credentials — an ID card, not a crowd. */
+export const IconBadge = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3" y="5" width="18" height="14" rx="2.5" />
+    <circle cx="9" cy="10.5" r="2.2" />
+    <path d="M5.8 16c.6-1.5 1.8-2.3 3.2-2.3s2.6.8 3.2 2.3" />
+    <path d="M15 10h3M15 13.5h3" />
+  </Svg>
+);
+
+/** Support: somebody asking for help. */
+export const IconLifebuoy = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="8.5" />
+    <circle cx="12" cy="12" r="3.5" />
+    <path d="M6 6l3.5 3.5M14.5 14.5L18 18M18 6l-3.5 3.5M9.5 14.5L6 18" />
+  </Svg>
+);
+
+/** Content: the words on the site. */
+export const IconPen = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 20l1-4.5L15.5 5a2.1 2.1 0 0 1 3 3L8 18.5z" />
+    <path d="M13.5 7l3 3" />
+    <path d="M13 20h7" />
+  </Svg>
+);
+
+/** Theme: the site's colours. */
+export const IconPalette = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 3a9 9 0 0 0 0 18c1.3 0 1.9-.9 1.5-2l-.3-.8c-.5-1.3.4-2.7 1.8-2.7H18a3 3 0 0 0 3-3c0-5.2-4-9.5-9-9.5z" />
+    <path d="M7.5 11.5h.01M9.5 7.5h.01M14 7h.01M17 10h.01" strokeWidth={2.6} />
+  </Svg>
+);
+
+/** Audit log: what was done, and when — a clock turned back. */
+export const IconHistory = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 12a8 8 0 1 0 2.3-5.7" />
+    <path d="M4 4.5v4h4" />
+    <path d="M12 8v4l2.8 1.8" />
+  </Svg>
+);

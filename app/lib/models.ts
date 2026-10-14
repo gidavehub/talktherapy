@@ -442,17 +442,17 @@ export type SessionNote = {
 export const AI_TIERS = {
   initial: {
     id: "initial",
-    label: "Initial consultation",
+    label: "First conversation with TALK",
     amountMinor: 200_00,
     durationSec: 8 * 60,
-    blurb: "A first conversation, up to 8 minutes, that ends with matched providers.",
+    blurb: "Up to 8 minutes with TALK, in your language, ending with providers who fit you.",
   },
   extended: {
     id: "extended",
-    label: "Extended session",
+    label: "A longer talk with TALK",
     amountMinor: 500_00,
     durationSec: 20 * 60,
-    blurb: "A longer 20 minute check-in if you are not ready for a human yet.",
+    blurb: "Up to 20 minutes with TALK, for when you are not ready to speak to a person yet.",
   },
 } as const;
 
@@ -748,7 +748,7 @@ export const SUPPORT_TOPIC_LABELS: Record<SupportTopic, string> = {
   account: "My account",
   booking: "A booking or payment",
   provider: "Joining as a provider",
-  organisation: "Institutional packages",
+  organisation: "Funding sessions for an organisation",
   safety: "Reporting a concern",
 };
 

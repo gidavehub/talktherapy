@@ -7,7 +7,7 @@ import { CheckItem, Alert } from "@/components/ui/Feedback";
 export const metadata: Metadata = {
   title: "Technology",
   description:
-    "How Talk uses AI — what it does, what it deliberately does not do, and the boundaries it operates within.",
+    "How TALK uses AI — what it does, what it deliberately does not do, and the boundaries it operates within.",
 };
 
 const CAN_DO = [
@@ -39,7 +39,7 @@ const PRINCIPLES = [
   },
   {
     title: "Crisis escalation",
-    body: "Where a conversation suggests possible immediate danger, the platform surfaces emergency and crisis resources straight away rather than continuing the conversation.",
+    body: "Where a conversation suggests possible danger, TALK says the emergency numbers out loud and keeps them on screen, with tap-to-call, for the rest of the conversation.",
   },
   {
     title: "Defined boundaries",
@@ -51,7 +51,7 @@ const PRINCIPLES = [
   },
   {
     title: "Language and context",
-    body: "Support should not require speaking English. Wolof and other local Gambian languages are a design goal, introduced only where quality can be assured.",
+    body: "Support should not require speaking English. TALK speaks English, Wolof, Mandinka and Pulaar — the Gambian way, with English words mixed in, as people really talk.",
   },
 ];
 
@@ -61,7 +61,7 @@ export default function TechnologyPage() {
       <PageIntro
         eyebrow="Technology"
         lines={["AI that knows", "what it is not."]}
-        lede="Talk uses AI as an accessibility layer — a way to make the first step smaller. It is not a therapist, it does not pretend to be, and the whole design is built around that distinction."
+        lede="TALK uses AI as an accessibility layer — a way to make the first step smaller. It is not a therapist, it does not pretend to be, and the whole design is built around that distinction."
         stamp="AI"
       />
 
@@ -113,7 +113,7 @@ export default function TechnologyPage() {
         <SectionHeading
           eyebrow="Principles"
           lines={["Safety is a design", "requirement, not", "a feature."]}
-          lede="Because Talk operates in the mental wellbeing space, these are foundational rather than secondary."
+          lede="Because TALK operates in the mental wellbeing space, these are foundational rather than secondary."
         />
         <div className="mt-12 md:mt-16">
           <FeatureGrid items={PRINCIPLES} columns={3} />
@@ -128,27 +128,30 @@ export default function TechnologyPage() {
           />
           <div className="mt-8 space-y-5 text-[14px] md:text-[15px] leading-relaxed text-[var(--muted)]">
             <p>
-              Voice AI in Wolof, Mandinka and Pulaar is not yet reliable enough
-              to carry an emotionally sensitive conversation. We are designing
-              for those languages from the start, but we would rather ship
-              English well than ship four languages badly.
+              TALK speaks Wolof, Mandinka and Pulaar as well as English, but
+              voice AI in these languages is still young. She can mishear, or
+              choose an odd word, so the English can be shown under every line,
+              and you can ask her to change language at any time. Her fixed
+              Wolof, Mandinka and Pulaar wording — the consent she reads out,
+              and the recorded Wolof lines — is still a draft, waiting to be
+              checked by a Gambian translator.
             </p>
             <p>
               AI safety detection is imperfect. It can miss genuine distress and
-              it can flag ordinary turns of phrase. That is why the crisis
-              pathway always surfaces real emergency contacts rather than
-              relying on a model&rsquo;s judgement, and why human review sits behind
-              it.
+              it can flag ordinary turns of phrase. That is why the emergency
+              contacts are linked from TALK&rsquo;s own screen at all times,
+              whatever the model decides.
             </p>
             <p>
-              Conversations are encrypted in transit and at rest. They are not
-              end-to-end encrypted — our infrastructure provider holds the keys.
-              We would rather state that plainly than imply a stronger guarantee
-              than we can deliver.
+              The words of your conversation with TALK are not saved — only what
+              she learns to match you. Messages with your provider are encrypted
+              in transit and at rest. They are not end-to-end encrypted — our
+              infrastructure provider holds the keys. We would rather state that
+              plainly than imply a stronger guarantee than we can deliver.
             </p>
           </div>
 
-          <Alert tone="warning" title="Talk is not an emergency service" className="mt-10">
+          <Alert tone="warning" title="TALK is not an emergency service" className="mt-10">
             The companion cannot summon help. If you or someone else is in
             immediate danger, call 117 for police or 116 for an ambulance.
           </Alert>

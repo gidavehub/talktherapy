@@ -153,7 +153,7 @@ export function Webcam({
         }
       })
       .catch(() => {
-        if (!cancelled) onUnavailable("Talk could not open your camera. Choose a photo from your device instead.");
+        if (!cancelled) onUnavailable("We could not open your camera. Choose a photo from your device instead.");
       });
     return () => {
       cancelled = true;

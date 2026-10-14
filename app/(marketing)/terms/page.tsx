@@ -7,31 +7,31 @@ import { Alert } from "@/components/ui/Feedback";
 export const metadata: Metadata = {
   title: "Terms of service",
   description:
-    "The terms on which Talk is provided — what the service is, what it is not, and the responsibilities on both sides.",
+    "The terms on which TALK is provided — what the service is, what it is not, and the responsibilities on both sides.",
 };
 
-const LAST_UPDATED = "20 September 2026";
+const LAST_UPDATED = "14 October 2026";
 
 const SECTIONS = [
   {
-    heading: "What Talk is",
+    heading: "What TALK is",
     body: [
-      "Talk is a digital platform that provides wellbeing resources, an AI-assisted support companion, and access to independent providers and psychosocial support professionals.",
-      "Talk is a platform. Providers on Talk practise independently — they are not employees or agents of Talk, and the professional relationship in a session is between you and them.",
+      "TALK is a digital platform that provides wellbeing resources, an AI-assisted support companion, and access to independent providers and psychosocial support professionals.",
+      "TALK is a platform. Providers on TALK practise independently — they are not employees or agents of TALK, and the professional relationship in a session is between you and them.",
     ],
   },
   {
-    heading: "What Talk is not",
+    heading: "What TALK is not",
     body: [
-      "Talk is not an emergency service. Nobody monitors the platform continuously, and submitting anything here will not summon help. If you or someone else is in immediate danger, contact the emergency services directly.",
+      "TALK is not an emergency service. Nobody monitors the platform continuously, and submitting anything here will not summon help. If you or someone else is in immediate danger, contact the emergency services directly.",
       "The AI companion is not a therapist and does not provide medical advice, diagnosis or treatment. It is a supportive tool, clearly labelled as AI throughout.",
-      "Resources published on Talk are general information. They are not a substitute for professional assessment of your own situation.",
+      "Resources published on TALK are general information. They are not a substitute for professional assessment of your own situation.",
     ],
   },
   {
     heading: "Using the platform",
     body: [
-      "You must be able to enter into a binding agreement to use Talk. Where you are under the age of majority, you should have the involvement of a parent or guardian.",
+      "You must be able to enter into a binding agreement to use TALK. Where you are under the age of majority, you should have the involvement of a parent or guardian.",
       "You agree to provide accurate account information, to keep your login credentials secure, and not to share your account with anyone else.",
       "You agree not to misuse the platform — including harassing providers or other users, misrepresenting your identity, attempting to access data that is not yours, or using the service for any unlawful purpose.",
     ],
@@ -39,18 +39,18 @@ const SECTIONS = [
   {
     heading: "Providers",
     body: [
-      "Providers are verified before appearing in the directory: we check identity and evidence of qualifications. Verification confirms credentials; it is not a guarantee of any particular outcome, and it does not make Talk responsible for the clinical judgement of an independent professional.",
+      "Providers are verified before appearing in the directory: we check identity and evidence of qualifications. Verification confirms credentials; it is not a guarantee of any particular outcome, and it does not make TALK responsible for the clinical judgement of an independent professional.",
       "Providers remain responsible for their own professional registration, insurance, record-keeping and adherence to their professional obligations.",
-      "If you have a concern about a professional on Talk, report it. We review reports and may suspend a provider from the directory while we investigate.",
+      "If you have a concern about a professional on TALK, report it. We review reports and may suspend a provider from the directory while we investigate.",
     ],
   },
   {
     heading: "Bookings, payments and cancellations",
     body: [
-      "Session fees are set by each provider within the platform's published range and are shown before you book. Talk retains a service fee from each completed session.",
-      "Payment is taken at the time of booking. If a provider does not attend, you are refunded in full.",
-      "You may cancel without charge up to 24 hours before a session. Cancellations inside 24 hours are at the provider's discretion.",
-      "AI companion sessions are charged per session at the rates published on the plans page.",
+      "Session fees are set by each provider within the platform's published range and are shown before you book. TALK retains a service fee from each completed session.",
+      "You pay for a session after booking it, before it takes place. If a provider does not attend, tell us within 24 hours of the session; once a person has checked, you are refunded in full.",
+      "You may cancel a session at any time before it starts. If you had already paid, contact us about a refund.",
+      "Conversations with TALK are paid for one at a time, at the prices on our pricing page. There is no subscription.",
     ],
   },
   {
@@ -63,21 +63,21 @@ const SECTIONS = [
   {
     heading: "Your content",
     body: [
-      "Anything you write in the platform — journal entries, messages, session notes you add — remains yours. You grant Talk only the permission needed to store it and show it back to you and, where you choose, to your provider.",
+      "Anything you write in the platform — journal entries, messages — remains yours. You grant TALK only the permission needed to store it and show it back to you and, where you choose, to your provider.",
       "You can export or delete your content at any time from your settings.",
     ],
   },
   {
     heading: "Availability",
     body: [
-      "We work to keep Talk available but cannot guarantee uninterrupted service. Sessions depend on your internet connection and device as well as ours.",
+      "We work to keep TALK available but cannot guarantee uninterrupted service. Sessions depend on your internet connection and device as well as ours.",
       "We may change, suspend or discontinue parts of the service. Where a change materially affects you, we will give reasonable notice.",
     ],
   },
   {
     heading: "Liability",
     body: [
-      "To the extent permitted by law, Talk is not liable for the clinical judgement, conduct or outcomes of independent professionals practising through the platform, nor for decisions you take based on general wellbeing information published here.",
+      "To the extent permitted by law, TALK is not liable for the clinical judgement, conduct or outcomes of independent professionals practising through the platform, nor for decisions you take based on general wellbeing information published here.",
       "Nothing in these terms limits liability that cannot lawfully be limited.",
     ],
   },
@@ -108,10 +108,10 @@ export default function TermsPage() {
 
       <Section tone="surface">
         <Alert tone="warning" title="The most important line on this page" className="mb-14 max-w-[760px]">
-          Talk is not an emergency service. If you or someone else is in
+          TALK is not an emergency service. If you or someone else is in
           immediate danger, call 117 for police or 116 for an ambulance — see{" "}
           <Link href="/crisis" className="underline underline-offset-4">
-            crisis contacts
+            emergency contacts
           </Link>
           .
         </Alert>

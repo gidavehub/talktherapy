@@ -43,7 +43,7 @@ export default function PaidPage() {
         {stayed ? (
           <>
             <p className="mt-3 text-[14px] leading-relaxed text-white/70">
-              Talk is waiting for you in the other tab — go back to it, and she will begin. You can
+              TALK is waiting for you in the other tab — go back to it, and she will begin. You can
               close this one.
             </p>
             <Link
@@ -54,7 +54,7 @@ export default function PaidPage() {
             </Link>
           </>
         ) : (
-          <p className="mt-3 text-[14px] text-white/70">Taking you back to Talk…</p>
+          <p className="mt-3 text-[14px] text-white/70">Taking you back to TALK…</p>
         )}
       </div>
     </main>

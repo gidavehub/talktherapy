@@ -8,7 +8,7 @@ import Button from "@/components/ui/Button";
 export const metadata: Metadata = {
   title: "For institutions",
   description:
-    "Wellbeing packages for companies, universities, schools, NGOs and youth organisations in The Gambia — with anonymised reporting that never identifies individuals.",
+    "Fund sessions for the people you support — companies, universities, schools, NGOs and youth organisations in The Gambia. Agreed with you, and never at the cost of anyone's privacy.",
 };
 
 const AUDIENCES = [
@@ -36,38 +36,38 @@ const STEPS = [
     body: "How many people, what kind of pressures they face, and what you already have in place. We would rather complement existing provision than duplicate it.",
   },
   {
-    title: "Choose a package",
-    body: "Buy a block of seats or a pool of sessions. Members redeem against it without ever seeing a bill.",
+    title: "Agree what to fund",
+    body: "Pay for sessions for the people you support — we will work out the details with you.",
   },
   {
-    title: "Invite your members",
-    body: "Send invite links or codes. People join with their own private account — their data belongs to them, not to you.",
+    title: "Tell your people",
+    body: "They join with their own private account — their data belongs to them, not to you.",
   },
   {
     title: "See whether it is working",
-    body: "Aggregate, anonymised reporting shows uptake and broad wellbeing trends across the cohort, with small groups suppressed so no one can be identified.",
+    body: "We can share anonymised, aggregate numbers once enough people take part — never who used it.",
   },
 ];
 
 const PRIVACY_POINTS = [
   "You never see who booked a session, when, or with whom.",
   "You never see mood scores, journal entries or session content.",
-  "Reporting is aggregate only, and is suppressed entirely below a minimum cohort size.",
+  "Any reporting is aggregate only, and is held back entirely below a minimum group size.",
   "Members can leave your programme and keep their account and their data.",
 ];
 
 const FAQS = [
   {
     q: "Will we be able to see which employees used it?",
-    a: "No — and this is not a setting that can be turned on. If people believed their employer could see that they booked a counselling session, they would not book one, and the programme would fail. Aggregate reporting is suppressed below a minimum cohort size so that small teams cannot be reverse-engineered.",
+    a: "No — and this is not a setting that can be turned on. If people believed their employer could see that they booked a session, they would not book one, and the programme would fail. Aggregate numbers are held back below a minimum group size so that small teams cannot be worked out.",
   },
   {
     q: "What does it cost?",
-    a: "Pricing depends on the number of seats and how many sessions are included. Talk to us with a rough headcount and we will put a proposal together.",
+    a: "It depends on how many people you want to support and how many sessions you want to fund. Talk to us with a rough headcount and we will put a proposal together.",
   },
   {
-    q: "Can we fund sessions without buying seats for everyone?",
-    a: "Yes. Some organisations buy a pool of sessions that any member can draw on, which works well when you expect a minority to use it but want it available to everyone.",
+    q: "Can we fund a pool of sessions rather than everyone?",
+    a: "Yes. A pool of sessions that anyone you support can draw on works well when you expect a minority to use it but want it there for everyone. We will agree the details with you.",
   },
   {
     q: "Do you work with organisations outside The Gambia?",
@@ -81,7 +81,7 @@ export default function ForInstitutionsPage() {
       <PageIntro
         eyebrow="For institutions"
         lines={["Support your people", "without surveilling", "them."]}
-        lede="Wellbeing packages for companies, universities, schools, NGOs and youth organisations — built so that the people you are supporting can actually trust it."
+        lede="Funded sessions for companies, universities, schools, NGOs and youth organisations — built so that the people you are supporting can actually trust it."
         stamp="TOGETHER"
       >
         <Button href="/support?intent=organisation" size="lg">
@@ -152,7 +152,7 @@ export default function ForInstitutionsPage() {
                 programme exists.
               </BulletItem>
               <BulletItem>
-                A named contact at Talk for onboarding and ongoing questions.
+                A named contact at TALK for onboarding and ongoing questions.
               </BulletItem>
             </ul>
           </div>
@@ -168,10 +168,10 @@ export default function ForInstitutionsPage() {
 
       <Section>
         <Alert tone="info" className="max-w-[820px]">
-          Institutional packages are how we intend to reach people for whom cost
-          is the barrier. If you are a funder or development partner interested
-          in underwriting access rather than buying seats, we would like to hear
-          from you.
+          Funding through institutions is how we intend to reach people for whom
+          cost is the barrier. If you are a funder or development partner
+          interested in paying for access for many people at once, we would like
+          to hear from you.
         </Alert>
       </Section>
 

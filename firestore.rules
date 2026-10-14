@@ -160,6 +160,9 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // ==== PROVIDER APPLICATIONS (track: providers) ====
+    // ==== END PROVIDER APPLICATIONS ====
+
     // -------------------------------------------------------- availability
 
     match /availability/{providerId} {
@@ -629,6 +632,9 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ==== SITE CONTENT (track: content) ====
+    // ==== END SITE CONTENT ====
+
     // ------------------------------------------------------ support requests
 
     // Contact form. Anyone may submit, signed in or not — an organisation
@@ -690,6 +696,12 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow write: if false;
     }
+
+    // ==== ADMIN ANALYTICS (track: analytics) ====
+    // ==== END ADMIN ANALYTICS ====
+
+    // ==== ADMIN OPERATIONS (track: ops) ====
+    // ==== END ADMIN OPERATIONS ====
 
     // ------------------------------------------------------ legacy: media/
 

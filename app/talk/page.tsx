@@ -107,9 +107,9 @@ function TalkShell() {
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-end bg-[var(--stage)] px-4 pb-10 text-[var(--cream)]">
       <p className="text-center text-[11px] uppercase leading-relaxed tracking-[0.18em] text-white/45 max-w-[460px]">
-        Talk is an AI, not a therapist, and cannot respond to an emergency.{" "}
+        TALK is an AI, not a therapist, and cannot respond to an emergency.{" "}
         <Link href="/crisis" className="underline underline-offset-4 text-white/70">
-          Urgent help
+          Emergency numbers
         </Link>
       </p>
     </div>
@@ -328,7 +328,7 @@ function Talk() {
   // Talk runs the way in, from this screen, in her recorded voice (English,
   // then Wolof), and each step appears AS SHE SAYS IT:
   //
-  //   "Welcome to Talk Therapy."
+  //   "Welcome to TALK."
   //   "To begin a session with us, please sign in."   → sign-in opens
   //   "You can use your email, or Google."
   //   (signed in)
@@ -612,8 +612,8 @@ function Talk() {
     : talk.phase === "hearing"
       ? "I'm done speaking"
       : talk.phase === "thinking" || talk.phase === "speaking"
-        ? "Interrupt Talk"
-        : "Talk is listening";
+        ? "Interrupt TALK"
+        : "TALK is listening";
 
   /**
    * A tapped answer. Once Talk has introduced the shortlist, the options are
@@ -678,7 +678,7 @@ function Talk() {
           transition={SPRING_SOFT}
           className="relative z-10 text-[12px] uppercase tracking-[0.22em] text-white/65"
         >
-          Talk
+          TALK
           {talk.language && talk.language !== "other" ? (
             <span className="text-white/40"> · {LANGUAGE_LABEL[talk.language]}</span>
           ) : null}
@@ -747,7 +747,7 @@ function Talk() {
           {denied
             ? "Microphone blocked — type your answers below, or allow the microphone and start again."
             : recorded
-              ? "Talk is speaking."
+              ? "TALK is speaking."
               : STATUS[talk.phase]}
         </p>
 
@@ -872,7 +872,7 @@ function Talk() {
 
         {talk.error?.kind === "payment" ? (
           <div className="relative z-10 mt-4 max-w-[440px] text-center text-[13px] text-white/70">
-            {repaired ? "All set — tap to carry on." : "Checking your consultation…"}
+            {repaired ? "All set — tap to carry on." : "Checking your payment…"}
           </div>
         ) : talk.error ? (
           <div className="relative z-10 mt-4 max-w-[440px] text-center text-[13px] text-[var(--accent-soft)]">
@@ -934,7 +934,7 @@ function Talk() {
               href={minor ? "/crisis#under-18" : "/crisis"}
               className="mt-3 inline-block text-[13.5px] font-medium text-[var(--accent)] underline-offset-4 hover:underline"
             >
-              {minor ? "Help for young people" : "More urgent help"}
+              {minor ? "Help for young people" : "All emergency numbers"}
             </Link>
           </motion.div>
         ) : null}
@@ -995,7 +995,7 @@ function Talk() {
                 autoFocus
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                aria-label="Type to Talk"
+                aria-label="Type to TALK"
                 className="flex-1 h-12 rounded-full bg-white/10 border border-white/15 px-5 text-[14px] text-white placeholder:text-white/35 outline-none focus:border-[var(--accent)] transition-colors"
                 placeholder="Type…"
               />
@@ -1058,7 +1058,7 @@ function Talk() {
 
         {intakeMode && !talk.active ? (
           <p className="relative z-10 mt-4 text-[11px] text-white/40 text-center max-w-[320px] leading-relaxed">
-            Before she asks anything, Talk will tell you out loud what she keeps and ask whether that is
+            Before she asks anything, TALK will tell you out loud what she keeps and ask whether that is
             alright. The written version:{" "}
             <Link href="/terms" className="underline underline-offset-2 text-white/60">
               Terms
@@ -1074,9 +1074,9 @@ function Talk() {
         {/* Never further than one line away, on the surface most likely to
             be open when someone is struggling. */}
         <p className="relative z-10 mt-10 text-[11px] uppercase tracking-[0.18em] text-white/45 text-center max-w-[460px] leading-relaxed">
-          Talk is an AI, not a therapist, and cannot respond to an emergency.{" "}
+          TALK is an AI, not a therapist, and cannot respond to an emergency.{" "}
           <Link href="/crisis" className="underline underline-offset-4 text-white/70">
-            Urgent help
+            Emergency numbers
           </Link>
         </p>
       </main>

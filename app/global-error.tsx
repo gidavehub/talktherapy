@@ -5,8 +5,14 @@
  *
  * Replaces the whole document, so it must render its own <html> and <body>,
  * and it cannot rely on the app's fonts or providers having mounted. Styles are
- * inline for that reason — globals.css may not have loaded either.
+ * inline for that reason — globals.css may not have loaded either. The colours
+ * are the brand tokens written out by hand (background, foreground, muted,
+ * accent), so this still looks like TALK when nothing else has loaded.
  */
+const BACKGROUND = "#FBF7F1";
+const FOREGROUND = "#3B2C26";
+const MUTED = "#7A6A61";
+const ACCENT = "#C8754E";
 export default function GlobalError({
   error,
   retry,
@@ -22,8 +28,8 @@ export default function GlobalError({
           minHeight: "100vh",
           display: "grid",
           placeItems: "center",
-          background: "#E7E4DE",
-          color: "#0A0A0A",
+          background: BACKGROUND,
+          color: FOREGROUND,
           fontFamily: "system-ui, sans-serif",
           padding: "24px",
         }}
@@ -34,7 +40,7 @@ export default function GlobalError({
               fontSize: 11,
               textTransform: "uppercase",
               letterSpacing: "0.22em",
-              color: "#6B6B6B",
+              color: ACCENT,
               margin: 0,
             }}
           >
@@ -43,15 +49,17 @@ export default function GlobalError({
           <h1
             style={{
               marginTop: 16,
+              // Fraunces has not loaded here; the nearest serif stands in.
+              fontFamily: "Georgia, 'Times New Roman', serif",
               fontSize: 40,
               lineHeight: 1.05,
               letterSpacing: "-0.025em",
               fontWeight: 500,
             }}
           >
-            Talk could not start.
+            TALK could not start.
           </h1>
-          <p style={{ marginTop: 20, fontSize: 15, lineHeight: 1.6, color: "#6B6B6B" }}>
+          <p style={{ marginTop: 20, fontSize: 15, lineHeight: 1.6, color: MUTED }}>
             Something failed while loading the application. Reloading usually
             fixes it.
           </p>
@@ -65,11 +73,9 @@ export default function GlobalError({
               padding: "0 28px",
               borderRadius: 999,
               border: "none",
-              background: "#C8754E",
+              background: ACCENT,
               color: "#fff",
-              fontSize: 12,
-              textTransform: "uppercase",
-              letterSpacing: "0.14em",
+              fontSize: 14.5,
               fontWeight: 500,
               cursor: "pointer",
             }}
@@ -77,12 +83,12 @@ export default function GlobalError({
             Try again
           </button>
 
-          <p style={{ marginTop: 32, fontSize: 13, color: "#6B6B6B" }}>
-            If you need urgent help, call 117 for police or 116 for an ambulance.
+          <p style={{ marginTop: 32, fontSize: 13, color: MUTED }}>
+            If you are in danger right now, call 117 for police or 116 for an ambulance — both are free.
           </p>
 
           {error.digest ? (
-            <p style={{ marginTop: 16, fontSize: 12, color: "#6B6B6B" }}>
+            <p style={{ marginTop: 16, fontSize: 12, color: MUTED }}>
               Reference: {error.digest}
             </p>
           ) : null}

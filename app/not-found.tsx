@@ -1,22 +1,19 @@
 import Link from "next/link";
+import Logo from "./components/Logo";
 
 /**
  * Root 404.
  *
  * Lives at the app root rather than inside `(marketing)`, so it also catches
  * unmatched paths under the authenticated areas. That means it renders without
- * the marketing Header and Footer — hence the minimal wordmark and links here.
+ * the marketing Header and Footer — hence the logo on its own and the links here.
  */
 export default function NotFound() {
   return (
     <div className="min-h-screen bg-[var(--background)] flex flex-col">
       <div className="px-4 sm:px-6 md:px-10 pt-5 md:pt-8">
-        <Link
-          href="/"
-          className="leading-[0.85] text-[15px] font-medium tracking-tight inline-block"
-        >
-          <span className="block">TALK</span>
-          <span className="block">THERAPY</span>
+        <Link href="/" aria-label="TALK — home" className="inline-block">
+          <Logo height={36} />
         </Link>
       </div>
 
@@ -44,16 +41,16 @@ export default function NotFound() {
             </Link>
             <Link
               href="/support"
-              className="inline-flex h-12 items-center justify-center rounded-full border-[1.5px] border-[var(--dark)] px-7 text-[14px] font-medium hover:bg-[var(--dark)] hover:text-white hover:border-[var(--dark)] transition-colors"
+              className="inline-flex h-12 items-center justify-center rounded-full border-[1.5px] border-[var(--dark)] px-7 text-[14px] font-medium hover:bg-[var(--dark)] hover:text-[var(--cream)] transition-colors"
             >
               Get help
             </Link>
           </div>
 
           <p className="mt-12 text-[13px] text-[var(--muted)]">
-            If you were looking for urgent help,{" "}
+            If you were looking for emergency numbers,{" "}
             <Link href="/crisis" className="underline underline-offset-4 text-[var(--foreground)]">
-              crisis contacts are here
+              they are here
             </Link>
             .
           </p>

@@ -85,7 +85,7 @@ export default function SupportForm() {
       >
         <Alert tone="success" title="Message received">
           Thank you — we have your message and will reply by email. If this is
-          about something urgent and safety-related, please also see our crisis
+          about something urgent and safety-related, please also see our emergency
           contacts page rather than waiting for a reply.
         </Alert>
         <div className="mt-6">

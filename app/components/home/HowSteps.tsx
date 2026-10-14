@@ -1,13 +1,14 @@
 "use client";
 
 import Reveal from "./Reveal";
+import { AI_TIERS } from "../../lib/models";
 
 /** "How it works" — three steps, each under a sage arch. */
 
 const STEPS = [
   {
     title: "Talk with TALK",
-    text: "Speak or type, in your language, for up to eight minutes.",
+    text: `Speak or type — English, Wolof, Mandinka or Pulaar — for up to ${AI_TIERS.initial.durationSec / 60} minutes.`,
     icon: (
       <path d="M7 9h14a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-7l-5 4v-4H7a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3z" fill="#F4EADD" />
     ),
@@ -21,7 +22,7 @@ const STEPS = [
   },
   {
     title: "Begin your sessions",
-    text: "Video or audio, private, whenever you are ready.",
+    text: "By video or voice call, private, whenever you are ready.",
     icon: <rect x="4" y="10" width="14" height="10" rx="2.5" fill="#F4EADD" />,
     dot: <path d="M19 13.5l5-3v9l-5-3z" fill="#F4EADD" />,
   },

@@ -286,7 +286,7 @@ export const startSessionPayment = onCall(
     const body = buildCheckoutBody({
       amountMajor: toMajor(charge.amountMinor),
       title: "Session with your provider",
-      description: "One session, by video, inside Talk.",
+      description: "One session with a provider, by video or voice call, inside TALK.",
       customerEmail: customer.email,
       customerName: customer.name,
       paymentMethods,
@@ -990,3 +990,10 @@ export const modemWebhook = onRequest(
     }
   },
 );
+
+// Four feature tracks, one module each, so they never edit the same lines.
+// Each module exports its own functions; adding one there deploys it.
+export * from "./providers";
+export * from "./adminStats";
+export * from "./adminOps";
+export * from "./content";

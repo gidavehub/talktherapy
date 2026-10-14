@@ -15,7 +15,7 @@ import MinorFlag from "../ui/MinorFlag";
 import { useReadAloud } from "../../lib/useReadAloud";
 import { directChatId } from "../../lib/chat";
 import { formatDalasi } from "../../lib/money";
-import { cancelBooking, spokenSlot, startSessionPayment, watchMyBookings } from "../../lib/booking";
+import { SESSION_MINUTES, cancelBooking, spokenSlot, startSessionPayment, watchMyBookings } from "../../lib/booking";
 import { useNow } from "../../lib/useNow";
 import { joinWindow } from "../../lib/call";
 import { reportMissedSession } from "../../lib/payouts-client";
@@ -209,7 +209,7 @@ function MissedSession({ booking, now }: { booking: Booking; now: number }) {
   if (booking.disputed || sent) {
     return (
       <p className="mt-2.5 text-[12px] leading-relaxed text-[var(--muted)]">
-        You told us this session did not happen. A person from Talk is looking into it.
+        You told us this session did not happen. Someone from the TALK team is looking into it.
       </p>
     );
   }
@@ -233,7 +233,7 @@ function MissedSession({ booking, now }: { booking: Booking; now: number }) {
             }}
             className="rounded-full bg-[var(--accent)] px-4 py-2 font-medium text-white hover:bg-[var(--accent-deep)] disabled:opacity-60"
           >
-            {sending ? "Sending…" : "Yes, tell Talk"}
+            {sending ? "Sending…" : "Yes, tell us"}
           </button>
           <button type="button" onClick={() => setAsking(false)} className="rounded-full px-3 py-2 text-[var(--muted)]">
             No
@@ -382,8 +382,8 @@ export default function SessionList() {
       ) : null}
 
       <p className="text-[12px] text-[var(--muted)] leading-relaxed">
-        Sessions happen by video inside Talk. We will tell you when that is
-        ready — until then, use the conversation.
+        Sessions are {SESSION_MINUTES} minutes, by video or voice call, right here in TALK. Tap Join when it
+        is time.
       </p>
     </div>
   );

@@ -105,7 +105,7 @@ function consultationRefusal(
   // rest belong to whichever one is running.
   if (body.mode === "intake" || body.mode === "companion") {
     if (!tierCovers(tier, body.mode)) {
-      return { error: "Talking with Talk again is the longer conversation.", code: "payment_required" };
+      return { error: "Talking with TALK again is the longer conversation.", code: "payment_required" };
     }
   }
   return null;
@@ -138,7 +138,7 @@ async function entry(
 
   const caller = await callerClaims(req);
   if (!caller) {
-    json(res, 401, { error: "Sign in to talk to Talk." });
+    json(res, 401, { error: "Sign in to talk to TALK." });
     return null;
   }
   const { uid } = caller;

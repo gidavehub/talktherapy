@@ -89,7 +89,7 @@ export default function AppGate({ children }: { children: React.ReactNode }) {
 
   const isProvider = profile.role === "provider";
   if (profile.role === "patient" && !profile.onboarded && !openBeforeOnboarding(pathname)) {
-    return <Splash label="Taking you to Talk" />;
+    return <Splash label="Taking you to TALK" />;
   }
 
   // Messages carries the count of what is waiting, on both sides of the app.
@@ -97,5 +97,12 @@ export default function AppGate({ children }: { children: React.ReactNode }) {
     item.href === "/chats" && unread > 0 ? { ...item, badge: unread } : item,
   );
 
-  return <AppShell nav={nav}>{children}</AppShell>;
+  // Staff pages are tables and charts; they get the wide column.
+  const staffPage = pathname === "/admin" || pathname.startsWith("/admin/");
+
+  return (
+    <AppShell nav={nav} wide={staffPage}>
+      {children}
+    </AppShell>
+  );
 }

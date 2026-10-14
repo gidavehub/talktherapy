@@ -66,7 +66,7 @@ export async function resolveReview(
         tx.update(ref, { fulfilled: true, needsReview: false, review, updatedAt: review.at });
         return { ok: true as const };
       }
-      return { ok: false as const, reason: "This payment is not for anything Talk sells — refund it." };
+      return { ok: false as const, reason: "This payment is not for anything TALK sells — refund it." };
     });
   }
 

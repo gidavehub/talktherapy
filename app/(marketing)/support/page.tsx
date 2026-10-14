@@ -10,7 +10,7 @@ import { Alert, Spinner } from "@/components/ui/Feedback";
 export const metadata: Metadata = {
   title: "Support",
   description:
-    "Get in touch with the Talk team — questions about your account, bookings, joining as a provider, or institutional packages.",
+    "Get in touch with the TALK team — questions about your account, bookings, joining as a provider, or funding sessions for your organisation.",
 };
 
 const FAQS = [
@@ -27,8 +27,8 @@ const FAQS = [
     a: "You can do this yourself from Settings once signed in — it removes your profile, journal entries and mood history. If you are having trouble, write to us and we will handle it.",
   },
   {
-    q: "Can I get support in Wolof?",
-    a: "Yes. Write to us in Wolof and we will reply in Wolof. You can also filter the provider directory by language to find professionals who work in Wolof, Mandinka or Pulaar.",
+    q: "Can I get support in Wolof, Mandinka or Pulaar?",
+    a: "Yes. TALK speaks all three, as well as English, and you can filter the provider directory by language to find providers who work in them. Write to us in whichever is easiest, and we will do our best to reply in it.",
   },
 ];
 
@@ -38,7 +38,7 @@ export default function SupportPage() {
       <PageIntro
         eyebrow="Support"
         lines={["Ask us anything."]}
-        lede="Questions about your account, a booking, joining as a provider, or bringing Talk to your organisation — this reaches a person."
+        lede="Questions about your account, a booking, joining as a provider, or bringing TALK to your organisation — this reaches a person."
         stamp="HELP"
       />
 
@@ -66,7 +66,7 @@ export default function SupportPage() {
               you or someone else is in immediate danger, call 117 for police or
               116 for an ambulance.{" "}
               <Link href="/crisis" className="underline underline-offset-4">
-                All crisis contacts
+                All emergency contacts
               </Link>
               .
             </Alert>
@@ -78,12 +78,12 @@ export default function SupportPage() {
               <ul className="mt-5 space-y-3 text-[14px]">
                 <li>
                   <Link href="/how-it-works" className="underline underline-offset-4 hover:text-[var(--accent)] transition-colors">
-                    How Talk works
+                    How TALK works
                   </Link>
                 </li>
                 <li>
                   <Link href="/plans" className="underline underline-offset-4 hover:text-[var(--accent)] transition-colors">
-                    Plans and pricing
+                    Pricing
                   </Link>
                 </li>
                 <li>

@@ -95,10 +95,10 @@ export default async function ResourcePage(props: PageProps<"/resources/[slug]">
           </Alert>
 
           <Alert tone="warning" title="If you need help right now">
-            Talk is not an emergency service. Call 117 for police or 116 for an
+            TALK is not an emergency service. Call 117 for police or 116 for an
             ambulance, or see the{" "}
             <Link href="/crisis" className="underline underline-offset-4">
-              crisis contacts page
+              emergency contacts page
             </Link>
             .
           </Alert>

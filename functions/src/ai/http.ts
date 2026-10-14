@@ -246,7 +246,7 @@ export async function speakingResponse(
         send({
           type: "error",
           stage: "voice",
-          message: "Talk's voice didn't come through this time — her words are shown instead.",
+          message: "TALK's voice didn't come through this time — her words are shown instead.",
         });
       }
     }
@@ -254,7 +254,7 @@ export async function speakingResponse(
   } catch (e) {
     if (!aborted.value) {
       console.error(`[${label}]`, e);
-      send({ type: "error", stage: "turn", message: "Talk couldn't respond just then. Please try again." });
+      send({ type: "error", stage: "turn", message: "TALK couldn't respond just then. Please try again." });
     }
   } finally {
     try {

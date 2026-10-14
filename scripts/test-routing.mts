@@ -57,10 +57,11 @@ check("signed out: home is Talk", homeFor(null) === "/talk");
 check("a new patient's home is Talk", homeFor(patient(false)) === "/talk");
 check("an onboarded patient's home is the dashboard", homeFor(patient(true)) === "/dashboard");
 check("a verified provider's home is messages", homeFor(provider(true)) === "/chats");
-check("staff's home is the review queue", homeFor(admin) === "/admin/review");
+check("staff's home is the overview", homeFor(admin) === "/admin");
 
 check("someone set up goes where they were heading", afterSignIn(patient(true), "/settings") === "/settings");
 check("a provider goes where they were heading", afterSignIn(provider(true), "/chats/abc") === "/chats/abc");
+check("staff go where they were heading", afterSignIn(admin, "/admin/users") === "/admin/users");
 check("someone new meets Talk first, whatever next says", afterSignIn(patient(false), "/settings") === "/talk");
 for (const loop of ["/talk", "/talk?signin=1", "/sign-in", "/sign-in?next=/x", "/sign-up"]) {
   check(`never sent back to ${loop} (no loop)`, afterSignIn(patient(true), loop) === "/dashboard");

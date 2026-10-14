@@ -207,10 +207,10 @@ export function useVoiceRecorder() {
         ok: false,
         reason:
           name === "NotAllowedError"
-            ? "Talk is not allowed to use your microphone. Allow it in your browser's settings for this site, then try again."
+            ? "This site is not allowed to use your microphone. Allow it in your browser's settings, then try again."
             : name === "NotFoundError"
               ? "No microphone was found on this device. You can still type."
-              : "Talk could not reach your microphone — another app may be using it. You can still type.",
+              : "We could not reach your microphone — another app may be using it. You can still type.",
       };
     }
 

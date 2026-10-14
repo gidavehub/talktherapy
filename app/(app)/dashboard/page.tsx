@@ -165,7 +165,7 @@ export default function DashboardPage() {
             onClick={() => voice.unlock()}
             className="mt-4 inline-block text-[13.5px] font-medium text-[var(--accent)] underline-offset-4 hover:underline transition-colors"
           >
-            Tell Talk what you need for better matches
+            Tell TALK what you need for better matches
           </Link>
         ) : null}
       </section>
@@ -321,25 +321,25 @@ export default function DashboardPage() {
           </span>
           <h3 className="font-display mt-5 text-[20px] font-medium">Talk it through</h3>
           <p className="mt-2 text-[13px] text-[var(--muted)] leading-relaxed">
-            Talk listens any time, in your language.
+            TALK listens whenever you need her, in your language.
           </p>
           <Link
             href="/talk"
             onClick={() => voice.unlock()}
             className="mt-4 inline-block text-[13.5px] font-medium text-[var(--accent)] underline-offset-4 hover:underline transition-colors"
           >
-            Open Talk
+            Open TALK
           </Link>
         </Card>
       </div>
 
       <p className="text-[13px] text-[var(--muted)] pt-4">
-        If you need urgent help,{" "}
+        If you are in danger right now,{" "}
         <Link
           href="/crisis"
           className="underline underline-offset-4 text-[var(--foreground)]"
         >
-          crisis contacts are here
+          the emergency numbers are free to call
         </Link>
         .
       </p>

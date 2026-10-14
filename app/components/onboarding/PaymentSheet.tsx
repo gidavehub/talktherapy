@@ -42,7 +42,7 @@ export default function PaymentSheet({
   const price = formatDalasi(amountMinor);
 
   return (
-    <Modal open={open} onClose={onClose} title="Confirm payment for consultation" variant="responsive">
+    <Modal open={open} onClose={onClose} title="Confirm your payment" variant="responsive">
       <div className="space-y-5">
         <SpokenCaption saying={saying ?? null} tone="light" />
 
@@ -124,9 +124,10 @@ export default function PaymentSheet({
         </div>
 
         <p className="text-[12px] leading-relaxed text-[var(--muted)]">
-          Secure checkout by Modem Pay. If you are in danger right now, do not wait to pay —{" "}
+          Secure checkout by Modem Pay. If you are in danger right now, do not wait to pay — call 117 for the
+          police or 116 for an ambulance. These calls are free.{" "}
           <Link href="/crisis" className="underline underline-offset-2">
-            urgent help is free
+            See all emergency numbers
           </Link>
           .
         </p>

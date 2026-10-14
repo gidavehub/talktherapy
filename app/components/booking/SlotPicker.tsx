@@ -132,7 +132,7 @@ export default function SlotPicker({ providerId }: { providerId: string }) {
           </p>
           {provider ? (
             <p className="truncate text-[12px] text-[var(--muted)]">
-              {formatDalasi(provider.sessionRateMinor)} · {SESSION_MINUTES} minutes · by video
+              {formatDalasi(provider.sessionRateMinor)} · {SESSION_MINUTES} minutes · video or voice
             </p>
           ) : null}
         </div>
@@ -146,7 +146,7 @@ export default function SlotPicker({ providerId }: { providerId: string }) {
               {provider.displayName}
             </p>
             <p className="mt-0.5 text-[12.5px] text-[var(--muted)]">
-              {formatDalasi(provider.sessionRateMinor)} · {SESSION_MINUTES} minutes · by video
+              {formatDalasi(provider.sessionRateMinor)} · {SESSION_MINUTES} minutes · video or voice
             </p>
           </div>
         </div>

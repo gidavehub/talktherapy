@@ -48,10 +48,10 @@ const GUARDIAN_RELATIONSHIPS = [
 ];
 
 const TERMS = [
-  "Talk uses this to welcome a young person, understand what they need, and make sure the provider they meet knows they are under 18. That is all it is for.",
+  "TALK uses this to welcome a young person, understand what they need, and make sure the provider they meet knows they are under 18. That is all it is for.",
   "It is not consent to treatment. Before any therapy begins, the provider will ask you for that themselves, as their own professional rules require.",
-  "Talk is not responsible where somebody under 18 gives a false age, or false details about their parent or guardian.",
-  "If a young person tells Talk they are in danger, being hurt, or not safe at home, Talk will point them to help straight away — whether or not this form is finished.",
+  "TALK is not responsible where somebody under 18 gives a false age, or false details about their parent or guardian.",
+  "If a young person tells TALK they are in danger, being hurt, or not safe at home, TALK will point them to help straight away — whether or not this form is finished.",
 ];
 
 /** Two name parts at least: a signature, not an initial or a nickname. */
@@ -132,7 +132,7 @@ export default function GuardianConsentModal({
       onClose={close}
       variant="dialog"
       title="A parent or guardian, please"
-      description="Because you are under 18, a parent or guardian needs to fill this in with you before your first session with a provider. You can keep talking to Talk while you wait."
+      description="Because you are under 18, a parent or guardian needs to fill this in with you before your first session with a provider. You can keep talking with TALK while you wait."
       footer={
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Button variant="ghost" withArrow={false} onClick={close}>
@@ -200,7 +200,7 @@ export default function GuardianConsentModal({
           checked={agreed}
           onChange={setAgreed}
           label="I am their parent or guardian, and I agree to these terms for someone under 18"
-          description="Talk is for welcoming, triage and flagging only. The provider will ask for consent to treatment separately."
+          description="TALK is for welcoming, triage and flagging only. The provider will ask for consent to treatment separately."
         />
 
         <Input

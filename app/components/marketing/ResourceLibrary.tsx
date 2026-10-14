@@ -56,7 +56,7 @@ export default function ResourceLibrary({
         icon={<IconResources />}
         title="The library is being written"
         description="We are building out the resource centre now. Check back shortly."
-        action={<Button href="/how-it-works">See how Talk works</Button>}
+        action={<Button href="/how-it-works">See how TALK works</Button>}
       />
     );
   }

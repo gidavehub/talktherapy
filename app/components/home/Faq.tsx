@@ -4,29 +4,36 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { SPRING_SNAP } from "../motion/primitives";
 import Reveal from "./Reveal";
+import { AI_TIERS } from "../../lib/models";
+import { formatDalasi } from "../../lib/money";
 
 /** "Questions, answered" — two columns of plain answers. */
+
+// Prices and lengths come from the constants the checkout uses, so an answer
+// can never quote a number the payment does not take.
+const FIRST = AI_TIERS.initial;
+const LONGER = AI_TIERS.extended;
 
 const QUESTIONS: { q: string; a: string }[] = [
   {
     q: "What happens in my first conversation?",
-    a: "You talk with TALK for up to eight minutes, in your own language, by voice or by tapping. TALK then introduces you to providers who fit.",
+    a: `You talk with TALK for up to ${FIRST.durationSec / 60} minutes — in English, Wolof, Mandinka or Pulaar — by voice or by tapping. It costs ${formatDalasi(FIRST.amountMinor)}. TALK then introduces you to providers who fit.`,
   },
   {
     q: "Do I have to speak to a person?",
-    a: "No. You can keep talking with TALK for as long as you need — a longer conversation is twenty minutes. When you are ready, a provider is one message away.",
+    a: `No. You can keep talking with TALK — a longer talk is ${formatDalasi(LONGER.amountMinor)} for up to ${LONGER.durationSec / 60} minutes. When you are ready, a provider is one message away.`,
   },
   {
-    q: "What if I need urgent help?",
-    a: "Call 117 for the police or 116 for an ambulance. The urgent help page is free and needs no account, and TALK will always point you there if you are in danger.",
+    q: "What if I am in danger?",
+    a: "Call 117 for the police, 116 for an ambulance, or 118 for fire and rescue — free from any phone. TALK is not an emergency service and nobody is watching the app, but if you tell her you are in danger she will give you these numbers straight away.",
   },
   {
     q: "Who can see my journal and mood?",
-    a: "Only you. The provider you choose sees a short summary of what you told TALK, and nothing else unless you share it.",
+    a: "Only you. Providers never see your journal or mood check-ins — only what you choose to send them.",
   },
   {
     q: "How do I pay?",
-    a: "With Wave or another mobile money wallet, or a card. You see the price before you pay, and you only pay for what you use.",
+    a: "With Wave or another mobile money wallet, or a card. No plans, no subscription: you see the price first, and pay per conversation.",
   },
   {
     q: "Can I choose a male or female provider?",

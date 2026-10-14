@@ -15,7 +15,7 @@ export default function ProvidersPage() {
       <CtaBand
         tone="sage"
         lines={["Not sure who to choose?", "Let TALK match you."]}
-        text="A short conversation, in your language, then providers who fit what you need."
+        text="A short conversation — in English, Wolof, Mandinka or Pulaar — then providers who fit what you need."
       />
     </>
   );

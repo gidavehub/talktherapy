@@ -3,7 +3,7 @@ import Link from "next/link";
 import CrisisReadAloud from "@/components/marketing/CrisisReadAloud";
 
 export const metadata: Metadata = {
-  title: "Urgent help — Talk",
+  title: "Emergency contacts",
   description:
     "Emergency and crisis contacts in The Gambia. If you or someone else is in immediate danger, call 117 for police or 116 for an ambulance.",
 };
@@ -84,7 +84,7 @@ export default function CrisisPage() {
     <div className="bg-[var(--background)]">
       <div className="px-4 sm:px-6 md:px-10 pt-[120px] md:pt-[160px] pb-20 max-w-[900px] mx-auto">
         <p className="eyebrow">
-          Urgent help
+          Emergency contacts
         </p>
         <h1 className="mt-4 text-[34px] sm:text-[44px] md:text-[56px] leading-[1.06] font-display font-medium">
           If you are in danger
@@ -92,7 +92,7 @@ export default function CrisisPage() {
           right now, call.
         </h1>
         <p className="mt-5 text-[15px] md:text-[17px] leading-relaxed text-[var(--muted)] max-w-[620px]">
-          Talk is not an emergency service and cannot respond to a crisis. If
+          TALK is not an emergency service and cannot respond to a crisis. If
           you or someone near you is at immediate risk, contact one of these
           services directly.
         </p>
@@ -200,7 +200,7 @@ export default function CrisisPage() {
             deserve support.
           </p>
           <p>
-            You can book a session with a qualified provider through Talk, or
+            You can book a session with a qualified provider through TALK, or
             speak to someone you trust — a family member, a friend, a teacher, a
             colleague, or a religious leader. Telling one person is often the
             hardest and most useful step.
@@ -227,7 +227,7 @@ export default function CrisisPage() {
             <strong className="font-medium text-[var(--foreground)]">
               About this page.
             </strong>{" "}
-            Emergency numbers are the national services for The Gambia. Talk
+            Emergency numbers are the national services for The Gambia. TALK
             does not monitor this page, and submitting anything through the
             platform will not summon help. If something here is out of date,
             please{" "}

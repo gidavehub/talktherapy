@@ -65,6 +65,9 @@ service firebase.storage {
       allow delete: if isOwner(uid);
     }
 
+    // ==== PROVIDER CREDENTIALS (track: providers) ====
+    // ==== END PROVIDER CREDENTIALS ====
+
     // -------------------------------------------------------- resource media
     // Art and audio for the Wellbeing Resource Centre. Published resources are
     // free to read per the concept note's free tier.
@@ -78,6 +81,9 @@ service firebase.storage {
       allow write: if isOwner(uid) && underMB(25);
       allow delete: if isOwner(uid);
     }
+
+    // ==== SITE MEDIA (track: content) ====
+    // ==== END SITE MEDIA ====
 
     // ------------------------------------------------------ session artefacts
     // Files exchanged inside a consultation. Deliberately NOT readable by path

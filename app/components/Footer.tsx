@@ -27,7 +27,13 @@ export default function Footer() {
       <div className="mx-auto grid max-w-[1200px] grid-cols-1 gap-10 px-5 py-12 md:grid-cols-[1fr_auto] md:px-10 md:py-14">
         <div>
           <p className="font-display text-[40px] font-semibold leading-none tracking-[0.02em]">TALK</p>
-          <p className="mt-3 text-[11px] tracking-[0.42em] text-[var(--cream)]/80">LISTEN&nbsp; SUPPORT&nbsp; HEAL&nbsp; GROW</p>
+          {/* A plain space after each dot, so the line can wrap on a narrow
+              phone instead of pushing the page sideways. The dots are
+              decoration; a screen reader hears just the four words. */}
+          <p className="mt-3 text-[11px] tracking-[0.42em] text-[var(--cream)]/80">
+            LISTEN<span aria-hidden>&nbsp;•</span> SUPPORT<span aria-hidden>&nbsp;•</span> HEAL
+            <span aria-hidden>&nbsp;•</span> GROW
+          </p>
           <nav aria-label="More" className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-[13.5px] text-[var(--cream)]/65">
             {MORE.map((link) => (
               <Link key={link.href} href={link.href} className="hover:text-[var(--cream)]">
@@ -53,7 +59,7 @@ export default function Footer() {
               className="inline-flex items-center gap-2 rounded-full border border-[var(--cream)]/25 px-4 py-2 text-[13px] text-[var(--cream)] hover:bg-[var(--cream)]/10"
             >
               <span className="h-2 w-2 rounded-full bg-[var(--peach)]" aria-hidden />
-              Urgent help — free, no account
+              Emergency contacts — free to call
             </Link>
           </p>
         </div>

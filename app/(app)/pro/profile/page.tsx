@@ -23,7 +23,7 @@ export default function ProviderProfilePage() {
           How people find you
         </h1>
         <p className="mt-3 text-[14px] text-[var(--muted)] leading-relaxed max-w-[560px]">
-          Talk suggests providers by matching what you offer against what
+          TALK suggests providers by matching what you offer against what
           someone has said they need — the language they speak, what they are
           going through, where they are. Everything below is part of that match,
           not decoration.

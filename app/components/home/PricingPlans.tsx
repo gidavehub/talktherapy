@@ -26,7 +26,7 @@ export default function PricingPlans({ heading = true }: { heading?: boolean }) 
         {heading ? (
           <Reveal className="text-center">
             <h2 className="font-display text-[34px] font-medium leading-tight md:text-[42px]">Pay for what you use.</h2>
-            <p className="mt-3 text-[15px] text-[var(--muted)]">No plans, no subscription. Pay with mobile money or a card.</p>
+            <p className="mt-3 text-[15px] text-[var(--muted)]">No plans, no subscription. Pay per conversation, with mobile money or a card.</p>
           </Reveal>
         ) : null}
 
@@ -36,10 +36,10 @@ export default function PricingPlans({ heading = true }: { heading?: boolean }) 
             <p className="font-display mt-3 text-[46px] font-medium leading-none">{formatDalasi(first.amountMinor)}</p>
             <p className="mt-2 text-[13px] text-[var(--muted)]">up to {first.durationSec / 60} minutes</p>
             <p className="mt-5 text-[14px] leading-relaxed">
-              Up to eight minutes with TALK, in your own language, then providers who fit.
+              A first, private talk with TALK, then providers who fit what you need.
             </p>
             <ul className="mt-5 space-y-2.5 text-[13.5px]">
-              {["Your choice of language", "Speak, or tap your answers", "Ends with providers matched to you"].map((t) => (
+              {["English, Wolof, Mandinka or Pulaar", "Speak, or tap your answers", "Ends with providers matched to you"].map((t) => (
                 <li key={t} className="flex gap-3">
                   <Dot />
                   {t}
@@ -59,10 +59,10 @@ export default function PricingPlans({ heading = true }: { heading?: boolean }) 
             <p className="font-display mt-3 text-[46px] font-medium leading-none">From {formatDalasi(HUMAN_RATE_MIN_MINOR)}</p>
             <p className="mt-2 text-[13px] text-[var(--cream)]/75">per session</p>
             <p className="mt-5 text-[14px] leading-relaxed">
-              A qualified provider, by video or audio call. Fee shown before you book.
+              A qualified provider, by video or voice call. Fee shown before you book.
             </p>
             <ul className="mt-5 space-y-2.5 text-[13.5px]">
-              {["Message your provider any time", "Video or audio calls in the app", "Mobile money or card"].map((t) => (
+              {["Message your provider any time", "Video or voice calls in the app", "Mobile money or card"].map((t) => (
                 <li key={t} className="flex gap-3">
                   <Dot />
                   {t}
@@ -82,10 +82,17 @@ export default function PricingPlans({ heading = true }: { heading?: boolean }) 
             <p className="font-display mt-3 text-[46px] font-medium leading-none">{formatDalasi(longer.amountMinor)}</p>
             <p className="mt-2 text-[13px] text-[var(--muted)]">up to {longer.durationSec / 60} minutes</p>
             <p className="mt-5 text-[14px] leading-relaxed">
-              Twenty minutes with TALK, for when you&apos;re not ready to speak to a person.
+              More time with TALK, for when you&apos;re not ready to speak to a person.
             </p>
             <ul className="mt-5 space-y-2.5 text-[13.5px]">
-              {["Everything in the first conversation", "Twenty minutes instead of eight", "Urgent help is always free"].map((t) => (
+              {/* Not "everything in the first conversation": a longer talk is
+                  the companion, not the intake, so it has no tap-to-answer
+                  questions and does not end with a fresh shortlist. */}
+              {[
+                "The same four languages, spoken or typed",
+                `${longer.durationSec / 60} minutes instead of ${first.durationSec / 60}`,
+                "Emergency numbers on screen if you need them",
+              ].map((t) => (
                 <li key={t} className="flex gap-3">
                   <Dot />
                   {t}
@@ -104,7 +111,7 @@ export default function PricingPlans({ heading = true }: { heading?: boolean }) 
             className="inline-flex items-center gap-3 rounded-full bg-[var(--sage-pale)] px-6 py-3 text-[13.5px] text-[var(--foreground)]"
           >
             <span className="h-2.5 w-2.5 rounded-full bg-[var(--accent)]" aria-hidden />
-            Urgent help is always free. No payment, no account.
+            Emergency numbers are free to call — 117 police, 116 ambulance, 118 fire.
           </Link>
         </Reveal>
       </div>

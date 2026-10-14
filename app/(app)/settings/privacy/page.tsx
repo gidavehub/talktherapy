@@ -96,7 +96,7 @@ export default function PrivacySettingsPage() {
           What you agreed to
         </h2>
         <p className="mt-2 text-[13px] text-[var(--muted)] leading-relaxed">
-          Talk cannot operate without these. To withdraw them, close your
+          TALK cannot work without these. To withdraw them, close your
           account on the{" "}
           <Link href="/settings/data" className="underline underline-offset-4">
             Your data
@@ -164,7 +164,7 @@ export default function PrivacySettingsPage() {
       </Card>
 
       <Alert tone="info">
-        Nobody at Talk can read your journal or mood entries — not providers,
+        Nobody at TALK can read your journal or mood entries — not providers,
         not administrators. That is enforced by the database access rules, not
         by policy.
       </Alert>

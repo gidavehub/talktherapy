@@ -112,8 +112,8 @@ export default function ProvidersForYouPage() {
           }
         >
           Because you are under 18, a parent or guardian needs to fill in a short form with you before
-          your first session with a provider. You can still talk to Talk, and urgent help is always
-          open to you.
+          your first session with a provider. You can still talk with TALK, and the emergency numbers —
+          117 and 116 — are free to call at any time.
         </Alert>
       ) : null}
 
@@ -124,7 +124,7 @@ export default function ProvidersForYouPage() {
             onClick={() => voice.unlock()}
           className="flex items-center justify-between gap-4 rounded-[28px] bg-[var(--sage)] text-[var(--cream)] px-6 md:px-8 py-6 hover:bg-[var(--sage-deep)] transition-colors"
         >
-          <span className="text-[16px] md:text-[18px] font-medium">Tell Talk what you need</span>
+          <span className="text-[16px] md:text-[18px] font-medium">Tell TALK what you need</span>
           <span className="h-10 w-10 rounded-full bg-[var(--accent)] flex items-center justify-center shrink-0">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
               <path d="M5 12h14M13 6l6 6-6 6" />

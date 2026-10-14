@@ -21,7 +21,7 @@ export default function Home() {
       <Faq />
       <CtaBand
         lines={["Whatever you're carrying,", "you don't have to carry it alone."]}
-        text="Start with a private conversation, in your own language."
+        text="Start with a private conversation — in English, Wolof, Mandinka or Pulaar."
       />
     </>
   );
