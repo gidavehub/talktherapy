@@ -79,6 +79,16 @@ export const PROVIDER_NAV: NavItem[] = [
 ];
 
 /**
+ * A provider whose application has not been approved yet. Their work is the
+ * application itself, which lives at /apply outside this shell; the only
+ * screen of the app they need before approval is their own settings.
+ */
+export const PROVIDER_PENDING_NAV: NavItem[] = [
+  { href: "/apply", label: "Application", icon: <IconBadge />, primary: true },
+  { href: "/settings", label: "Settings", icon: <IconSettings />, primary: true },
+];
+
+/**
  * Staff. Fifteen places, so the rail is grouped: how the service is doing,
  * the people in it, the day-to-day work that waits for a person, the public
  * site, and the staff member's own messages and settings.

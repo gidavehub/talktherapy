@@ -3,46 +3,44 @@
 import { useCallback, useEffect, useState } from "react";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
-import { Input, Select, Textarea } from "@/components/ui/Input";
+import { Input, Textarea } from "@/components/ui/Input";
+import { Dropdown } from "@/components/ui/Dropdown";
 import { Alert, Spinner } from "@/components/ui/Feedback";
 import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/components/AuthProvider";
+import { CharCount, Slider, ToggleChips } from "@/components/apply/fields";
 import {
-  SERVICES,
   SERVICE_LABELS,
   SPECIALIZATIONS,
   SPECIALIZATION_LABELS,
   TOWNS_BY_AREA,
   AREA_LABELS,
   townLabel,
-  type Service,
   type Specialization,
 } from "@/lib/matching";
-import { LOCALE_LABELS, type Locale, type ProviderProfile } from "@/lib/models";
+import { HUMAN_RATE_MAX_MINOR, HUMAN_RATE_MIN_MINOR, LOCALE_LABELS, type Locale, type ProviderProfile } from "@/lib/models";
 import { getOwnProviderProfile, saveProviderProfile, uploadProviderPhoto } from "@/lib/providers";
 import ProviderAvatar from "@/components/providers/ProviderAvatar";
-import { toMajor, toMinor } from "@/lib/money";
+import { formatDalasi, formatDalasiRange, providerPayoutMinor } from "@/lib/money";
+import { BIO_MAX, HEADLINE_MAX } from "@/lib/providerApplication";
 import { SESSION_MINUTES } from "@/lib/booking";
 
 /**
- * A provider's own listing — the thing that decides whether anybody can find
- * them.
+ * A provider's own listing, once they are approved — the thing that decides
+ * whether anybody can find them.
  *
- * Every field here is matched against what someone told Talk they needed, so
+ * Every field here is matched against what someone told TALK they needed, so
  * the form says what each one is FOR rather than just naming it. A provider
  * who leaves languages blank is not making a tidy profile; they are making
  * themselves invisible to everyone who asked to be spoken to in Wolof.
  *
- * `status` is not on this form and cannot be. firestore.rules permits a
- * provider to create their profile only as draft or pending, and permits an
- * update only when the status is unchanged — so nobody lists themselves as
- * verified. What that word means to a patient is that somebody checked.
+ * What was checked when they were approved — the kinds of support they offer
+ * and the qualifications behind it — is shown here but not editable:
+ * firestore.rules keeps it as review left it. Changing it is a conversation
+ * with staff, not a form field.
  */
 
-const LANGUAGE_OPTIONS = (Object.keys(LOCALE_LABELS) as Locale[]).filter(
-  // The four Talk actually speaks. The locale list is wider.
-  (l) => ["en", "wo", "mnk", "ff"].includes(l),
-);
+const LANGUAGE_OPTIONS: Locale[] = ["en", "wo", "mnk", "ff"];
 
 const TOWN_OPTIONS = [
   { value: "", label: "Not saying" },
@@ -57,82 +55,34 @@ const GENDER_OPTIONS = [
   { value: "man", label: "Man" },
 ];
 
-/** A row of toggles. Used for everything a provider can pick more than one of. */
-function Choices<T extends string>({
-  legend,
-  hint,
-  values,
-  labels,
-  selected,
-  onChange,
-}: {
-  legend: string;
-  hint: string;
-  values: readonly T[];
-  labels: Record<T, string>;
-  selected: T[];
-  onChange: (next: T[]) => void;
-}) {
-  return (
-    <fieldset>
-      <legend className="text-[13px] font-medium">{legend}</legend>
-      <p className="mt-1 text-[12px] text-[var(--muted)] leading-relaxed">{hint}</p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {values.map((value) => {
-          const on = selected.includes(value);
-          return (
-            <button
-              key={value}
-              type="button"
-              onClick={() =>
-                onChange(on ? selected.filter((v) => v !== value) : [...selected, value])
-              }
-              aria-pressed={on}
-              className={`rounded-full px-3.5 py-2 text-[12.5px] transition-colors ${
-                on
-                  ? "bg-[var(--accent)] text-white"
-                  : "bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--foreground)]"
-              }`}
-            >
-              {labels[value]}
-            </button>
-          );
-        })}
-      </div>
-    </fieldset>
-  );
-}
+const FEE_STEP = 50_00;
 
 /** What the person reading this needs to know about where their listing stands. */
 function StatusNote({ profile }: { profile: ProviderProfile | null }) {
   if (!profile) {
     return (
-      <Alert tone="info" title="Your profile is not live">
-        Nobody can find you until this is filled in and checked. It usually takes
-        a day or two once you have saved it.
+      <Alert tone="info" title="Your profile is made when you are approved">
+        Once your application is approved, your listing appears here for you to keep up to date.
       </Alert>
     );
   }
   if (profile.status === "verified") {
     return (
       <Alert tone="success" title="Your profile is live">
-        People looking for support can find you, and TALK can suggest you to
-        someone whose needs match what you offer.
+        People looking for support can find you, and TALK can suggest you to someone whose needs match what you offer.
       </Alert>
     );
   }
   if (profile.status === "suspended") {
     return (
       <Alert tone="warning" title="Your profile is not being shown">
-        It has been taken out of the directory. Talk to us before changing
-        anything here.
+        It has been taken out of the directory. Talk to us before changing anything here.
       </Alert>
     );
   }
   return (
     <Alert tone="info" title="Waiting to be checked">
-      You can keep editing while we check it. Saving again does not put you back
-      at the end of the queue.
+      Your profile goes live when your application is approved.
     </Alert>
   );
 }
@@ -149,12 +99,10 @@ export default function ProviderProfileForm() {
   const [displayName, setDisplayName] = useState("");
   const [headline, setHeadline] = useState("");
   const [bio, setBio] = useState("");
-  const [services, setServices] = useState<Service[]>([]);
   const [languages, setLanguages] = useState<Locale[]>([]);
   const [focus, setFocus] = useState<Specialization[]>([]);
-  const [qualifications, setQualifications] = useState("");
   const [years, setYears] = useState("");
-  const [rate, setRate] = useState("");
+  const [rateMinor, setRateMinor] = useState<number>(HUMAN_RATE_MIN_MINOR);
   const [gender, setGender] = useState("");
   const [town, setTown] = useState("");
   const [photoPath, setPhotoPath] = useState<string | null>(null);
@@ -174,17 +122,16 @@ export default function ProviderProfileForm() {
           setDisplayName(found.displayName);
           setHeadline(found.headline);
           setBio(found.bio);
-          setServices(found.services);
           setLanguages(found.languages);
           setFocus(found.specializations as Specialization[]);
-          setQualifications(found.qualifications.join("\n"));
           setYears(String(found.yearsExperience || ""));
-          setRate(String(toMajor(found.sessionRateMinor) || ""));
+          setRateMinor(
+            Math.min(HUMAN_RATE_MAX_MINOR, Math.max(HUMAN_RATE_MIN_MINOR, found.sessionRateMinor || HUMAN_RATE_MIN_MINOR)),
+          );
           setGender(found.gender ?? "");
           setTown(found.location ?? "");
           setPhotoPath(found.photoPath);
         } else {
-          // Their own name is the one thing we already know.
           setDisplayName(account?.displayName ?? "");
         }
       })
@@ -209,10 +156,9 @@ export default function ProviderProfileForm() {
     const missing: string[] = [];
     if (!displayName.trim()) missing.push("your name");
     if (!headline.trim()) missing.push("a line about what you offer");
-    if (services.length === 0) missing.push("at least one service");
     if (languages.length === 0) missing.push("the languages you work in");
-    const rateMajor = Number(rate);
-    if (!Number.isFinite(rateMajor) || rateMajor <= 0) missing.push("your fee per session");
+    if (rateMinor < HUMAN_RATE_MIN_MINOR || rateMinor > HUMAN_RATE_MAX_MINOR)
+      missing.push(`a fee between ${formatDalasiRange(HUMAN_RATE_MIN_MINOR, HUMAN_RATE_MAX_MINOR)}`);
 
     if (missing.length > 0) {
       setError(`Still needed: ${missing.join(", ")}.`);
@@ -226,29 +172,23 @@ export default function ProviderProfileForm() {
         displayName,
         headline,
         bio,
-        services,
         languages,
         specializations: focus,
-        qualifications: qualifications.split("\n"),
         yearsExperience: Math.max(0, Math.round(Number(years) || 0)),
-        sessionRateMinor: toMinor(rateMajor),
+        sessionRateMinor: rateMinor,
         gender: gender === "woman" || gender === "man" ? gender : null,
         location: town || null,
         photoPath,
       });
 
-      const saved = await getOwnProviderProfile(uid);
-      setExisting(saved);
-      toast.success(existing ? "Profile saved" : "Profile sent for checking");
+      setExisting(await getOwnProviderProfile(uid));
+      toast.success("Profile saved");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save your profile.");
     } finally {
       setSaving(false);
     }
-  }, [
-    uid, displayName, headline, bio, services, languages, focus,
-    qualifications, years, rate, gender, town, photoPath, existing, toast,
-  ]);
+  }, [uid, displayName, headline, bio, languages, focus, years, rateMinor, gender, town, photoPath, toast]);
 
   /**
    * Their photo.
@@ -280,9 +220,8 @@ export default function ProviderProfileForm() {
   if (account && account.role !== "provider") {
     return (
       <Alert tone="info" title="This page is for providers">
-        Your account is set up as someone looking for support. If you offer
-        therapy or counselling and want to be listed, talk to us and we will
-        change it over.
+        Your account is set up as someone looking for support. Providers apply to join TALK at talktherapy.gm/apply,
+        with an account of their own.
       </Alert>
     );
   }
@@ -295,8 +234,16 @@ export default function ProviderProfileForm() {
     );
   }
 
+  if (!existing) {
+    return (
+      <div className="max-w-[640px]">
+        <StatusNote profile={null} />
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-[640px] space-y-6">
+    <div className="max-w-[680px] space-y-6">
       <StatusNote profile={existing} />
 
       <Card radius="md" padding="p-6 md:p-8" reveal={false}>
@@ -308,10 +255,10 @@ export default function ProviderProfileForm() {
           <div className="flex items-center gap-4">
             <ProviderAvatar photoPath={photoPath} name={displayName} size={72} />
             <div className="min-w-0">
-              <label className="inline-flex items-center rounded-full bg-[var(--background)] px-4 py-2 text-[12.5px] cursor-pointer hover:bg-[var(--dark)]/[.06] transition-colors">
+              <label className="inline-flex h-10 cursor-pointer items-center rounded-full bg-[var(--background)] px-4 text-[12.5px] transition-colors hover:bg-[var(--dark)]/[.06]">
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/webp"
                   className="hidden"
                   onChange={(e) => {
                     void choosePhoto(e.target.files?.[0]);
@@ -320,9 +267,8 @@ export default function ProviderProfileForm() {
                 />
                 {uploading ? "Uploading…" : photoPath ? "Change photo" : "Add a photo"}
               </label>
-              <p className="mt-1.5 text-[12px] text-[var(--muted)] leading-relaxed">
-                Somebody deciding whether to tell you the worst week of their
-                life would like to see your face first.
+              <p className="mt-1.5 text-[12px] leading-relaxed text-[var(--muted)]">
+                Face to the camera, eyes open, plain background.
               </p>
             </div>
           </div>
@@ -333,92 +279,120 @@ export default function ProviderProfileForm() {
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
           />
-          <Input
-            label="One line about what you offer"
-            hint="The first thing anyone reads. Plain words beat credentials here."
-            value={headline}
-            onChange={(e) => setHeadline(e.target.value)}
-            maxLength={120}
-          />
-          <Textarea
-            label="About you"
-            hint="A short paragraph. What it is like to talk to you matters more than where you studied."
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-            rows={6}
-          />
+          <div>
+            <Input
+              label="One line about what you offer"
+              hint="The first thing anyone reads. Plain words beat credentials here."
+              value={headline}
+              onChange={(e) => setHeadline(e.target.value)}
+              maxLength={HEADLINE_MAX + 20}
+            />
+            <CharCount value={headline} max={HEADLINE_MAX} />
+          </div>
+          <div>
+            <Textarea
+              label="About you"
+              hint="A short paragraph. What it is like to talk to you matters more than where you studied."
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              rows={6}
+            />
+            <CharCount value={bio} max={BIO_MAX} />
+          </div>
         </div>
       </Card>
 
       <Card radius="md" padding="p-6 md:p-8" reveal={false}>
         <div className="space-y-7">
-          <Choices
-            legend="What you offer"
-            hint="Matched directly against what someone asks TALK for."
-            values={SERVICES}
-            labels={SERVICE_LABELS}
-            selected={services}
-            onChange={setServices}
-          />
-          <Choices
+          <div>
+            <p className="block text-[11px] font-medium uppercase tracking-[0.24em] text-[var(--accent)]">What you offer</p>
+            <p className="mt-1 text-[12.5px] leading-relaxed text-[var(--muted)]">
+              Checked when you were approved. To change it, write to us through support.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {existing.services.map((s) => (
+                <span key={s} className="rounded-full bg-[var(--sage-pale)] px-3.5 py-1.5 text-[12.5px] text-[var(--sage-deep)]">
+                  {SERVICE_LABELS[s]}
+                </span>
+              ))}
+            </div>
+          </div>
+          <ToggleChips<Locale>
             legend="Languages you work in"
             hint="The heaviest part of matching. Someone who asks for Wolof sees the providers who speak it first."
-            values={LANGUAGE_OPTIONS}
-            labels={LOCALE_LABELS}
-            selected={languages}
+            options={LANGUAGE_OPTIONS.map((l) => ({ value: l, label: LOCALE_LABELS[l] }))}
+            value={languages}
             onChange={setLanguages}
           />
-          <Choices
+          <ToggleChips<Specialization>
             legend="What you work with"
             hint="Pick what you genuinely have experience in — these decide who is sent to you."
-            values={SPECIALIZATIONS}
-            labels={SPECIALIZATION_LABELS}
-            selected={focus}
+            options={SPECIALIZATIONS.map((s) => ({ value: s, label: SPECIALIZATION_LABELS[s] }))}
+            value={focus}
             onChange={setFocus}
+            max={8}
           />
         </div>
       </Card>
 
       <Card radius="md" padding="p-6 md:p-8" reveal={false}>
-        <div className="space-y-5">
-          <Select
-            label="Where you are"
-            hint="Used to put you in front of people near you. Sessions still happen online, by video or voice call."
-            options={TOWN_OPTIONS}
-            value={town}
-            onChange={(e) => setTown(e.target.value)}
-          />
-          <Select
-            label="Your gender"
-            hint="Shown because many people ask for a woman or a man. It weighs on who is suggested, and the directory can be filtered by it."
-            options={GENDER_OPTIONS}
-            value={gender}
-            onChange={(e) => setGender(e.target.value)}
-          />
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <Dropdown
+              label="Where you are"
+              hint="Puts you in front of people near you. Sessions still happen online."
+              searchable
+              searchPlaceholder="Type to find your town"
+              options={TOWN_OPTIONS}
+              value={town}
+              onChange={setTown}
+            />
+            <Dropdown
+              label="Your gender"
+              hint="Many people ask for a woman or a man."
+              options={GENDER_OPTIONS}
+              value={gender}
+              onChange={setGender}
+            />
+          </div>
           <Input
             label="Years of experience"
             type="number"
+            inputMode="numeric"
             min={0}
             max={60}
             value={years}
             onChange={(e) => setYears(e.target.value)}
           />
-          <Input
-            label="Fee per session, in Dalasi"
-            hint="What one session with you costs. A first conversation with TALK is paid for separately."
-            type="number"
-            min={0}
-            inputMode="numeric"
-            value={rate}
-            onChange={(e) => setRate(e.target.value)}
-          />
-          <Textarea
-            label="Qualifications"
-            hint="One per line. These are shown on your profile and checked before you go live."
-            value={qualifications}
-            onChange={(e) => setQualifications(e.target.value)}
-            rows={4}
-          />
+          <div>
+            <p className="block text-[11px] font-medium uppercase tracking-[0.24em] text-[var(--accent)]">Fee per session</p>
+            <p className="font-display mt-2 text-[40px] font-medium leading-none">{formatDalasi(rateMinor)}</p>
+            <Slider
+              label="Fee per session"
+              value={rateMinor}
+              min={HUMAN_RATE_MIN_MINOR}
+              max={HUMAN_RATE_MAX_MINOR}
+              step={FEE_STEP}
+              onChange={setRateMinor}
+              format={(v) => formatDalasi(v)}
+            />
+            <p className="text-[12.5px] text-[var(--muted)]">
+              You receive {formatDalasi(providerPayoutMinor(rateMinor))} of each session. A first conversation with TALK is
+              paid for separately.
+            </p>
+          </div>
+          <div>
+            <p className="block text-[11px] font-medium uppercase tracking-[0.24em] text-[var(--accent)]">Qualifications</p>
+            <p className="mt-1 text-[12.5px] text-[var(--muted)]">Checked when you were approved.</p>
+            <ul className="mt-3 space-y-1.5 text-[14px]">
+              {existing.qualifications.map((q) => (
+                <li key={q} className="flex gap-2.5">
+                  <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent)]" />
+                  {q}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </Card>
 
@@ -428,11 +402,11 @@ export default function ProviderProfileForm() {
         </Alert>
       ) : null}
 
-      <div className="flex items-center gap-3">
-        <Button onClick={() => void save()} disabled={saving}>
-          {saving ? "Saving…" : existing ? "Save changes" : "Send for checking"}
+      <div className="flex flex-wrap items-center gap-3">
+        <Button onClick={() => void save()} loading={saving}>
+          Save changes
         </Button>
-        <p className="text-[12px] text-[var(--muted)] leading-relaxed">
+        <p className="text-[12px] leading-relaxed text-[var(--muted)]">
           Sessions are {SESSION_MINUTES} minutes, by video or voice call, inside TALK.
         </p>
       </div>

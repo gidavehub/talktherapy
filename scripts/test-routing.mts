@@ -57,6 +57,8 @@ check("signed out: home is Talk", homeFor(null) === "/talk");
 check("a new patient's home is Talk", homeFor(patient(false)) === "/talk");
 check("an onboarded patient's home is the dashboard", homeFor(patient(true)) === "/dashboard");
 check("a verified provider's home is messages", homeFor(provider(true)) === "/chats");
+check("a provider not yet approved goes to their application", homeFor(provider(false)) === "/apply");
+check("a provider not yet approved signing up lands on the application", afterSignIn(provider(false), null) === "/apply");
 check("staff's home is the overview", homeFor(admin) === "/admin");
 
 check("someone set up goes where they were heading", afterSignIn(patient(true), "/settings") === "/settings");

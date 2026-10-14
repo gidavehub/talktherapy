@@ -125,12 +125,31 @@ service cloud.firestore {
         || isSelf(uid)
         || isAdmin();
 
-      // A provider writes their own profile but can never self-approve.
-      allow create: if isSelf(uid)
-        && hasRole('provider')
-        && request.resource.data.status in ['draft', 'pending'];
+      // A listing is made by approval, never by its owner: the
+      // reviewProviderApplication function writes it from the application a
+      // member of staff has just checked. A provider who could create their
+      // own could list themselves with qualifications nobody had seen.
+      allow create: if isAdmin();
 
-      allow update: if (isSelf(uid) && request.resource.data.status == resource.data.status)
+      // The owner may keep their listing up to date — how they describe
+      // themselves, their languages, their fee — and nothing that review
+      // decided. This used to be "anything, as long as status is unchanged",
+      // which let a provider set their own rating, mark themselves a sample
+      // or rewrite the qualifications that were checked. Now it is a list.
+      //
+      // The fee is held to the published range: 70000 and 300000 bututs are
+      // HUMAN_RATE_MIN_MINOR and HUMAN_RATE_MAX_MINOR in app/lib/models.ts.
+      // The photo must be their own, at the path the directory reads.
+      allow update: if (isSelf(uid)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+               'displayName', 'headline', 'bio', 'approach', 'firstSession', 'languages',
+               'specializations', 'ageGroups', 'yearsExperience', 'sessionRateMinor',
+               'gender', 'location', 'photoPath', 'formats', 'updatedAt'])
+          && request.resource.data.sessionRateMinor is int
+          && request.resource.data.sessionRateMinor >= 70000
+          && request.resource.data.sessionRateMinor <= 300000
+          && (request.resource.data.get('photoPath', null) == null
+              || request.resource.data.photoPath == 'avatars/' + uid + '/provider.jpg'))
         || isAdmin();
 
       allow delete: if isAdmin();
@@ -142,26 +161,106 @@ service cloud.firestore {
       // rules. Gating the URL here is what actually restricts access.
       // TODO(security): before public launch, move to Admin-SDK-issued signed
       // URLs with an expiry so a leaked link stops working.
+      //
+      // Superseded by the application (providerApplications below), whose
+      // documents are never handed out as download URLs at all. Kept readable
+      // so nothing already there is lost; nothing new is written here.
       match /privateDocs/{docId} {
         allow read: if isSelf(uid) || isAdmin();
-        allow create, update: if isSelf(uid);
+        allow create, update: if false;
         allow delete: if isSelf(uid) || isAdmin();
       }
     }
 
-    // Credential review queue.
+    // The old credential review queue, replaced by providerApplications.
+    // Readable for what is already there; nothing new is created.
     match /verificationRequests/{requestId} {
       allow get, list: if isAdmin()
         || (isSignedIn() && resource.data.providerId == request.auth.uid);
-      allow create: if isSignedIn()
-        && request.resource.data.providerId == request.auth.uid
-        && request.resource.data.status == 'pending';
-      // Only an admin decides. The applicant cannot move their own request.
+      allow create: if false;
       allow update, delete: if isAdmin();
     }
 
-    // ==== PROVIDER APPLICATIONS (track: providers) ====
-    // ==== END PROVIDER APPLICATIONS ====
+    // -------------------------------------------------- provider applications
+
+    // providerApplications/{uid} — a provider's application to join, filled
+    // in step by step from the browser. See app/lib/providerApplication.ts.
+    //
+    // The applicant writes the step sections of their OWN application, and
+    // only while it is a draft or has been sent back for changes. The status,
+    // the staff message, the history and every decision are written by the
+    // functions alone, so nobody sends, approves or un-rejects themselves.
+    match /providerApplications/{uid} {
+      // APPLICANT_KEYS in app/lib/providerApplication.ts — keep them equal.
+      function applicantKeys() {
+        return ['personal', 'professional', 'qualifications', 'practice', 'fee', 'photo',
+                'documents', 'availability', 'payout', 'agreements', 'lastStep', 'updatedAt'];
+      }
+
+      // Limits a real application never reaches and a script stuffing the
+      // document would. The functions check everything else on submit.
+      function sane(data) {
+        return (!('documents' in data) || (data.documents is list && data.documents.size() <= 12))
+          && (!('qualifications' in data) || (data.qualifications is list && data.qualifications.size() <= 8))
+          && (!('availability' in data) || data.availability.get('ranges', []).size() <= 30);
+      }
+
+      allow get: if isSelf(uid) || isAdmin();
+      allow list: if isAdmin();
+
+      // Started by a provider account, as a draft, as themselves.
+      allow create: if isSelf(uid)
+        && hasRole('provider')
+        && request.resource.data.uid == uid
+        && request.resource.data.status == 'draft'
+        && request.resource.data.keys().hasOnly(applicantKeys().concat(['uid', 'status', 'createdAt']))
+        && sane(request.resource.data);
+
+      allow update: if isSelf(uid)
+        && resource.data.status in ['draft', 'changes_requested']
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(applicantKeys())
+        && sane(request.resource.data);
+
+      // An application is a record of what someone claimed and what was
+      // decided about it. Nobody deletes that from the browser.
+      allow delete: if false;
+    }
+
+    // providerReviews/{uid} — staff's working space for one application: the
+    // checklist, what they made of each document, and their notes. Never
+    // readable by the applicant, which is why it is not on the application.
+    match /providerReviews/{uid} {
+      allow read, write: if isAdmin();
+
+      // Notes are a record, so they are added and never edited, under the
+      // name of whoever wrote them, at the server's time.
+      match /notes/{noteId} {
+        allow read: if isAdmin();
+        allow create: if isAdmin()
+          && request.resource.data.keys().hasOnly(['authorId', 'authorName', 'body', 'createdAt'])
+          && request.resource.data.authorId == request.auth.uid
+          && request.resource.data.authorName is string
+          && request.resource.data.body is string
+          && request.resource.data.body.size() > 0
+          && request.resource.data.body.size() <= 2000
+          && request.resource.data.createdAt == request.time;
+        allow update, delete: if false;
+      }
+    }
+
+    // notifications/{id} — something for one person to see in the app, or for
+    // every member of staff (`to: "staff"`). Written only by the functions.
+    // The one thing a recipient may change is marking it read.
+    match /notifications/{notificationId} {
+      allow get, list: if isSignedIn()
+        && (resource.data.to == request.auth.uid
+            || (resource.data.to == 'staff' && isAdmin()));
+      allow update: if isSignedIn()
+        && resource.data.to == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt'])
+        && request.resource.data.readAt is number;
+      allow create, delete: if false;
+    }
 
     // -------------------------------------------------------- availability
 
@@ -317,7 +416,9 @@ service cloud.firestore {
           // gather other clients into a room — peer groups are a later, more
           // deliberate decision, not something that falls out of this rule.
           (request.resource.data.participants.size() > 2
-            && hasRole('provider')
+            // A provider whose application was APPROVED — not merely an
+            // account that says provider, which anybody can make.
+            && isVerifiedProvider()
             && request.resource.data.createdBy == request.auth.uid
             && request.resource.data.get('group', 'led') in ['led', 'peer']
             // Never at a pair-shaped id: a group made at the id two other

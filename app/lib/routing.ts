@@ -4,10 +4,10 @@ import type { UserDoc } from "./models";
  * Where a person belongs right now. The one rule behind every "get started"
  * button, the sign-in page and the app gate, so they cannot disagree:
  *
- *   signed out               → Talk, who brings sign-in up herself
- *   provider, not yet live   → their profile, which is what makes them live
+ *   signed out               → TALK, who brings sign-in up herself
+ *   provider, not yet live   → their application, which is what makes them live
  *   provider, verified       → their messages
- *   patient, new             → Talk, who does the onboarding by conversation
+ *   patient, new             → TALK, who does the onboarding by conversation
  *   patient, onboarded       → their dashboard
  *   admin                    → the staff overview
  *
@@ -18,11 +18,11 @@ export function homeFor(profile: UserDoc | null): string {
   if (!profile) return "/talk";
 
   // A provider never does the patient intake — being asked "what brings you
-  // here today?" on your first day at work is a bug, not an onboarding. An
-  // unverified one is sent to their profile instead, because until it exists
-  // and is approved no patient can find them, and an empty inbox explains
-  // none of that.
-  if (profile.role === "provider") return profile.verified ? "/chats" : "/pro/profile";
+  // here today?" on your first day at work is a bug, not an onboarding. One
+  // not yet approved is sent to their application instead: until it is sent
+  // and approved no patient can find them, and an empty inbox explains none
+  // of that. /apply itself shows the draft, or where a sent one stands.
+  if (profile.role === "provider") return profile.verified ? "/chats" : "/apply";
   // Staff have no intake either. They land on the overview of the whole
   // service; the review queue is one tap from it.
   if (profile.role === "admin") return "/admin";

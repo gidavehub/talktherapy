@@ -28,6 +28,7 @@
     "../app/lib/matching.ts",
     "../app/lib/models.ts",
     "../app/lib/money.ts",
-    "../app/lib/payouts.ts"
+    "../app/lib/payouts.ts",
+    "../app/lib/providerApplication.ts"
   ]
 }

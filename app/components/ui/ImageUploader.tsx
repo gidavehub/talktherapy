@@ -60,6 +60,8 @@ export default function ImageUploader({
   maxBytes = FIVE_MB,
   accept = DEFAULT_ACCEPT,
   requireAlt = false,
+  describe = true,
+  dropLabel = "Add an image",
   hint,
   disabled = false,
   className = "",
@@ -82,6 +84,14 @@ export default function ImageUploader({
   accept?: string[];
   /** The description must be filled in (it is still the caller who blocks saving). */
   requireAlt?: boolean;
+  /**
+   * Ask for a description at all. Off only where the image is described by
+   * where it is shown — a person's own photo beside their name — rather than
+   * being content that needs words of its own.
+   */
+  describe?: boolean;
+  /** What the empty drop area says. */
+  dropLabel?: string;
   hint?: string;
   disabled?: boolean;
   className?: string;
@@ -296,7 +306,7 @@ export default function ImageUploader({
 
             {/* The description belongs to the finished image, so it waits
                 until there is one. */}
-            {value && !uploading ? (
+            {describe && value && !uploading ? (
               <Input
                 label="Describe the image"
                 value={alt}
@@ -317,7 +327,7 @@ export default function ImageUploader({
             accept={accept}
             maxBytes={maxBytes}
             onFiles={take}
-            label="Add an image"
+            label={dropLabel}
             disabled={disabled}
           />
           {failed ? (

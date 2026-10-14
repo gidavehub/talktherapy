@@ -17,8 +17,6 @@ import {
   getDocs,
   limit,
   query,
-  serverTimestamp,
-  setDoc,
   updateDoc,
   where,
 } from "firebase/firestore";
@@ -230,15 +228,18 @@ export async function uploadProviderPhoto(uid: string, file: File): Promise<stri
   return path;
 }
 
-/** The fields a provider fills in. Everything else is set by us or by review. */
+/**
+ * The fields a provider keeps up to date themselves. What kind of support
+ * they offer and the qualifications behind it are not here: those were
+ * checked when their application was approved, and firestore.rules keeps
+ * them that way.
+ */
 export type ProviderDraft = {
   displayName: string;
   headline: string;
   bio: string;
-  services: Service[];
   languages: Locale[];
   specializations: Specialization[];
-  qualifications: string[];
   yearsExperience: number;
   sessionRateMinor: number;
   gender: "woman" | "man" | null;
@@ -249,30 +250,25 @@ export type ProviderDraft = {
 };
 
 /**
- * Create or update a provider's own public listing.
+ * Update a provider's own public listing.
  *
- * `status` is never in the draft, and that is the point. firestore.rules lets
- * a provider create their profile only as `draft` or `pending`, and lets an
- * update through only when the status is unchanged — so a provider cannot
- * approve themselves. A new profile is therefore created as `pending`, and an
- * update simply omits the field, which leaves whatever review decided.
- *
- * `formats` is always video: Talk's sessions happen in the app, and the type
- * keeps the other values only so the field does not need a migration when
- * that changes.
+ * Update only. A listing is made when an application is approved (the
+ * reviewProviderApplication function), never from the browser, and
+ * firestore.rules lets its owner change only the fields in ProviderDraft —
+ * with the fee held to the published range.
  */
 export async function saveProviderProfile(uid: string, draft: ProviderDraft): Promise<void> {
   const ref = doc(firestore(), COLLECTIONS.providerProfiles, uid);
-  const existing = await getDoc(ref);
+  if (!(await getDoc(ref)).exists()) {
+    throw new Error("Your profile is created when your application is approved.");
+  }
 
-  const fields = {
+  await updateDoc(ref, {
     displayName: draft.displayName.trim(),
     headline: draft.headline.trim(),
     bio: draft.bio.trim(),
-    services: draft.services,
     languages: draft.languages,
     specializations: draft.specializations,
-    qualifications: draft.qualifications.map((q) => q.trim()).filter(Boolean),
     yearsExperience: draft.yearsExperience,
     sessionRateMinor: draft.sessionRateMinor,
     gender: draft.gender,
@@ -280,28 +276,7 @@ export async function saveProviderProfile(uid: string, draft: ProviderDraft): Pr
     // Only written when the form has one, so saving the rest of the profile
     // never clears a photo that is already there.
     ...(draft.photoPath !== undefined ? { photoPath: draft.photoPath } : {}),
-    formats: ["video"] as SessionFormat[],
-    updatedAt: serverTimestamp(),
-  };
-
-  if (existing.exists()) {
-    await updateDoc(ref, fields);
-    return;
-  }
-
-  await setDoc(ref, {
-    ...fields,
-    uid,
-    // Straight to pending: there is no save-as-draft in the UI, so a profile
-    // that exists is one its owner wants reviewed.
-    status: "pending",
-    photoPath: draft.photoPath ?? null,
-    ratingAvg: 0,
-    ratingCount: 0,
-    timezone: "Africa/Banjul",
-    // Never true from the app. Only the seed script writes sample profiles.
-    sample: false,
-    createdAt: serverTimestamp(),
+    updatedAt: Date.now(),
   });
 }
 

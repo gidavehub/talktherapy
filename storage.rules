@@ -1,15 +1,17 @@
 rules_version = '2';
 
-// Talk — Cloud Storage security rules.
+// TALK — Cloud Storage security rules.
 //
-// Two limitations shape everything below, and both are worth knowing before
-// you trust these rules:
+// Two things shape everything below, and both are worth knowing before you
+// trust these rules:
 //
-// 1. Storage rules CANNOT read Firestore. There is no way to ask "is this
-//    user an admin?" here without custom claims, which need the Admin SDK
-//    (Blaze plan). So role-gated writes are expressed by path ownership
-//    instead, and the authoritative admin check lives in firestore.rules on
-//    the document that *references* the file.
+// 1. These rules do not read Firestore. Staff are recognised by the `admin`
+//    custom claim on their ID token instead, which the functions set and
+//    clear whenever someone's role changes (setAdminClaim in
+//    functions/src/staff.ts) and which an admin's browser refreshes on the
+//    way into the staff pages. Everything else is expressed by path
+//    ownership, with the authoritative checks in firestore.rules on the
+//    document that *references* the file.
 //
 // 2. getDownloadURL() mints a capability URL containing a token. That URL
 //    bypasses these rules entirely — anyone holding it can fetch the object.
@@ -41,6 +43,12 @@ service firebase.storage {
       return request.resource.size < n * 1024 * 1024;
     }
 
+    // Staff, by the custom claim (see the note at the top). `get` with a
+    // default, so a token without the claim is a plain no, not an error.
+    function isStaff() {
+      return isSignedIn() && request.auth.token.get('admin', false) == true;
+    }
+
     // ---------------------------------------------------------------- avatars
     // Profile photos. Publicly readable because they appear in the provider
     // directory, which is browsable before sign-in.
@@ -51,22 +59,22 @@ service firebase.storage {
     }
 
     // ----------------------------------------------------- provider documents
-    // Certificates, licences, government ID. The most sensitive files in the
-    // system after the journals.
+    // Certificates, licences, government ID and the photo sent with an
+    // application. The most sensitive files in the system after the journals.
     //
-    // Owner-only here. Admin review works by reading the URL recorded in
-    // providerProfiles/{uid}/privateDocs/{docId}, which firestore.rules
-    // restricts to the owner and admins.
+    // The applicant uploads and reads their own; staff read them to review
+    // the application. Both read with getBlob(), which these rules govern —
+    // never a download URL, which is a capability anyone it is forwarded to
+    // could use. PDF and the three image types a reviewer's browser can
+    // show, at most 10 MB: DOC_ACCEPT and DOC_MAX_BYTES in
+    // app/lib/providerApplication.ts say the same.
     match /provider-credentials/{uid}/{fileName} {
-      allow read: if isOwner(uid);
-      allow write: if isOwner(uid)
+      allow read: if isOwner(uid) || isStaff();
+      allow create, update: if isOwner(uid)
         && underMB(10)
-        && (isImage() || request.resource.contentType == 'application/pdf');
+        && request.resource.contentType.matches('application/pdf|image/jpeg|image/png|image/webp');
       allow delete: if isOwner(uid);
     }
-
-    // ==== PROVIDER CREDENTIALS (track: providers) ====
-    // ==== END PROVIDER CREDENTIALS ====
 
     // -------------------------------------------------------- resource media
     // Art and audio for the Wellbeing Resource Centre. Published resources are

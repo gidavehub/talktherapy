@@ -7,7 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "../AuthProvider";
 import AppShell from "../ui/AppShell";
 import LogoLoader from "../ui/LogoLoader";
-import { ADMIN_NAV, PATIENT_NAV, PROVIDER_NAV } from "../../lib/nav";
+import { ADMIN_NAV, PATIENT_NAV, PROVIDER_NAV, PROVIDER_PENDING_NAV } from "../../lib/nav";
 import { useUnreadCount } from "../../lib/useUnread";
 
 /**
@@ -46,6 +46,16 @@ function openBeforeOnboarding(pathname: string): boolean {
   return ["/settings", "/mood", "/journal"].some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
+/**
+ * What a provider can reach before their application is approved: their own
+ * settings, and nothing that assumes they are live — no inbox nobody can
+ * write to, no hours nobody can book, no earnings. Everything else is the
+ * application, at /apply.
+ */
+function openBeforeApproval(pathname: string): boolean {
+  return pathname === "/settings" || pathname.startsWith("/settings/");
+}
+
 export default function AppGate({ children }: { children: React.ReactNode }) {
   const { user, profile, ready } = useAuth();
   const unread = useUnreadCount();
@@ -81,6 +91,11 @@ export default function AppGate({ children }: { children: React.ReactNode }) {
     if (profile.role === "patient" && !profile.onboarded && !openBeforeOnboarding(pathname)) {
       router.replace(TALK);
     }
+
+    // A provider not yet approved has one job here, and it is the application.
+    if (profile.role === "provider" && !profile.verified && !openBeforeApproval(pathname)) {
+      router.replace("/apply");
+    }
   }, [ready, user, profile, router, pathname]);
 
   if (!ready) return <Splash label="Checking your session" />;
@@ -91,9 +106,19 @@ export default function AppGate({ children }: { children: React.ReactNode }) {
   if (profile.role === "patient" && !profile.onboarded && !openBeforeOnboarding(pathname)) {
     return <Splash label="Taking you to TALK" />;
   }
+  if (isProvider && !profile.verified && !openBeforeApproval(pathname)) {
+    return <Splash label="Opening your application" />;
+  }
 
   // Messages carries the count of what is waiting, on both sides of the app.
-  const nav = (isProvider ? PROVIDER_NAV : profile.role === "admin" ? ADMIN_NAV : PATIENT_NAV).map((item) =>
+  const roleNav = isProvider
+    ? profile.verified
+      ? PROVIDER_NAV
+      : PROVIDER_PENDING_NAV
+    : profile.role === "admin"
+      ? ADMIN_NAV
+      : PATIENT_NAV;
+  const nav = roleNav.map((item) =>
     item.href === "/chats" && unread > 0 ? { ...item, badge: unread } : item,
   );
 

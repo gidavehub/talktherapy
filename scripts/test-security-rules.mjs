@@ -27,6 +27,7 @@ const PATIENT = "patient-uid";
 const PROVIDER = "provider-uid";
 const STRANGER = "stranger-uid";
 const ADMIN = "admin-uid";
+const UNVERIFIED = "unverified-provider-uid";
 const CHAT = `${PATIENT}__${PROVIDER}`;
 
 /** A chat document as `openChat` writes it. */
@@ -190,6 +191,10 @@ const CASES = [
   // clients into a room.
   ["a provider starts a group session", "ALLOW", PROVIDER, "create", `${DOCS}/chats/group_1`, null,
     { ...chat, participants: [PATIENT, PROVIDER, STRANGER], title: "Thursday group", createdBy: PROVIDER }],
+  // A provider ACCOUNT is not enough — anybody can make one. Only one whose
+  // application was approved leads a group.
+  ["a provider not yet approved starts a group", "DENY", UNVERIFIED, "create", `${DOCS}/chats/group_6`, null,
+    { ...chat, participants: [PATIENT, UNVERIFIED, STRANGER], title: "Thursday group", createdBy: UNVERIFIED }],
   ["a patient starts a group", "DENY", PATIENT, "create", `${DOCS}/chats/group_2`, null,
     { ...chat, participants: [PATIENT, PROVIDER, STRANGER], title: "Our group", createdBy: PATIENT }],
   ["a provider starts a group in somebody else's name", "DENY", PROVIDER, "create", `${DOCS}/chats/group_3`, null,
@@ -278,7 +283,9 @@ const CASES = [
   // --- a provider's own listing ------------------------------------------
   // The whole point of "verified" is that somebody else checked, so the one
   // thing a provider must not be able to write is that word.
-  ["listing yourself for review", "ALLOW", PROVIDER, "create", `${DOCS}/providerProfiles/${PROVIDER}`,
+  // A listing is made by approval (reviewProviderApplication), never by its
+  // owner — so even a plain "pending" one is refused from the browser.
+  ["listing yourself for review", "DENY", PROVIDER, "create", `${DOCS}/providerProfiles/${PROVIDER}`,
     null, listing],
   ["listing yourself as already verified", "DENY", PROVIDER, "create", `${DOCS}/providerProfiles/${PROVIDER}`,
     null, { ...listing, status: "verified" }],
@@ -292,6 +299,26 @@ const CASES = [
     listing, { ...listing, headline: "Not theirs to write" }],
   ["a patient listing themselves as a provider", "DENY", PATIENT, "create", `${DOCS}/providerProfiles/${PATIENT}`,
     null, { ...listing, uid: PATIENT }],
+  // What the owner may change is a list: how they describe themselves and
+  // their fee, within the published range. Not what review decided.
+  ["changing your own fee within the range", "ALLOW", PROVIDER, "update", `${DOCS}/providerProfiles/${PROVIDER}`,
+    listing, { ...listing, sessionRateMinor: 150000 }],
+  ["a fee below the range", "DENY", PROVIDER, "update", `${DOCS}/providerProfiles/${PROVIDER}`,
+    listing, { ...listing, sessionRateMinor: 50000 }],
+  ["a fee above the range", "DENY", PROVIDER, "update", `${DOCS}/providerProfiles/${PROVIDER}`,
+    listing, { ...listing, sessionRateMinor: 350000 }],
+  ["giving yourself a rating", "DENY", PROVIDER, "update", `${DOCS}/providerProfiles/${PROVIDER}`,
+    listing, { ...listing, ratingAvg: 5, ratingCount: 40 }],
+  ["rewriting the qualifications that were checked", "DENY", PROVIDER, "update", `${DOCS}/providerProfiles/${PROVIDER}`,
+    listing, { ...listing, qualifications: ["PhD, Oxford"] }],
+  ["marking yourself a sample", "DENY", PROVIDER, "update", `${DOCS}/providerProfiles/${PROVIDER}`,
+    listing, { ...listing, sample: true }],
+  ["pointing your photo at somebody else's", "DENY", PROVIDER, "update", `${DOCS}/providerProfiles/${PROVIDER}`,
+    listing, { ...listing, photoPath: `avatars/${STRANGER}/provider.jpg` }],
+  ["your own photo", "ALLOW", PROVIDER, "update", `${DOCS}/providerProfiles/${PROVIDER}`,
+    listing, { ...listing, photoPath: `avatars/${PROVIDER}/provider.jpg` }],
+  ["staff list a provider", "ALLOW", ADMIN, "create", `${DOCS}/providerProfiles/${PROVIDER}`,
+    null, { ...listing, status: "verified" }],
   // The public directory: a verified profile is readable by anyone, including
   // somebody who has not signed in. One that is still being checked is not.
   ["anyone reads a verified listing", "ALLOW", null, "get", `${DOCS}/providerProfiles/${PROVIDER}`,
@@ -487,14 +514,16 @@ const parentChatMock = {
  * whoever is acting.
  */
 const userDocMocks = [
-  [PROVIDER, "provider"],
-  [PATIENT, "patient"],
-  [STRANGER, "patient"],
-  [ADMIN, "admin"],
-].map(([uid, role]) => ({
+  [PROVIDER, "provider", true],
+  [PATIENT, "patient", true],
+  [STRANGER, "patient", true],
+  [ADMIN, "admin", true],
+  // A provider account whose application has not been approved.
+  [UNVERIFIED, "provider", false],
+].map(([uid, role, verified]) => ({
   function: "get",
   args: [{ exactValue: `${DOCS}/users/${uid}` }],
-  result: { value: { data: { uid, role } } },
+  result: { value: { data: { uid, role, verified } } },
 }));
 
 const testCase = ([, expectation, uid, method, path, existing, incoming]) => ({
