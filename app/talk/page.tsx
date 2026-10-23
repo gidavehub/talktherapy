@@ -35,7 +35,7 @@ import SpokenCaption from "@/components/onboarding/SpokenCaption";
 import AuthCard from "@/components/AuthCard";
 import Modal from "@/components/ui/Modal";
 import { useVoice, voice } from "@/lib/audio/lines";
-import { useConsultation } from "@/lib/payments/consultation";
+import { useConsultation, useFreeTalk } from "@/lib/payments/consultation";
 import { afterSignIn, isSettled, safeNext } from "@/lib/routing";
 import { AI_TIERS, type AiTierId } from "@/lib/models";
 import { useTalkSessionReport } from "@/lib/analytics/reportTalkSession";
@@ -124,6 +124,11 @@ function Talk() {
   // the guardian form first, then their conversation.
   const { open: openProvider, guardian } = useOpenProvider();
   const { user, profile, ready } = useAuth();
+  // The owner's own access: talks to TALK as often as they like, without
+  // paying — and, though their account is staff, is not sent off to the
+  // staff pages. Null while it is being read.
+  const free = useFreeTalk();
+  const staffTalking = profile?.role === "admin" && free === true;
 
   // From the URL: ?intake redoes the intake for someone already set up;
   // ?debug shows capture diagnostics; ?signin came from a Sign in control
@@ -138,7 +143,7 @@ function Talk() {
   // first day at work is a bug, and the answer would be filed as their notes.
   const intakeMode =
     profile?.role !== "provider" &&
-    profile?.role !== "admin" &&
+    (profile?.role !== "admin" || staffTalking) &&
     (params.has("intake") || Boolean(profile && !profile.onboarded));
   const next = safeNext(params.get("next"));
   const showDebug = params.has("debug");
@@ -311,7 +316,7 @@ function Talk() {
   const tier = intakeMode ? "initial" : "extended";
   // ?paid: a checkout brought them back to this tab, which may never have
   // learned the payment's id — it is on its way all the same.
-  const consultation = useConsultation(tier, { expecting: params.has("paid") });
+  const consultation = useConsultation(tier, { expecting: params.has("paid"), free });
   const { paid, prepare } = consultation;
   const price = formatDalasi(AI_TIERS[tier].amountMinor);
   const payLines = PAY_LINES[tier];
@@ -343,9 +348,11 @@ function Talk() {
   // whichever of the two runs last, they agree.
   useEffect(() => {
     if (profile?.role !== "provider" && profile?.role !== "admin") return;
+    // Staff with free access stay and talk; wait until that is known.
+    if (profile.role === "admin" && free !== false) return;
     voice.forget();
     router.replace(afterSignIn(profile, next));
-  }, [next, profile, router]);
+  }, [next, profile, router, free]);
 
   // ---- the doorway --------------------------------------------------------
   // Talk runs the way in, from this screen, in her recorded voice (English,
@@ -486,7 +493,7 @@ function Talk() {
   const decided = useRef(false);
   useEffect(() => {
     if (decided.current || concluded.current || !ready || !user || !profile) return;
-    if (heard.saying || paid === null || talk.active || profile.role !== "patient") return;
+    if (heard.saying || paid === null || talk.active || (profile.role !== "patient" && !staffTalking)) return;
     if (!paid) {
       decided.current = true;
       // Build her voice into the graph first, so the particles follow it.

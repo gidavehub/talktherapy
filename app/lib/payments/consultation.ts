@@ -135,7 +135,44 @@ export type PaymentPhase =
  * `expecting`: this page was opened by a checkout coming back, so a payment
  * is on its way even if this tab never learned its id.
  */
-export function useConsultation(tier: AiTierId, { expecting = false }: { expecting?: boolean } = {}) {
+/**
+ * Whether this account talks to TALK for free — the owner's own access, the
+ * `talkFree` claim set by scripts/grant-free-talk.mjs. Null while it is being
+ * read. A fresh token is asked for once, so access granted since the last
+ * sign-in counts straight away, here and in every request the conversation
+ * then makes with that token.
+ */
+export function useFreeTalk(): boolean | null {
+  const { user, ready } = useAuth();
+  const [read, setRead] = useState<{ uid: string; free: boolean } | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    user
+      .getIdTokenResult(true)
+      .then((token) => {
+        if (!cancelled) setRead({ uid: user.uid, free: token.claims.talkFree === true });
+      })
+      .catch(() => {
+        if (!cancelled) setRead({ uid: user.uid, free: false });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+  if (!ready) return null;
+  if (!user) return false;
+  return read && read.uid === user.uid ? read.free : null;
+}
+
+/**
+ * `free` (from useFreeTalk): an account that never pays — always paid, with
+ * no paid clock to start and no window to count down.
+ */
+export function useConsultation(
+  tier: AiTierId,
+  { expecting = false, free = false }: { expecting?: boolean; free?: boolean | null } = {},
+) {
   const { user } = useAuth();
   const uid = user?.uid ?? null;
   const now = useNow(15_000);
@@ -158,9 +195,11 @@ export function useConsultation(tier: AiTierId, { expecting = false }: { expecti
   const covers = tier === "initial" ? "intake" : "companion";
   const paid = !uid
     ? false
-    : known === undefined
-      ? null
-      : Boolean(known && entitlementActive(known, now) && tierCovers(known.aiTier, covers));
+    : free === true
+      ? true
+      : known === undefined || free === null
+        ? null
+        : Boolean(known && entitlementActive(known, now) && tierCovers(known.aiTier, covers));
 
   // Paid: the payment in flight is settled; nothing left to remember.
   useEffect(() => {
@@ -263,14 +302,17 @@ export function useConsultation(tier: AiTierId, { expecting = false }: { expecti
    */
   const prepare = useCallback(async () => {
     if (!user) return false;
+    // Nothing to start: free access has no clock.
+    if (free === true) return true;
     const ok = await claimConsultation();
     if (ok) await user.getIdToken(true).catch(() => null);
     return ok;
-  }, [user]);
+  }, [user, free]);
 
   return {
     paid,
-    entitlement: known ?? null,
+    // No window to count down for free access, whatever an old payment says.
+    entitlement: free === true ? null : (known ?? null),
     phase,
     error,
     slow,

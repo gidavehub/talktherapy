@@ -80,10 +80,20 @@ export async function callerUid(req: Request): Promise<string | null> {
  * payment functions — see grantClaim in ../index.ts), so it is covered by the
  * same signature check and needs no database read. That matters here: these
  * functions run as an identity that cannot read the database at all.
+ *
+ * `talkFree` is the owner's own access: an account that talks to TALK as
+ * often as it likes without paying. Set only with scripts/grant-free-talk.mjs
+ * (the service account), never by anything in the app.
  */
 export async function callerClaims(
   req: Request,
-): Promise<{ uid: string; aiTier: string | null; aiExpiresAt: number | null; aiEndsAt: number | null } | null> {
+): Promise<{
+  uid: string;
+  aiTier: string | null;
+  aiExpiresAt: number | null;
+  aiEndsAt: number | null;
+  talkFree: boolean;
+} | null> {
   const header = req.get("authorization") ?? "";
   const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
   if (!token) return null;
@@ -94,6 +104,7 @@ export async function callerClaims(
       aiTier: typeof decoded.aiTier === "string" ? decoded.aiTier : null,
       aiExpiresAt: typeof decoded.aiExpiresAt === "number" ? decoded.aiExpiresAt : null,
       aiEndsAt: typeof decoded.aiEndsAt === "number" ? decoded.aiEndsAt : null,
+      talkFree: decoded.talkFree === true,
     };
   } catch {
     return null;

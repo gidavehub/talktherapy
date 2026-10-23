@@ -147,7 +147,9 @@ async function entry(
   // that is not an object.
   const body = (req.body ?? {}) as Record<string, unknown>;
 
-  if (paid && gateOn()) {
+  // An account with free access (talkFree — the owner's) is never asked to
+  // pay. Everything else here still applies to it, the rate limit included.
+  if (paid && gateOn() && !caller.talkFree) {
     const refusal = consultationRefusal(caller, body);
     if (refusal) {
       json(res, 402, refusal);
